@@ -1,0 +1,2058 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Repulsor HUD</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: #7fe9ff;
+    font-family: Consolas, "SF Mono", Menlo, monospace; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  video { display: none; }
+  #start { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 22px;
+    background: radial-gradient(circle at center, #04202b 0%, #000 70%); }
+  #start h1 { margin: 0; font-weight: 400; font-size: 30px; letter-spacing: .45em;
+    text-shadow: 0 0 14px #2ad4ff; }
+  #start p { margin: 0; font-size: 13px; line-height: 1.9; letter-spacing: .08em;
+    text-align: center; opacity: .75; }
+  #go { background: transparent; color: #bff6ff; border: 1px solid #2ad4ff; padding: 12px 36px;
+    font: inherit; letter-spacing: .3em; cursor: pointer;
+    box-shadow: 0 0 18px #2ad4ff55 inset, 0 0 18px #2ad4ff33; }
+  #go:hover { background: #2ad4ff22; }
+  #go:disabled { opacity: .5; cursor: wait; }
+  #status { font-size: 12px; min-height: 1em; opacity: .85; }
+
+  #ui { position: fixed; top: 16px; right: 16px; z-index: 1; display: flex; flex-direction: column;
+    align-items: flex-end; gap: 8px; max-width: calc(100vw - 32px); }
+  #ui[hidden] { display: none; }
+  #tab { background: rgba(2,16,26,.82); color: #bff6ff; border: 1px solid #2ad4ff66; padding: 7px 14px;
+    font: inherit; font-size: 12px; letter-spacing: .25em; cursor: pointer; }
+  #panel { width: 250px; max-width: 100%; max-height: calc(100vh - 90px); overflow-y: auto; box-sizing: border-box;
+    padding: 14px; background: rgba(2,16,26,.82); border: 1px solid #2ad4ff55;
+    box-shadow: 0 0 24px #2ad4ff22; backdrop-filter: blur(6px); }
+  #panel.collapsed { display: none; }
+  #panel h2 { margin: 0 0 10px; font-size: 11px; font-weight: 400; letter-spacing: .3em; opacity: .65; }
+  #panel h2:not(:first-child) { margin-top: 16px; }
+  .power { display: block; width: 100%; margin-bottom: 10px; padding: 12px; text-align: left; cursor: pointer;
+    background: transparent; color: #cfefff; border: 1px solid #ffffff22; font: inherit; opacity: .5;
+    transition: opacity .15s, border-color .15s, box-shadow .15s; }
+  .power[aria-pressed="true"] { opacity: 1; border-color: var(--accent); box-shadow: inset 0 0 18px var(--glow), 0 0 14px var(--glow); }
+  .power .name { display: block; font-size: 15px; letter-spacing: .2em; color: var(--accent); }
+  .power .name::after { content: "OFF"; float: right; font-size: 10px; letter-spacing: .15em; color: #8aa3ad; }
+  .power[aria-pressed="true"] .name::after { content: "ON"; color: var(--accent); }
+  .power .desc { display: block; margin-top: 5px; font-size: 11px; line-height: 1.55; opacity: .8; }
+  .swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin: -2px 0 12px; }
+  .swatch { width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 2px solid #ffffff33; cursor: pointer; }
+  .swatch[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 10px #ffffffaa; }
+  #spinPick { width: 28px; height: 26px; padding: 0; border: 0; background: none; cursor: pointer; }
+  .swatch:focus-visible, #spinPick:focus-visible { outline: 1px solid #2ad4ff; outline-offset: 2px; }
+  .opt { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 6px 0;
+    background: none; border: 0; color: #bfe9f7; font: inherit; font-size: 12px; cursor: pointer; }
+  .opt .key, .power .key { opacity: .45; font-size: 10px; margin-left: 6px; }
+  .sw { position: relative; width: 30px; height: 14px; border-radius: 7px; background: #ffffff22; flex: none; }
+  .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 50%;
+    background: #8aa3ad; transition: left .15s; }
+  .opt[aria-pressed="true"] .sw { background: #2ad4ff66; }
+  .opt[aria-pressed="true"] .sw::after { left: 18px; background: #bff6ff; }
+  .power:focus-visible, .opt:focus-visible, #tab:focus-visible { outline: 1px solid #2ad4ff; outline-offset: 2px; }
+</style>
+</head>
+<body>
+<video id="video" playsinline muted></video>
+<canvas id="c"></canvas>
+<div id="start">
+  <h1>REPULSOR&nbsp;HUD</h1>
+  <p>
+    ✊ make a fist — charge the repulsor<br>
+    🖐 snap your hand open — release the blast<br>
+    🖐 hold your palm open — fire the repulsor beam<br>
+    👥 two or more people — blasts deal damage, closer hits hurt more<br>
+    💪 flex both arms and hold — power up your aura (again for blue, then white)<br>
+    🌪 spin a full 360, or swing both arms across fast — Spinjitzu tornado<br>
+    🔥 punch or throw fast — shoot an elemental ball<br>
+    🕸 index + pinky up, middle + ring down — shoot webs<br><br>
+    pick your superpowers in the side panel (P) · F fullscreen
+  </p>
+  <button id="go">INITIALIZE</button>
+  <div id="status"></div>
+</div>
+<div id="ui" hidden>
+  <button id="tab" aria-expanded="true" aria-controls="panel">POWERS</button>
+  <aside id="panel">
+    <h2>SUPERPOWERS</h2>
+    <button class="power" data-setting="ironman" style="--accent:#ff6a4a;--glow:#ff4a2a33">
+      <span class="name">IRON MAN</span>
+      <span class="desc">Fist to charge · snap open to blast · hold palm open for the beam<span class="key">I</span></span>
+    </button>
+    <button class="power" data-setting="goku" style="--accent:#ffc83a;--glow:#ffb81a33">
+      <span class="name">GOKU</span>
+      <span class="desc">Flex both arms and hold to power up a yellow aura · release and flex again for blue, then white<span class="key">G</span></span>
+    </button>
+    <button class="power" id="spinCard" data-setting="spinjitzu">
+      <span class="name">SPINJITZU</span>
+      <span class="desc">Spin a full 360, or swing both arms across your body fast, for a 5-second tornado · punch or throw to shoot elemental balls<span class="key">J</span></span>
+    </button>
+    <div class="swatches" role="group" aria-label="Tornado color">
+      <button class="swatch" data-color="255,70,40" style="background:rgb(255,70,40)" aria-label="Fire red" title="Fire"></button>
+      <button class="swatch" data-color="60,150,255" style="background:rgb(60,150,255)" aria-label="Lightning blue" title="Lightning"></button>
+      <button class="swatch" data-color="215,240,255" style="background:rgb(215,240,255)" aria-label="Ice white" title="Ice"></button>
+      <button class="swatch" data-color="60,255,120" style="background:rgb(60,255,120)" aria-label="Energy green" title="Energy"></button>
+      <button class="swatch" data-color="230,150,60" style="background:rgb(230,150,60)" aria-label="Earth amber" title="Earth"></button>
+      <button class="swatch" data-color="255,205,40" style="background:rgb(255,205,40)" aria-label="Golden" title="Golden"></button>
+      <button class="swatch" data-color="180,90,255" style="background:rgb(180,90,255)" aria-label="Purple" title="Purple"></button>
+      <input type="color" id="spinPick" aria-label="Custom tornado color" title="Custom color">
+    </div>
+    <button class="power" data-setting="spiderman" style="--accent:#ff4a4a;--glow:#ff2a2a33">
+      <span class="name">SPIDER-MAN</span>
+      <span class="desc">Web-shooter sign (index + pinky up, middle + ring down) shoots webs · hold to keep firing<span class="key">W</span></span>
+    </button>
+    <h2>DISPLAY</h2>
+    <button class="opt" data-setting="video"><span>Camera video<span class="key">V</span></span><span class="sw"></span></button>
+    <button class="opt" data-setting="skeleton"><span>Skeletons<span class="key">H</span></span><span class="sw"></span></button>
+    <button class="opt" data-setting="silhouettes"><span>Body outlines<span class="key">S</span></span><span class="sw"></span></button>
+    <button class="opt" data-setting="muted" data-invert><span>Sound<span class="key">M</span></span><span class="sw"></span></button>
+  </aside>
+</div>
+
+<script type="module">
+import { HandLandmarker, PoseLandmarker, FilesetResolver } from
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+
+const WASM_PATH = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
+const HAND_MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+const POSE_MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+const POSE_WIDTH = 320;     // pose runs on a downscaled frame; masks come back at this size
+const PLAYER_COLORS = [[90, 220, 255], [255, 170, 60], [120, 255, 140], [255, 100, 220]];
+
+const MAX_HEALTH = 100;
+const MAX_DAMAGE = 45;      // full-charge blast at point-blank range
+const KO_SECONDS = 3;
+const BEAM_DPS = 35;        // health per second while the beam is on someone
+
+// Landmark indices: 0 wrist, [pip, tip] per non-thumb finger below.
+const FINGERS = [
+  { pip: 6,  tip: 8  },  // index
+  { pip: 10, tip: 12 },  // middle
+  { pip: 14, tip: 16 },  // ring
+  { pip: 18, tip: 20 },  // pinky
+];
+const POSE_CONNECTIONS = [
+  [11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],
+  [27,29],[29,31],[27,31],[28,30],[30,32],[28,32],[15,17],[15,19],[15,21],[17,19],[16,18],[16,20],
+  [16,22],[18,20],[0,1],[1,2],[2,3],[3,7],[0,4],[4,5],[5,6],[6,8],[9,10],
+];
+const CONNECTIONS = [
+  [0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+  [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17],
+];
+
+const video = document.getElementById("video");
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+const startEl = document.getElementById("start");
+const goBtn = document.getElementById("go");
+const statusEl = document.getElementById("status");
+
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  canvas.width = Math.round(W * DPR);
+  canvas.height = Math.round(H * DPR);
+}
+addEventListener("resize", resize);
+resize();
+
+const settings = { ironman: true, goku: true, spinjitzu: true, spinColor: "255,70,40", spiderman: true,
+  video: true, skeleton: true, silhouettes: true, muted: false };
+let clock = 0;   // timestamp of the current frame
+
+// ---------------------------------------------------------------- audio
+
+class Sfx {
+  init() {
+    const ac = this.ac = new (window.AudioContext || window.webkitAudioContext)();
+    this.master = ac.createGain();
+    this.master.gain.value = 0.6;
+    this.master.connect(ac.destination);
+
+    // white noise buffer reused by blasts
+    this.noise = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+    const d = this.noise.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+
+    // beam hum: two detuned saws through a wobbling resonant lowpass
+    this.beamGain = ac.createGain();
+    this.beamGain.gain.value = 0;
+    const lf = ac.createBiquadFilter();
+    lf.type = "lowpass"; lf.frequency.value = 1800; lf.Q.value = 6;
+    for (const f of [140, 143.5]) {
+      const o = ac.createOscillator();
+      o.type = "sawtooth"; o.frequency.value = f; o.connect(lf); o.start();
+    }
+    const wobble = ac.createOscillator(), wobbleAmt = ac.createGain();
+    wobble.frequency.value = 7; wobbleAmt.gain.value = 400;
+    wobble.connect(wobbleAmt).connect(lf.frequency); wobble.start();
+    lf.connect(this.beamGain).connect(this.master);
+
+    // charge whine: pitch follows charge level
+    this.chargeOsc = ac.createOscillator();
+    this.chargeOsc.type = "triangle"; this.chargeOsc.frequency.value = 200;
+    this.chargeGain = ac.createGain(); this.chargeGain.gain.value = 0;
+    this.chargeOsc.connect(this.chargeGain).connect(this.master);
+    this.chargeOsc.start();
+
+    // tornado wind: looping noise through a bandpass
+    const wind = ac.createBufferSource();
+    wind.buffer = this.noise; wind.loop = true;
+    this.windFilter = ac.createBiquadFilter();
+    this.windFilter.type = "bandpass"; this.windFilter.frequency.value = 400; this.windFilter.Q.value = 0.7;
+    this.windGain = ac.createGain(); this.windGain.gain.value = 0;
+    wind.connect(this.windFilter).connect(this.windGain).connect(this.master);
+    wind.start();
+  }
+  setWind(level) {
+    if (!this.ready) return;
+    const t = this.ac.currentTime;
+    this.windGain.gain.setTargetAtTime(level * 0.35, t, 0.1);
+    this.windFilter.frequency.setTargetAtTime(300 + 900 * level + 200 * Math.sin(t * 6), t, 0.1);
+  }
+  fireball() {
+    if (!this.ready) return;
+    const ac = this.ac, t = ac.currentTime;
+    const src = ac.createBufferSource(); src.buffer = this.noise;
+    const f = ac.createBiquadFilter(); f.type = "bandpass"; f.Q.value = 2;
+    f.frequency.setValueAtTime(2200, t); f.frequency.exponentialRampToValueAtTime(450, t + 0.3);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.4, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    src.connect(f).connect(g).connect(this.master);
+    src.start(t); src.stop(t + 0.4);
+    this.tone("sine", 320, 110, 0.25, 0.2);
+  }
+  pop() { if (this.ready) this.tone("sine", 220, 50, 0.25, 0.35); }
+  thwip() {
+    if (!this.ready) return;
+    const ac = this.ac, t = ac.currentTime;
+    const src = ac.createBufferSource(); src.buffer = this.noise;
+    const f = ac.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 2500;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    src.connect(f).connect(g).connect(this.master);
+    src.start(t); src.stop(t + 0.15);
+    this.tone("triangle", 1800, 700, 0.08, 0.08);
+  }
+  whoosh() {
+    if (!this.ready) return;
+    const ac = this.ac, t = ac.currentTime;
+    const src = ac.createBufferSource(); src.buffer = this.noise;
+    const f = ac.createBiquadFilter(); f.type = "bandpass"; f.Q.value = 1.5;
+    f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(2500, t + 0.6);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+    src.connect(f).connect(g).connect(this.master);
+    src.start(t); src.stop(t + 0.85);
+  }
+  get ready() { return !!this.ac; }
+  setMuted(m) { if (this.ready) this.master.gain.setTargetAtTime(m ? 0 : 0.6, this.ac.currentTime, 0.02); }
+  setBeam(level) {
+    if (!this.ready) return;
+    this.beamGain.gain.setTargetAtTime(Math.min(level, 3) * 0.06, this.ac.currentTime, 0.03);
+  }
+  setCharge(c) {
+    if (!this.ready) return;
+    const t = this.ac.currentTime;
+    this.chargeGain.gain.setTargetAtTime(c > 0.01 ? 0.03 + c * 0.05 : 0, t, 0.05);
+    this.chargeOsc.frequency.setTargetAtTime(180 + c * c * 1100, t, 0.05);
+  }
+  tone(type, f0, f1, dur, vol) {
+    const ac = this.ac, t = ac.currentTime;
+    const o = ac.createOscillator(); o.type = type;
+    o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g).connect(this.master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  transform() {
+    if (!this.ready) return;
+    this.blast(1);
+    this.tone("sawtooth", 180, 1500, 0.7, 0.12);   // rising shriek over the boom
+  }
+  blast(power) {
+    if (!this.ready) return;
+    const ac = this.ac, t = ac.currentTime;
+    const src = ac.createBufferSource(); src.buffer = this.noise;
+    const f = ac.createBiquadFilter(); f.type = "lowpass";
+    f.frequency.setValueAtTime(6000, t); f.frequency.exponentialRampToValueAtTime(150, t + 0.9);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.5 * power + 0.2, t); g.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+    src.connect(f).connect(g).connect(this.master);
+    src.start(t); src.stop(t + 1.05);
+    this.tone("sine", 140, 35, 0.6, 0.7 * power + 0.2);
+  }
+  hit() { if (this.ready) this.tone("square", 520, 90, 0.22, 0.15); }
+  ko() {
+    if (!this.ready) return;
+    this.tone("sawtooth", 600, 40, 1.2, 0.2);
+    this.tone("sine", 90, 25, 1.0, 0.6);
+  }
+}
+const sfx = new Sfx();
+
+// ---------------------------------------------------------------- helpers
+
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// Rect the video occupies on screen ("cover" fit).
+function videoRect() {
+  const vw = video.videoWidth || 1280, vh = video.videoHeight || 720;
+  const s = Math.max(W / vw, H / vh);
+  const w = vw * s, h = vh * s;
+  return { x: (W - w) / 2, y: (H - h) / 2, w, h };
+}
+
+// Normalized landmark -> mirrored screen coords.
+const toScreen = (lm, r) => ({ x: r.x + (1 - lm.x) * r.w, y: r.y + lm.y * r.h });
+
+// Where a ray from (x,y) along unit (dx,dy) leaves the screen.
+function rayToEdge(x, y, dx, dy) {
+  let t = Infinity;
+  if (dx > 1e-6) t = Math.min(t, (W - x) / dx); else if (dx < -1e-6) t = Math.min(t, -x / dx);
+  if (dy > 1e-6) t = Math.min(t, (H - y) / dy); else if (dy < -1e-6) t = Math.min(t, -y / dy);
+  return isFinite(t) ? Math.max(0, t) : 0;
+}
+
+// Pair detections with existing tracks, closest first. cost() returns null when too far apart.
+function greedyMatch(dets, tracks, cost) {
+  const pairs = [];
+  dets.forEach((d, i) => tracks.forEach(t => {
+    const c = cost(d, t);
+    if (c !== null) pairs.push([c, i, t]);
+  }));
+  pairs.sort((a, b) => a[0] - b[0]);
+  const match = new Map(), taken = new Set();
+  for (const [, i, t] of pairs) {
+    if (match.has(i) || taken.has(t)) continue;
+    match.set(i, t); taken.add(t);
+  }
+  return match;
+}
+
+// ---------------------------------------------------------------- people (pose + segmentation)
+
+class Person {
+  constructor(box, num) {
+    Object.assign(this, box);      // head box: x, y, w, h
+    this.num = num;
+    this.color = PLAYER_COLORS[(num - 1) % PLAYER_COLORS.length];
+    this.lastSeen = 0;
+    this.lm = null;                // pose landmarks in screen space
+    this.mask = null;              // silhouette 0..255, in raw (unmirrored) frame space
+    this.mw = 0; this.mh = 0;
+    this.edge = document.createElement("canvas");   // outline, drawn in player color
+    this.fill = document.createElement("canvas");   // solid red silhouette for hit flashes
+    this.health = MAX_HEALTH;
+    this.shown = MAX_HEALTH;   // trailing "damage taken" segment of the bar
+    this.hitFlash = 0;
+    this.ko = 0;               // seconds left knocked out
+    this.beamAcc = 0;          // beam damage not yet shown as a floating number
+    this.edgeList = [];        // mask indices on the silhouette edge (lightning spawn points)
+    this.auraLevel = 0;        // 0..1, flares up while charging or firing
+    this.facing = "front";     // spin tracking: which way the body faces the camera
+    this.facingCand = "front"; this.facingSince = 0;
+    this.turnedAt = -Infinity; // when they last turned away
+    this.profile = 0; this.profileAt = -Infinity;   // last side profile seen (-1 / 1, by nose direction)
+    this.outSide = 0;          // profile passed on the way out (turning away)
+    this.swRef = 0;            // usual (front-on) shoulder width, in torso lengths
+    this.swNow = 1;            // current shoulder width relative to that
+    this.narrow = false;       // shoulders currently collapsed (side view)
+    this.narrowTimes = [];     // when recent side views started
+    this.swingHist = [];       // recent wrist sides for the arm-swing trigger
+    this.spinUntil = 0;        // tornado runs until this time
+    this.spin = 0;             // 0..1 tornado strength
+    this.spinOn = false;
+    this.tw = null;            // smoothed tornado geometry
+    this.orbiters = [];        // solid chunks riding the tornado
+    this.streaks = [];         // solid wind streaks wrapping around it
+    this.flexing = false;      // holding the flex pose this frame
+    this.flexCharge = 0;       // 0..1 while holding a flex to power up
+    this.stage = 0;            // aura stage: 0 off, 1 yellow, 2 blue, 3 white
+    this.flexReady = true;     // flex was released since the last transformation
+    this.env = null;           // aura envelope: body reach per direction from the torso
+    this.envC = null;          // ...and that torso center
+  }
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+}
+let persons = [];
+
+function freeNumber() {
+  const used = new Set(persons.map(p => p.num));
+  let n = 1;
+  while (used.has(n)) n++;
+  return n;
+}
+
+// Head box from pose landmarks (0 nose, 2/5 eyes, 7/8 ears, 11/12 shoulders).
+function headBox(lm) {
+  const w = Math.max(dist(lm[7], lm[8]) * 1.3, dist(lm[11], lm[12]) * 0.45, 40);
+  const cx = (lm[0].x + lm[7].x + lm[8].x) / 3, cy = (lm[0].y + lm[2].y + lm[5].y) / 3;
+  return { x: cx - w / 2, y: cy - w * 0.6, w, h: w * 1.25 };
+}
+
+function ingestPoses(result, now) {
+  const r = videoRect();
+  const dets = result.landmarks.map(lms => lms.map(l => ({ ...toScreen(l, r), v: l.visibility ?? 1 })));
+  const boxes = dets.map(headBox);
+  const match = greedyMatch(boxes, persons, (b, p) => {
+    const d = Math.hypot(b.x + b.w / 2 - p.cx, b.y + b.h / 2 - p.cy);
+    return d < Math.max(b.w, p.w) * 1.5 ? d : null;
+  });
+  boxes.forEach((b, i) => {
+    let p = match.get(i);
+    if (!p) { p = new Person(b, freeNumber()); persons.push(p); }
+    else for (const k of ["x", "y", "w", "h"]) p[k] += (b[k] - p[k]) * 0.5;
+    p.lastSeen = now;
+    p.lm = dets[i];
+    const m = result.segmentationMasks?.[i];
+    if (m) setMask(p, m.getAsFloat32Array(), m.width, m.height);
+  });
+}
+
+// Store the silhouette and prebuild its outline / hit-flash images.
+function setMask(p, data, mw, mh) {
+  if (p.mw !== mw || p.mh !== mh) {
+    p.mw = mw; p.mh = mh;
+    p.mask = new Uint8Array(mw * mh);
+    p.edge.width = p.fill.width = mw;
+    p.edge.height = p.fill.height = mh;
+    p.edgeImg = p.edge.getContext("2d").createImageData(mw, mh);
+    p.fillImg = p.fill.getContext("2d").createImageData(mw, mh);
+  }
+  const m = p.mask;
+  for (let i = 0; i < m.length; i++) m[i] = clamp(data[i], 0, 1) * 255;
+  const [r, g, b] = p.ko > 0 ? [255, 70, 50] : p.color;
+  const e = p.edgeImg.data, f = p.fillImg.data;
+  p.edgeList.length = 0;
+  for (let y = 0; y < mh; y++) {
+    for (let x = 0; x < mw; x++) {
+      const i = y * mw + x, o = i * 4;
+      const edge = m[i] > 127 && x > 0 && y > 0 && x < mw - 1 && y < mh - 1 &&
+        (m[i - 1] <= 127 || m[i + 1] <= 127 || m[i - mw] <= 127 || m[i + mw] <= 127);
+      if (edge) p.edgeList.push(i);
+      e[o] = r; e[o + 1] = g; e[o + 2] = b; e[o + 3] = edge ? 255 : 0;
+      f[o] = 255; f[o + 1] = 50; f[o + 2] = 30; f[o + 3] = m[i];
+    }
+  }
+  p.edge.getContext("2d").putImageData(p.edgeImg, 0, 0);
+  p.fill.getContext("2d").putImageData(p.fillImg, 0, 0);
+}
+
+// ---------------------------------------------------------------- aura
+
+// The aura is a shell well outside the body: for each direction out from the torso we find how
+// far the silhouette reaches, smooth that into an envelope, push it out by a margin, and trace
+// its edge as a ring of sharp, upward-licking flame tips. The inside stays mostly clear.
+const ENV_N = 72;
+const FLEX_SECONDS = 2;    // hold a flex this long to power up
+
+const torsoCenter = L => ({ x: (L[11].x + L[12].x + L[23].x + L[24].x) / 4,
+  y: Math.min(H - 10, (L[11].y + L[12].y + L[23].y + L[24].y) / 4) });
+
+// Flex: both arms bent at the elbow with the elbows pushed out past the shoulders
+// (double-biceps, or the bent-arm power-up stance).
+function isFlexing(L) {
+  if (![11, 12, 13, 14, 15, 16].every(i => L[i].v > 0.5)) return false;
+  const sw = dist(L[11], L[12]), mx = (L[11].x + L[12].x) / 2;
+  return [[11, 13, 15], [12, 14, 16]].every(([s, e, w]) => {
+    const ax = L[s].x - L[e].x, ay = L[s].y - L[e].y, bx = L[w].x - L[e].x, by = L[w].y - L[e].y;
+    const cos = (ax * bx + ay * by) / ((Math.hypot(ax, ay) * Math.hypot(bx, by)) || 1);
+    const bent = Math.acos(clamp(cos, -1, 1)) < 2.0;   // elbow angle under ~115°
+    const flared = Math.abs(L[e].x - mx) > Math.abs(L[s].x - mx) + 0.25 * sw;
+    return bent && flared;
+  });
+}
+
+// Aura stages, each reached by flexing and holding: 1 yellow, 2 blue, 3 silver-white. Colors are "r,g,b".
+const AURA_STAGES = [null, {
+  name: "POWER UP!", fill: "255,220,20", haze: "255,210,0", glow: "255,225,0", line: "255,235,20",
+  core: "255,255,150", energy: "255,235,70", streak: "255,245,140", flash: "255,235,80",
+}, {
+  name: "MAX POWER!", fill: "40,165,255", haze: "0,140,255", glow: "60,190,255", line: "90,210,255",
+  core: "225,250,255", energy: "110,210,255", streak: "185,235,255", flash: "120,205,255",
+}, {
+  name: "ULTRA INSTINCT!", fill: "205,220,255", haze: "190,205,255", glow: "235,240,255", line: "245,248,255",
+  core: "255,255,255", energy: "225,235,255", streak: "245,248,255", flash: "235,240,255",
+}];
+const rgb = s => s.split(",").map(Number);
+// Blend color a toward color b by f (0..1), as an "r,g,b" string.
+const mixRgb = (a, b, f) => { const x = rgb(a), y = rgb(b); return x.map((v, i) => Math.round(v + (y[i] - v) * f)).join(","); };
+
+// While charging: energy gets pulled into the body, speed lines rise, the screen starts to shake.
+function chargeUpEffects(p, dt, k, pal) {
+  const c = torsoCenter(p.lm), sw = dist(p.lm[11], p.lm[12]);
+  const [er, eg, eb] = rgb(pal.energy), [sr, sg, sb] = rgb(pal.streak);
+  for (let n = (30 + 120 * k) * dt; n > 0; n--) {
+    if (Math.random() > n) break;
+    const a = rand(0, Math.PI * 2), rr = sw * rand(1.2, 2.2), life = rand(0.3, 0.5);
+    spawn({ x: c.x + Math.cos(a) * rr, y: c.y + Math.sin(a) * rr, vx: -Math.cos(a) * rr / life,
+      vy: -Math.sin(a) * rr / life, drag: 1, life, size: rand(1.5, 3), r: er, g: eg, b: eb });
+  }
+  for (let n = (10 + 50 * k) * dt; n > 0; n--) {
+    if (Math.random() > n) break;
+    spawn({ x: c.x + rand(-1.3, 1.3) * sw, y: c.y + sw * rand(0.3, 1.5), vy: rand(-1100, -700),
+      drag: 1, life: rand(0.25, 0.4), size: rand(1, 2), r: sr, g: sg, b: sb });
+  }
+  shake = Math.max(shake, 1 + 5 * k);
+}
+
+function transform(p) {
+  p.stage++;
+  p.flexCharge = 0;
+  p.flexReady = false;   // let go of the flex before charging the next stage
+  const pal = AURA_STAGES[p.stage], c = torsoCenter(p.lm);
+  flash = 1; flashColor = pal.flash;
+  shake = Math.max(shake, 30);
+  for (let k = 0; k < 3; k++) {
+    shockwaves.push({ x: c.x, y: c.y, nx: 0, ny: 0, facing: 1, d: 0, r0: 40, r: 40,
+      speed: 1800 * (1 - k * 0.22), life: 0.9 - k * 0.15, max: 0.9 - k * 0.15, width: 30 * (1 - k * 0.3),
+      color: pal.energy, damage: null });
+  }
+  burst(c.x, c.y, 260, 1600, rgb(pal.energy));
+  floaters.push({ x: c.x, y: p.y - 20, text: pal.name, life: 1.4, max: 1.4, big: true, color: pal.flash });
+  sfx.transform();
+}
+
+// Power gauge around the torso while charging, in the color of the stage being charged.
+function drawFlexGauge(p) {
+  if (p.flexCharge <= 0.01 || !p.lm || p.stage >= AURA_STAGES.length - 1) return;
+  const pal = AURA_STAGES[p.stage + 1];
+  const c = torsoCenter(p.lm), R = dist(p.lm[11], p.lm[12]) * 1.05;
+  ctx.lineCap = "round";
+  ctx.strokeStyle = `rgba(${pal.streak},0.25)`; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = `rgba(${pal.line},0.95)`;
+  ctx.beginPath(); ctx.arc(c.x, c.y, R, -Math.PI / 2, -Math.PI / 2 + p.flexCharge * Math.PI * 2); ctx.stroke();
+  ctx.font = "bold 14px Consolas, monospace";
+  ctx.textAlign = "center";
+  ctx.fillStyle = `rgba(${pal.streak},0.95)`;
+  ctx.fillText(`POWERING UP ${Math.round(p.flexCharge * 100)}%`, c.x, c.y - R - 12);
+  ctx.textAlign = "left";
+}
+
+function updateEnvelope(p) {
+  const L = p.lm, r = videoRect();
+  const c = torsoCenter(L);
+  const raw = new Float32Array(ENV_N), maxT = Math.hypot(W, H);
+  for (let k = 0; k < ENV_N; k++) {
+    const a = k / ENV_N * Math.PI * 2, dx = Math.cos(a), dy = Math.sin(a);
+    let reach = 0;
+    for (let t = 0; t < maxT; t += 8) {
+      const x = c.x + dx * t, y = c.y + dy * t;
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      if (maskAt(p, x, y, r) > 127) reach = t;
+    }
+    raw[k] = reach;
+  }
+  // widen (max over neighbours) then soften, so gaps between limbs don't make deep notches
+  const wide = new Float32Array(ENV_N), soft = new Float32Array(ENV_N);
+  for (let k = 0; k < ENV_N; k++) {
+    let m = 0;
+    for (let j = -3; j <= 3; j++) m = Math.max(m, raw[(k + j + ENV_N) % ENV_N]);
+    wide[k] = m;
+  }
+  for (let k = 0; k < ENV_N; k++) {
+    let s = 0;
+    for (let j = -2; j <= 2; j++) s += wide[(k + j + ENV_N) % ENV_N];
+    soft[k] = s / 5;
+  }
+  if (!p.env) { p.env = soft; p.envC = c; return; }
+  for (let k = 0; k < ENV_N; k++) p.env[k] += (soft[k] - p.env[k]) * 0.35;
+  p.envC.x += (c.x - p.envC.x) * 0.35;
+  p.envC.y += (c.y - p.envC.y) * 0.35;
+}
+
+// Sparks drifting up inside the shell.
+function updateAura(p, dt) {
+  if (!isFresh(p) || !p.lm || p.auraLevel < 0.02) return;
+  updateEnvelope(p);
+  const c = p.envC;
+  for (let n = p.auraLevel * 25 * dt; n > 0; n--) {
+    if (Math.random() > n) break;
+    const k = Math.random() * ENV_N | 0, a = k / ENV_N * Math.PI * 2, rr = p.env[k] * rand(0.4, 1.1);
+    spawn({ x: c.x + Math.cos(a) * rr, y: c.y + Math.sin(a) * rr, vx: rand(-15, 15), vy: rand(-380, -200),
+      life: rand(0.3, 0.6), size: rand(1.5, 3), ...sparkColor(p), drag: 0.99 });
+  }
+}
+
+function auraPath(p, now) {
+  const L = p.lm, lvl = p.auraLevel, c = p.envC;
+  const sw = Math.max(dist(L[11], L[12]), p.w);
+  const margin = sw * (0.3 + 0.35 * lvl);       // empty space between body and aura edge
+  const spikeLen = sw * (0.3 + 0.45 * lvl);
+  const n = 28;
+  const envAt = a => {
+    const f = ((a / (Math.PI * 2)) % 1 + 1) % 1 * ENV_N, k0 = Math.floor(f), t = f - k0;
+    return p.env[k0 % ENV_N] * (1 - t) + p.env[(k0 + 1) % ENV_N] * t + margin;
+  };
+  // valleys sit on the envelope; the whole ring creeps slowly so the flames seem to flow upward
+  const drift = now * 0.00025;
+  const base = [];
+  for (let j = 0; j < n; j++) {
+    const a = (j / n + drift) * Math.PI * 2, rr = envAt(a);
+    base.push({ x: c.x + Math.cos(a) * rr, y: c.y + Math.sin(a) * rr });
+  }
+  ctx.beginPath();
+  ctx.moveTo(base[0].x, base[0].y);
+  for (let j = 0; j < n; j++) {
+    const A = base[j], B = base[(j + 1) % n];
+    const am = ((j + 0.5) / n + drift) * Math.PI * 2, ox = Math.cos(am), oy = Math.sin(am);
+    // flames lean upward on the top and sides; below the waist they just point outward and shrink
+    let tx = ox, ty = oy - 1.1 * (1 - Math.max(0, oy));
+    const tl = Math.hypot(tx, ty) || 1;
+    tx /= tl; ty /= tl;
+    const up = Math.max(0, -oy);
+    const flick = 0.7 + 0.25 * Math.sin(now * 0.02 + j * 2.3) + 0.15 * Math.sin(now * 0.047 + j * 5.1)
+      + Math.random() * 0.06;
+    const len = spikeLen * (0.45 + 0.9 * up) * (1 - 0.6 * Math.max(0, oy)) * flick;
+    const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
+    const T = { x: mx + tx * len, y: my + ty * len };
+    // flame-lick: the leading side bulges out, the trailing side curls in, meeting at a sharp tip
+    ctx.quadraticCurveTo((A.x + T.x) / 2 + ox * len * 0.2, (A.y + T.y) / 2 + oy * len * 0.2, T.x, T.y);
+    ctx.quadraticCurveTo((T.x + B.x) / 2 - tx * len * 0.2, (T.y + B.y) / 2 - ty * len * 0.2, B.x, B.y);
+  }
+  ctx.closePath();
+}
+
+// Current aura colors. While charging toward the next stage, the aura flickers into its color
+// more and more often; before the first stage it flickers in yellow.
+function auraPalette(p) {
+  const next = AURA_STAGES[p.stage + 1];
+  if (p.stage === 0) return AURA_STAGES[1];
+  if (next && Math.random() < p.flexCharge * 0.7) return next;
+  return AURA_STAGES[p.stage];
+}
+
+function sparkColor(p) {
+  const [r, g, b] = rgb(AURA_STAGES[Math.max(1, p.stage)].energy);
+  return { r, g, b };
+}
+
+function drawAura(p, now) {
+  if (!p.env || p.auraLevel < 0.02) return;
+  const a = Math.min(1, p.auraLevel * 1.4);
+  ctx.lineJoin = "miter"; ctx.miterLimit = 12;
+  auraPath(p, now);
+  const pal = auraPalette(p);
+  ctx.fillStyle = `rgba(${pal.fill},${0.32 * a})`;   // body of the aura
+  ctx.fill();
+  // border: a soft blurred halo around a solid, brighter line
+  ctx.strokeStyle = `rgba(${pal.haze},${0.12 * a})`; ctx.lineWidth = 26; ctx.stroke();
+  ctx.strokeStyle = `rgba(${pal.haze},${0.22 * a})`; ctx.lineWidth = 15; ctx.stroke();
+  ctx.save();
+  ctx.shadowColor = `rgba(${pal.glow},${a})`; ctx.shadowBlur = 18;
+  ctx.strokeStyle = `rgba(${pal.line},${a})`; ctx.lineWidth = 6; ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle = `rgba(${pal.core},${a})`; ctx.lineWidth = 2; ctx.stroke();
+  ctx.lineJoin = "round";
+
+  // Lightning crackles off the body at every stage: more bolts at higher stages and as the
+  // aura flares. White-hot core inside a glow in the stage's color, sometimes with a fork.
+  if (p.stage > 0 && p.edgeList.length) {
+    const r = videoRect(), pal = AURA_STAGES[p.stage];
+    const count = Math.random() < 0.3 + 0.5 * p.auraLevel ? 1 + (Math.random() * (1 + p.stage) | 0) : 0;
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    for (let k = 0; k < count; k++) {
+      const i = p.edgeList[Math.random() * p.edgeList.length | 0];
+      const x = r.x + (1 - ((i % p.mw) + 0.5) / p.mw) * r.w, y = r.y + (((i / p.mw) | 0) + 0.5) / p.mh * r.h;
+      const ang = -Math.PI / 2 + rand(-1.4, 1.4), len = p.w * rand(0.4, 1.2);
+      const arcs = [jagged(x, y, x + Math.cos(ang) * len, y + Math.sin(ang) * len, 8, len * 0.18)];
+      if (Math.random() < 0.5) {
+        const [fx, fy] = arcs[0][4], fa = ang + rand(-1, 1), fl = len * 0.45;
+        arcs.push(jagged(fx, fy, fx + Math.cos(fa) * fl, fy + Math.sin(fa) * fl, 4, fl * 0.2));
+      }
+      for (const pts of arcs) {
+        strokePts(pts, `rgba(${pal.glow},0.5)`, 5);
+        strokePts(pts, "rgba(255,255,255,0.95)", 1.4);
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------- spinjitzu
+
+const SPIN_WINDOW = 3000;   // ms allowed to complete the turn
+const SPIN_SECONDS = 5;     // tornado lasts this long after a 360 or an arm swing
+const SWING_WINDOW = 500;   // ms for both arms to swing across the body
+
+const torsoLen = L => Math.max(30, dist({ x: (L[11].x + L[12].x) / 2, y: (L[11].y + L[12].y) / 2 },
+  { x: (L[23].x + L[24].x) / 2, y: (L[23].y + L[24].y) / 2 }));
+
+// Arm swing: both wrists on one side of the body, then both on the other side within SWING_WINDOW.
+function trackSwing(p, now) {
+  const L = p.lm;
+  if (L[15].v < 0.3 || L[16].v < 0.3) return;
+  const cx = torsoCenter(L).x, tl = torsoLen(L);
+  const a = (L[15].x - cx) / tl, b = (L[16].x - cx) / tl;
+  const side = (x, y) => x > 0.35 && y > 0.35 ? 1 : x < -0.35 && y < -0.35 ? -1 : 0;
+  const hist = p.swingHist;
+  hist.push({ t: now, s: side(a, b) });
+  while (hist.length && now - hist[0].t > SWING_WINDOW) hist.shift();
+  const cur = hist[hist.length - 1].s;
+  if (cur && hist.some(h => h.s === -cur)) {
+    p.spinUntil = now + SPIN_SECONDS * 1000;
+    hist.length = 0;
+  }
+}
+
+// A 360 shows up as: facing the camera -> facing away -> facing it again, passing through one
+// side profile on the way out and the opposite one on the way back. (Turning away and back the
+// same way shows the same profile twice, so it doesn't count.) "Away" = the face landmarks lose
+// visibility, or the shoulders swap sides on screen.
+function trackSpin(p, now) {
+  const L = p.lm;
+  const faceVis = (L[0].v + L[2].v + L[5].v) / 3;
+  const swapped = L[11].x > L[12].x;   // mirrored screen: facing us, the left shoulder is on the left
+  const f = faceVis < 0.3 || (swapped && faceVis < 0.6) ? "back" : "front";
+
+  // side profile: shoulders collapse to a narrow line and the nose sticks out to one side
+  const ms = { x: (L[11].x + L[12].x) / 2, y: (L[11].y + L[12].y) / 2 };
+  const tl = torsoLen(L);
+  if (Math.abs(L[11].x - L[12].x) < 0.45 * tl && Math.abs(L[0].x - ms.x) > 0.12 * tl) {
+    p.profile = Math.sign(L[0].x - ms.x);
+    p.profileAt = now;
+  }
+
+  // Backup that ignores the face: a full turn narrows the shoulders to a line twice (once per
+  // side view), measured against this person's usual front-on shoulder width.
+  const sw = Math.abs(L[11].x - L[12].x) / tl;
+  p.swRef = Math.max(sw, p.swRef * 0.999);   // decays slowly so it survives a whole spin
+  p.swNow = sw / (p.swRef || 1);
+  if (!p.narrow && p.swNow < 0.45) { p.narrow = true; p.narrowTimes.push(now); }
+  else if (p.narrow && p.swNow > 0.75) p.narrow = false;
+  while (p.narrowTimes.length && now - p.narrowTimes[0] > SPIN_WINDOW) p.narrowTimes.shift();
+  if (p.narrowTimes.length >= 2) {
+    p.spinUntil = now + SPIN_SECONDS * 1000;
+    p.narrowTimes.length = 0;
+  }
+
+  if (f !== p.facingCand) { p.facingCand = f; p.facingSince = now; }
+  if (now - p.facingSince < 80 || f === p.facing) return;
+  if (f === "back") {
+    p.turnedAt = now;
+    p.outSide = now - p.profileAt < 1500 ? p.profile : 0;
+  } else {
+    const inSide = p.profileAt > p.turnedAt ? p.profile : 0;
+    // if a profile was missed (fast spin) give it the benefit of the doubt
+    const sameWayBack = p.outSide && inSide && p.outSide === inSide;
+    if (now - p.turnedAt < SPIN_WINDOW && !sameWayBack) p.spinUntil = now + SPIN_SECONDS * 1000;
+  }
+  p.facing = f;
+}
+
+// Smoothed funnel placement: centered on the torso, from the feet (or screen bottom) to above the head.
+function updateTornadoFrame(p) {
+  const L = p.lm, c = torsoCenter(L);
+  const ms = { x: (L[11].x + L[12].x) / 2, y: (L[11].y + L[12].y) / 2 };
+  const tl = Math.max(30, dist(ms, { x: (L[23].x + L[24].x) / 2, y: (L[23].y + L[24].y) / 2 }));
+  const feetVisible = L[27].v > 0.3 || L[28].v > 0.3;
+  const bottom = feetVisible ? Math.min(H + 20, Math.max(L[27].y, L[28].y) + tl * 0.15) : H + 20;
+  const t = { cx: c.x, top: Math.min(L[0].y, p.y) - tl * 0.7, bottom, tl };
+  if (!p.tw) { p.tw = t; return; }
+  for (const k in t) p.tw[k] += (t[k] - p.tw[k]) * 0.2;
+}
+
+// Funnel radius at height t (0 = feet, 1 = top): narrow at the bottom, flaring out above.
+const tornadoRadius = (p, t) => 1.2 * (p.tw.tl * 0.35 + p.tw.tl * 1.05 * Math.pow(t, 1.4)) * (0.6 + 0.4 * p.spin);
+const tornadoSway = (p, y, now) => Math.sin(y * 0.012 + now * 0.003) * p.tw.tl * 0.035;
+const SPIN_RATE = 0.012;    // radians per ms
+
+function startSpinjitzu(p) {
+  p.spinOn = true;
+  const c = torsoCenter(p.lm), col = settings.spinColor;
+  shockwaves.push({ x: c.x, y: c.y, nx: 0, ny: 0, facing: 1, d: 0, r0: 30, r: 30, speed: 1500,
+    life: 0.6, max: 0.6, width: 18, color: col, damage: null });
+  burst(c.x, c.y, 120, 1100, rgb(col));
+  floaters.push({ x: c.x, y: p.y - 20, text: "SPINJITZU!", life: 1.3, max: 1.3, big: true, color: col });
+  sfx.whoosh();
+}
+
+// Debris flung off the spinning wall.
+function tornadoDebris(p, dt) {
+  const { cx, top, bottom } = p.tw, [r, g, b] = rgb(settings.spinColor);
+  for (let n = 60 * p.spin * dt; n > 0; n--) {
+    if (Math.random() > n) break;
+    const t = Math.random(), y = bottom - t * (bottom - top), R = tornadoRadius(p, t);
+    const th = rand(0, Math.PI * 2);
+    spawn({ x: cx + R * Math.sin(th), y, vx: -Math.cos(th) * R * 4 + rand(-40, 40), vy: rand(-260, -80),
+      life: rand(0.3, 0.7), size: rand(1.5, 3), r, g, b, drag: 0.95 });
+  }
+}
+
+function drawTornado(p, now) {
+  if (p.spin < 0.02 || !p.tw) return;
+  const s = p.spin, col = settings.spinColor, { cx, top, bottom } = p.tw, span = bottom - top;
+  const R = t => tornadoRadius(p, t), sway = y => tornadoSway(p, y, now);
+  const phase = now * SPIN_RATE;
+
+  // body of the funnel: painted (not added as light) so it actually covers what's behind it
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.beginPath();
+  for (let y = bottom; y >= top; y -= 10) ctx.lineTo(cx + sway(y) - R((bottom - y) / span), y);
+  for (let y = top; y <= bottom; y += 10) ctx.lineTo(cx + sway(y) + R((bottom - y) / span), y);
+  ctx.closePath();
+  // light tint of the color for the body, dark shade for the swirls on top of it
+  const light = mixRgb(col, "255,255,255", 0.4), dark = mixRgb(col, "0,0,0", 0.55);
+  const body = ctx.createLinearGradient(0, top, 0, bottom);
+  body.addColorStop(0, `rgba(${light},${0.5 * s})`); body.addColorStop(1, `rgba(${light},${0.3 * s})`);
+  ctx.fillStyle = body; ctx.fill();
+
+  // Bold dark spiral ribbons winding up the funnel (painted, so they read darker than the body).
+  // Each drifts in and out, up to 15% beyond the funnel edge. Near side solid, far side faint.
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  const N = 9;
+  for (let i = 0; i < N; i++) {
+    const front = new Path2D(), back = new Path2D();
+    let prev = null;
+    for (let y = bottom; y >= top - 1; y -= 5) {
+      const t = (bottom - y) / span, th = i / N * Math.PI * 2 + t * 6 - phase * (1 + t * 0.5);
+      const out = 1 + 0.15 * (0.5 + 0.5 * Math.sin(t * 9 + i * 1.7 + now * 0.002));
+      const x = cx + sway(y) + R(t) * out * Math.sin(th), near = Math.cos(th) > 0;
+      const path = near ? front : back;
+      if (!prev || prev.near !== near) path.moveTo(prev ? prev.x : x, prev ? prev.y : y);
+      path.lineTo(x, y);
+      prev = { x, y, near };
+    }
+    ctx.lineWidth = 3; ctx.strokeStyle = `rgba(${dark},${0.35 * s})`; ctx.stroke(back);
+    ctx.lineWidth = 6; ctx.strokeStyle = `rgba(${dark},${0.95 * s})`; ctx.stroke(front);
+    ctx.lineWidth = 1.2; ctx.strokeStyle = `rgba(${col},${0.6 * s})`; ctx.stroke(front);   // crisp edge
+  }
+  ctx.restore();
+
+  // rings rising up the funnel (near half bright, far half dim)
+  for (let k = 0; k < 6; k++) {
+    const t = (k / 6 + now * 0.0006) % 1, y = bottom - t * span, r = R(t), x = cx + sway(y);
+    const fade = s * (1 - t * 0.6);
+    ctx.lineWidth = 2; ctx.strokeStyle = `rgba(${col},${0.2 * fade})`;
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.16, 0, Math.PI, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 3; ctx.strokeStyle = `rgba(${col},${0.7 * fade})`;
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.16, 0, 0, Math.PI); ctx.stroke();
+  }
+
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  const [cr, cg, cb] = rgb(col), [dr, dg, db] = rgb(dark);
+
+  // Solid dark wind streaks wrapping around the funnel and sweeping with the spin: thick at the
+  // leading edge, tapering along the tail. A point at angle a sits at x = R·sin(a), and on the
+  // near side (cos a > 0) slightly lower, matching the rings' perspective.
+  ctx.lineCap = "round";
+  for (const st of [...p.streaks].sort((a, b) => Math.cos(a.th) - Math.cos(b.th))) {
+    const y0 = bottom - st.t * span, r = R(st.t) * st.rr, x0 = cx + sway(y0);
+    const fadeIn = Math.min(1, st.t * 8, (1 - st.t) * 8);
+    const SEG = 8;
+    for (let k = 0; k < SEG; k++) {
+      const a0 = st.th + st.len * k / SEG, a1 = st.th + st.len * (k + 1) / SEG;   // leading edge first
+      const depth = Math.cos((a0 + a1) / 2), shade = 0.8 + 0.2 * depth;
+      ctx.globalAlpha = s * fadeIn * (depth > 0 ? 0.95 : 0.4);
+      ctx.strokeStyle = `rgb(${dr * shade | 0},${dg * shade | 0},${db * shade | 0})`;
+      ctx.lineWidth = st.width * (1 - k / SEG * 0.85);
+      ctx.beginPath();
+      ctx.moveTo(x0 + r * Math.sin(a0), y0 + r * 0.16 * Math.cos(a0));
+      ctx.lineTo(x0 + r * Math.sin(a1), y0 + r * 0.16 * Math.cos(a1));
+      ctx.stroke();
+    }
+  }
+
+  // solid chunks riding the funnel: drawn opaque, big and bright in front, small and dim behind
+  const sorted = [...p.orbiters].sort((a, b) => Math.cos(a.th) - Math.cos(b.th));   // far ones first
+  for (const o of sorted) {
+    const y = bottom - o.t * span, depth = Math.cos(o.th);
+    const x = cx + sway(y) + R(o.t) * o.rr * Math.sin(o.th);
+    const size = o.size * (0.75 + 0.35 * depth), shade = 0.55 + 0.45 * depth;
+    ctx.globalAlpha = s * (depth > 0 ? 1 : 0.45) * Math.min(1, o.t * 8, (1 - o.t) * 8);
+    ctx.fillStyle = `rgb(${cr * shade | 0},${cg * shade | 0},${cb * shade | 0})`;
+    ctx.beginPath(); ctx.arc(x, y, size, 0, Math.PI * 2); ctx.fill();
+    if (depth > 0) {   // glint on the near ones
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.beginPath(); ctx.arc(x - size * 0.3, y - size * 0.3, size * 0.35, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+// Chunks and streaks orbit with the funnel's rotation (faster higher up) while slowly rising,
+// then recycle at the bottom.
+function ride(list, want, make, dt) {
+  while (list.length < want) list.push(make());
+  if (list.length > want) list.length = want;
+  for (const o of list) {
+    o.th -= SPIN_RATE * dt * 1000 * (1 + o.t * 0.5);
+    o.t += o.rise * dt;
+    if (o.t > 1) { o.t = 0; o.th = rand(0, Math.PI * 2); }
+  }
+}
+
+function updateOrbiters(p, dt) {
+  const on = p.spin > 0.05;
+  ride(p.orbiters, on ? Math.round(36 * p.spin) : 0, () => ({ th: rand(0, Math.PI * 2), t: Math.random(),
+    rr: rand(0.75, 1.0), size: rand(2.5, 5.5), rise: rand(0.15, 0.35) }), dt);
+  ride(p.streaks, on ? Math.round(22 * p.spin) : 0, () => ({ th: rand(0, Math.PI * 2), t: Math.random(),
+    rr: rand(1.0, 1.15), len: rand(0.6, 1.4), width: rand(3, 7), rise: rand(0.08, 0.2) }), dt);
+}
+
+// ---------------------------------------------------------------- ninja: hand flames + elemental balls
+
+const THROW_SPEED = 10;       // palm sizes per second that counts as a punch / throw
+const THROW_COOLDOWN = 450;   // ms between shots per hand
+const BALL_DAMAGE = 12;
+const flames = [];            // flame puffs (on hands and trailing balls), in the Spinjitzu color
+const balls = [];
+
+// Soft flame puff sprite per color: white-hot center fading out through the color.
+const spriteCache = new Map();
+function flameSprite(col) {
+  let s = spriteCache.get(col);
+  if (s) return s;
+  s = document.createElement("canvas");
+  s.width = s.height = 64;
+  const c = s.getContext("2d"), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, "rgba(255,255,255,1)");
+  g.addColorStop(0.25, `rgba(${col},0.9)`);
+  g.addColorStop(1, `rgba(${col},0)`);
+  c.fillStyle = g; c.fillRect(0, 0, 64, 64);
+  spriteCache.set(col, s);
+  return s;
+}
+
+function spawnFlame(x, y, size, vx, vy, life) {
+  if (flames.length < 900) flames.push({ x, y, size, vx, vy, life, max: life });
+}
+
+const FLAME_POINTS = [0, 4, 8, 12, 16, 20, 5, 9, 13, 17];   // wrist, fingertips, knuckles
+
+function handFlames(h, dt) {
+  for (let n = 80 * dt; n > 0; n--) {
+    if (Math.random() > n) break;
+    const q = h.pts[FLAME_POINTS[Math.random() * FLAME_POINTS.length | 0]];
+    spawnFlame(q.x + rand(-4, 4), q.y + rand(-4, 4), h.ps * rand(0.15, 0.3),
+      rand(-30, 30), rand(-220, -90), rand(0.25, 0.5));
+  }
+}
+
+// A throw is the palm moving faster than THROW_SPEED over the last ~0.1 s; the ball flies that way.
+function trackThrow(h, now) {
+  const hist = h.hist;
+  hist.push({ t: now, x: h.cx, y: h.cy });
+  while (hist.length && now - hist[0].t > 150) hist.shift();
+  const old = hist[0], span = (now - old.t) / 1000;
+  if (span < 0.06 || now - h.lastThrow < THROW_COOLDOWN) return;
+  const vx = (h.cx - old.x) / span, vy = (h.cy - old.y) / span, speed = Math.hypot(vx, vy);
+  if (speed < THROW_SPEED * h.ps) return;
+  h.lastThrow = now;
+  hist.length = 0;
+  const v = clamp(speed * 1.2, 900, 2400);
+  balls.push({ x: h.cx, y: h.cy, vx: vx / speed * v, vy: vy / speed * v, r: h.ps * 0.35, owner: h.owner, life: 3 });
+  sfx.fireball();
+}
+
+function updateBalls(dt) {
+  const r = videoRect(), col = rgb(settings.spinColor);
+  for (let i = balls.length - 1; i >= 0; i--) {
+    const b = balls[i];
+    b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+    for (let k = 0; k < 3; k++) {   // fiery trail
+      spawnFlame(b.x + rand(-0.4, 0.4) * b.r, b.y + rand(-0.4, 0.4) * b.r, b.r * rand(0.6, 1.1),
+        -b.vx * 0.08 + rand(-30, 30), -b.vy * 0.08 + rand(-60, 10), rand(0.2, 0.4));
+    }
+    let hit = null;
+    if (persons.length >= 2) {
+      for (const p of persons) if (p !== b.owner && p.ko === 0 && bodyAt(p, b.x, b.y, r)) { hit = p; break; }
+    }
+    const off = b.x < -b.r || b.y < -b.r || b.x > W + b.r || b.y > H + b.r;
+    if (!hit && !off && b.life > 0) continue;
+    if (hit) {
+      hit.hitFlash = 1;
+      floaters.push({ x: hit.cx + rand(-20, 20), y: hit.y, text: `-${BALL_DAMAGE}`, life: 1.1, max: 1.1, big: false });
+      sfx.hit();
+      applyDamage(hit, BALL_DAMAGE);
+    } else {
+      sfx.pop();
+    }
+    burst(clamp(b.x, 0, W), clamp(b.y, 0, H), 50, 700, col);
+    shake = Math.max(shake, hit ? 10 : 4);
+    balls.splice(i, 1);
+  }
+}
+
+function updateFlames(dt) {
+  for (let i = flames.length - 1; i >= 0; i--) {
+    const f = flames[i];
+    f.life -= dt;
+    if (f.life <= 0) { flames.splice(i, 1); continue; }
+    f.x += f.vx * dt; f.y += f.vy * dt;
+    f.vx *= 0.96;
+  }
+}
+
+function drawFlames() {
+  const sprite = flameSprite(settings.spinColor);
+  for (const f of flames) {
+    const k = f.life / f.max, s = f.size * (0.4 + 0.6 * k);   // shrink and fade as they rise
+    ctx.globalAlpha = Math.min(1, k * 1.5);
+    ctx.drawImage(sprite, f.x - s, f.y - s, s * 2, s * 2);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawBalls(now) {
+  const col = settings.spinColor, sprite = flameSprite(col);
+  for (const b of balls) {
+    const s = b.r * 1.3 * (1 + 0.1 * Math.sin(now * 0.04));
+    glow(b.x, b.y, b.r * 2.6, [[0, `rgba(${col},0.55)`], [1, `rgba(${col},0)`]]);
+    ctx.drawImage(sprite, b.x - s, b.y - s, s * 2, s * 2);
+    glow(b.x, b.y, b.r * 0.6, [[0, "rgba(255,255,255,1)"], [1, "rgba(255,255,255,0)"]]);
+  }
+}
+
+// ---------------------------------------------------------------- spider: webs
+
+const WEB_COOLDOWN = 500;   // ms between webs while holding the sign
+const WEB_LIFE = 10;        // seconds a web stays on screen
+const webs = [];
+
+// A thread zips out from the palm along the hand's direction (wrist -> middle knuckle, with a little
+// spread) and a web unfurls where it lands, stuck to the screen.
+function shootWeb(h, now) {
+  h.lastWeb = now;
+  const a = Math.atan2(h.pts[9].y - h.pts[0].y, h.pts[9].x - h.pts[0].x) + rand(-0.35, 0.35);
+  const dx = Math.cos(a), dy = Math.sin(a), sx = h.pts[9].x, sy = h.pts[9].y;
+  const d = Math.max(80, rayToEdge(sx, sy, dx, dy) * rand(0.45, 0.95));
+  const n = 9 + (Math.random() * 4 | 0), base = rand(0, Math.PI * 2);
+  webs.push({
+    x: sx + dx * d, y: sy + dy * d, sx, sy, born: now,
+    R: Math.min(W, H) * rand(0.08, 0.15),
+    spokes: Array.from({ length: n }, (_, i) => ({ a: base + (i + rand(-0.25, 0.25)) / n * Math.PI * 2, len: rand(0.85, 1.1) })),
+    rings: 5 + (Math.random() * 3 | 0),
+  });
+  if (webs.length > 25) webs.shift();
+  sfx.thwip();
+}
+
+function webPath(w, g) {
+  ctx.beginPath();
+  for (const s of w.spokes) {
+    ctx.moveTo(w.x, w.y);
+    ctx.lineTo(w.x + Math.cos(s.a) * w.R * s.len * g, w.y + Math.sin(s.a) * w.R * s.len * g);
+  }
+  // spiral rings: threads between neighbouring spokes, sagging toward the center
+  for (let k = 1; k <= w.rings; k++) {
+    const f = k / w.rings * g;
+    w.spokes.forEach((s, i) => {
+      const t = w.spokes[(i + 1) % w.spokes.length];
+      const ax = w.x + Math.cos(s.a) * w.R * s.len * f, ay = w.y + Math.sin(s.a) * w.R * s.len * f;
+      const bx = w.x + Math.cos(t.a) * w.R * t.len * f, by = w.y + Math.sin(t.a) * w.R * t.len * f;
+      const mx = (ax + bx) / 2, my = (ay + by) / 2;
+      ctx.moveTo(ax, ay);
+      ctx.quadraticCurveTo(mx + (w.x - mx) * 0.18, my + (w.y - my) * 0.18, bx, by);
+    });
+  }
+}
+
+function drawWebs(now) {
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  for (const w of webs) {
+    const age = (now - w.born) / 1000;
+    const travel = Math.min(1, age / 0.12);   // thread reaches the target in 0.12 s
+    if (age < 0.4) {
+      const tx = w.sx + (w.x - w.sx) * travel, ty = w.sy + (w.y - w.sy) * travel;
+      ctx.globalAlpha = 1 - age / 0.4;
+      ctx.strokeStyle = "rgba(255,255,255,0.95)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(w.sx, w.sy); ctx.lineTo(tx, ty); ctx.stroke();
+    }
+    if (travel < 1) continue;
+    const g = Math.min(1, (age - 0.12) / 0.15);   // then the web unfurls
+    ctx.globalAlpha = Math.min(1, WEB_LIFE - age);   // fades over its last second
+    webPath(w, g);
+    ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 3; ctx.stroke();   // contrast on bright backgrounds
+    ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 1.4; ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+const isFresh = p => p.mask && clock - p.lastSeen < 300;
+
+// Silhouette value (0..255) under a screen point.
+function maskAt(p, sx, sy, r) {
+  const u = 1 - (sx - r.x) / r.w, v = (sy - r.y) / r.h;
+  if (u < 0 || u >= 1 || v < 0 || v >= 1) return 0;
+  return p.mask[(v * p.mh | 0) * p.mw + (u * p.mw | 0)];
+}
+
+const inHead = (p, x, y) => x > p.x && x < p.x + p.w && y > p.y && y < p.y + p.h;
+const bodyAt = (p, x, y, r) => inHead(p, x, y) || (isFresh(p) && maskAt(p, x, y, r) > 127);
+
+// Would a beam from (x,y) along (dx,dy) run back into p's own head or body? The hand itself
+// is usually inside the silhouette, so for the body this means leaving it and then re-entering.
+function hitsSelf(p, x, y, dx, dy) {
+  const r = videoRect(), L = rayToEdge(x, y, dx, dy), startInHead = inHead(p, x, y);
+  const useMask = isFresh(p);
+  let outside = 0, left = false;
+  for (let t = 0; t < L; t += 8) {
+    const px = x + dx * t, py = y + dy * t;
+    if (!startInHead && inHead(p, px, py)) return true;
+    if (!useMask) continue;
+    if (maskAt(p, px, py, r) > 127) {
+      if (left) return true;
+      outside = 0;
+    } else if (++outside >= 3) {
+      left = true;
+    }
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------- hands
+
+function classify(p) {
+  const w = p[0];
+  // A finger counts as extended when its tip is clearly farther from the wrist than its PIP joint.
+  const ext = FINGERS.map(f => dist(w, p[f.tip]) > dist(w, p[f.pip]) * 1.12);
+  const n = ext.filter(Boolean).length;
+  if (n === 4) return "open";
+  if (n === 0) return "fist";
+  if (ext[0] && !ext[1] && !ext[2] && ext[3]) return "web";   // index + pinky up, middle + ring down
+  return "none";
+}
+
+class Hand {
+  constructor(pts) {
+    this.pts = pts;
+    this.label = "HAND";
+    this.lastSeen = 0;
+    this.gesture = "none";
+    this.candidate = "";
+    this.candidateN = 0;
+    this.charge = 0;
+    this.openGlow = 0;   // 0..1 palm glow intensity
+    this.openTime = 0;   // seconds the palm has been held open
+    this.beam = 0;       // 0..1 beam intensity
+    this.owner = null;
+    this.n = { x: 0, y: 0, z: -1 };   // palm normal in mirrored screen space; -z faces the camera
+    this.curlKnown = false;           // finger curl has settled which side is the palm
+    this.hist = [];                   // recent palm positions, for detecting throws
+    this.lastThrow = -Infinity;
+    this.lastWeb = -Infinity;
+    this.cx = pts[9].x; this.cy = pts[9].y; this.ps = 100;
+  }
+}
+let hands = [];
+
+function ingestHands(result, now) {
+  const r = videoRect();
+  const dets = result.landmarks.map(lms => lms.map(l => toScreen(l, r)));
+  const match = greedyMatch(dets, hands, (pts, h) => {
+    const d = dist(pts[9], h.pts[9]);
+    return d < Math.max(120, h.ps * 1.5) ? d : null;
+  });
+  dets.forEach((pts, i) => {
+    let h = match.get(i);
+    if (!h) { h = new Hand(pts); hands.push(h); }
+    else for (let j = 0; j < pts.length; j++) {
+      h.pts[j].x += (pts[j].x - h.pts[j].x) * 0.6;
+      h.pts[j].y += (pts[j].y - h.pts[j].y) * 0.6;
+    }
+    h.lastSeen = now;
+    const raw = result.handedness?.[i]?.[0]?.categoryName;
+    h.label = raw === "Left" ? "LEFT" : raw === "Right" ? "RIGHT" : "HAND";
+
+    const wl = result.worldLandmarks?.[i];
+    if (wl) {
+      // Palm axis = (index knuckle - wrist) x (pinky knuckle - wrist), in raw (unmirrored) space.
+      const a = { x: wl[5].x - wl[0].x, y: wl[5].y - wl[0].y, z: wl[5].z - wl[0].z };
+      const b = { x: wl[17].x - wl[0].x, y: wl[17].y - wl[0].y, z: wl[17].z - wl[0].z };
+      let cx = a.y * b.z - a.z * b.y, cy = a.z * b.x - a.x * b.z, cz = a.x * b.y - a.y * b.x;
+      const len = Math.hypot(cx, cy, cz) || 1;
+      cx /= len; cy /= len; cz /= len;
+
+      // Which side is the palm? Fingers only bend toward it, so measure how far the finger joints
+      // sit off the palm plane along the axis. If the model mirrors its depth guess, the axis and
+      // the curl mirror together, so the on-screen direction still comes out right.
+      let curl = 0;
+      for (const [mcp, dip, tip] of [[5, 7, 8], [9, 11, 12], [13, 15, 16], [17, 19, 20]]) {
+        for (const j of [dip, tip]) {
+          curl += (wl[j].x - wl[mcp].x) * cx + (wl[j].y - wl[mcp].y) * cy + (wl[j].z - wl[mcp].z) * cz;
+        }
+      }
+      curl /= 8 * (Math.hypot(a.x, a.y, a.z) || 1);
+
+      // Clear curl decides. A flat hand keeps whichever side curl last picked (continuity);
+      // a hand that has never shown curl falls back to the handedness label.
+      let sign, byCurl = false;
+      if (Math.abs(curl) > 0.12) {
+        sign = Math.sign(curl); byCurl = true; h.curlKnown = true;
+      } else if (h.curlKnown) {
+        sign = -cx * h.n.x + cy * h.n.y + cz * h.n.z < 0 ? -1 : 1;
+      } else {
+        sign = h.label === "RIGHT" ? 1 : -1;
+      }
+      let nx = -sign * cx, ny = sign * cy, nz = sign * cz;   // negated x: into mirrored screen space
+
+      // Never fire into yourself: unless curl just settled it, if this direction runs back into
+      // the owner's head or body and the opposite one doesn't, flip it.
+      const p = h.owner, side = Math.hypot(nx, ny);
+      if (p && side > 0.2 && !byCurl) {
+        const dx = nx / side, dy = ny / side;
+        if (hitsSelf(p, h.cx, h.cy, dx, dy) && !hitsSelf(p, h.cx, h.cy, -dx, -dy)) {
+          nx = -nx; ny = -ny; nz = -nz;
+        }
+      }
+
+      // snap instead of smoothing through zero when the direction reverses
+      if (nx * h.n.x + ny * h.n.y + nz * h.n.z < 0) {
+        h.n = { x: nx, y: ny, z: nz };
+      } else {
+        h.n.x += (nx - h.n.x) * 0.5;
+        h.n.y += (ny - h.n.y) * 0.5;
+        h.n.z += (nz - h.n.z) * 0.5;
+        const nl = Math.hypot(h.n.x, h.n.y, h.n.z) || 1;
+        h.n.x /= nl; h.n.y /= nl; h.n.z /= nl;
+      }
+    }
+
+    // Debounce: a new gesture must hold for 2 detection frames before it takes over.
+    const g = classify(h.pts);
+    if (g === h.candidate) h.candidateN++; else { h.candidate = g; h.candidateN = 1; }
+    if (h.candidateN >= 2) h.gesture = g;
+  });
+}
+
+// A hand belongs to the body whose pose wrist it sits on; failing that, the closest head
+// (weighting vertical distance less, since hands sit below heads).
+function ownerOf(h) {
+  let best = null, bestD = Infinity;
+  for (const p of persons) {
+    if (!p.lm || clock - p.lastSeen > 300) continue;
+    const d = Math.min(dist(h.pts[0], p.lm[15]), dist(h.pts[0], p.lm[16]));
+    if (d < bestD) { bestD = d; best = p; }
+  }
+  if (best && bestD < h.ps * 2) return best;
+  best = null; bestD = Infinity;
+  for (const p of persons) {
+    const d = Math.hypot(h.cx - p.cx, (h.cy - p.cy) * 0.5);
+    if (d < bestD) { bestD = d; best = p; }
+  }
+  return best;
+}
+
+// ---------------------------------------------------------------- effects state
+
+const particles = [];
+const shockwaves = [];
+const floaters = [];   // floating damage numbers
+let flash = 0, shake = 0, flashColor = "170,230,255";
+
+function spawn(o) {
+  if (particles.length > 1400) return;
+  particles.push(Object.assign({ vx: 0, vy: 0, drag: 0.94, grav: 0, size: 2, life: 0.5,
+    r: 255, g: 200, b: 160, anchor: null }, o, { max: o.life ?? 0.5 }));
+}
+
+function burst(x, y, n, speed, color, extra = {}, dir = 0, spread = Math.PI) {
+  for (let k = 0; k < n; k++) {
+    const a = dir + rand(-spread, spread), s = rand(0.2, 1) * speed;
+    spawn(Object.assign({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.4, 1.0),
+      size: rand(1.5, 3.5), r: color[0], g: color[1], b: color[2], drag: 0.93 }, extra));
+  }
+}
+
+function blast(h) {
+  const power = h.charge;
+  h.charge = 0;
+  flash = Math.max(flash, 0.35 + power * 0.65); flashColor = "170,230,255";
+  shake = Math.max(shake, 8 + power * 22);
+  sfx.blast(power);
+  const base = h.ps * 0.4, { x: nx, y: ny } = h.n, facing = Math.abs(h.n.z);
+  for (let k = 0; k < 3; k++) {
+    shockwaves.push({ x: h.cx, y: h.cy, nx, ny, facing, d: 0, r0: base, r: base,
+      speed: (700 + power * 1300) * (1 - k * 0.22),
+      life: 0.9 - k * 0.15, max: 0.9 - k * 0.15, width: 26 * (power + 0.4) * (1 - k * 0.3),
+      // only the lead ring carries damage
+      damage: k === 0 ? { owner: h.owner, power, hit: new Set() } : null });
+  }
+  // debris sprays in a cone along the palm direction, all around when the palm faces the camera
+  burst(h.cx, h.cy, Math.round(80 + power * 220), 1400 * (0.4 + power), [150, 230, 255], {},
+    Math.atan2(ny, nx), Math.PI * (0.2 + 0.8 * facing));
+}
+
+// A shockwave is a ring perpendicular to the palm normal travelling along it, so on screen
+// it's an ellipse squashed along the normal's projection and drifting in that direction.
+function ring(s) {
+  return { cx: s.x + s.nx * s.d, cy: s.y + s.ny * s.d, rot: Math.atan2(s.ny, s.nx),
+    rx: s.r * Math.max(0.15, s.facing), ry: s.r };
+}
+
+// Beam runs from the palm along the projected palm normal to the screen edge, or to the first
+// opponent's body in the way. It shortens as the palm turns toward the camera, since then it's
+// shooting at the viewer rather than across the screen.
+function beamFor(h) {
+  const side = Math.hypot(h.n.x, h.n.y) || 1e-6;
+  const dx = h.n.x / side, dy = h.n.y / side;
+  let len = rayToEdge(h.cx, h.cy, dx, dy) * clamp((side - 0.15) / 0.35, 0, 1) * h.beam;
+  let target = null;
+  if (persons.length >= 2) {
+    const r = videoRect();
+    for (let t = 0; t < len && !target; t += 6) {
+      const x = h.cx + dx * t, y = h.cy + dy * t;
+      for (const p of persons) {
+        if (p !== h.owner && p.ko === 0 && bodyAt(p, x, y, r)) { len = t; target = p; break; }
+      }
+    }
+  }
+  return { x: h.cx, y: h.cy, ex: h.cx + dx * len, ey: h.cy + dy * len, dx, dy, len, side, target };
+}
+
+// Does a shockwave ring touch this person's head or silhouette?
+function ringHits(p, g) {
+  if (insideRing(p.cx, p.cy, g, p.w / 2)) return true;
+  if (!isFresh(p)) return false;
+  const r = videoRect(), c = Math.cos(g.rot), s = Math.sin(g.rot);
+  for (let k = 0; k < 48; k++) {
+    const a = k / 48 * Math.PI * 2, ex = g.rx * Math.cos(a), ey = g.ry * Math.sin(a);
+    if (maskAt(p, g.cx + ex * c - ey * s, g.cy + ex * s + ey * c, r) > 127) return true;
+  }
+  return false;
+}
+
+function insideRing(x, y, g, pad) {
+  const dx = x - g.cx, dy = y - g.cy, c = Math.cos(g.rot), sn = Math.sin(g.rot);
+  const u = dx * c + dy * sn, v = -dx * sn + dy * c;
+  return (u / (g.rx + pad)) ** 2 + (v / (g.ry + pad)) ** 2 <= 1;
+}
+
+function damage(p, s) {
+  const dmg = s.damage;
+  dmg.hit.add(p);
+  if (p.ko > 0) return;
+  // Falls off with distance from where the blast went off.
+  const d = Math.hypot(p.cx - s.x, p.cy - s.y);
+  const amount = Math.round(MAX_DAMAGE * dmg.power * clamp(1 - d / (Math.max(W, H) * 0.8), 0.15, 1));
+  if (amount <= 0) return;
+  p.hitFlash = 1;
+  shake = Math.max(shake, 6 + amount * 0.4);
+  floaters.push({ x: p.cx + rand(-20, 20), y: p.y, text: `-${amount}`, life: 1.1, max: 1.1, big: false });
+  burst(p.cx, p.cy, 30 + amount, 700, [255, 70, 50], { grav: 600 });
+  sfx.hit();
+  applyDamage(p, amount);
+}
+
+function beamDamage(p, amount) {
+  if (p.ko > 0) return;
+  p.hitFlash = Math.max(p.hitFlash, 0.6);
+  p.beamAcc += amount;
+  if (p.beamAcc >= 5) {
+    floaters.push({ x: p.cx + rand(-30, 30), y: p.y, text: `-${Math.round(p.beamAcc)}`,
+      life: 0.8, max: 0.8, big: false });
+    p.beamAcc = 0;
+    sfx.hit();
+  }
+  applyDamage(p, amount);
+}
+
+function applyDamage(p, amount) {
+  p.health = Math.max(0, p.health - amount);
+  if (p.health === 0) {
+    p.beamAcc = 0;
+    p.ko = KO_SECONDS;
+    floaters.push({ x: p.cx, y: p.cy, text: "K.O.", life: 1.6, max: 1.6, big: true });
+    burst(p.cx, p.cy, 160, 1200, [255, 120, 60], { grav: 400 });
+    sfx.ko();
+  }
+}
+
+function update(dt, now) {
+  let maxCharge = 0, beams = 0, maxSpin = 0;
+
+  persons = persons.filter(p => now - p.lastSeen < 1500);
+  for (const p of persons) {
+    p.hitFlash = Math.max(0, p.hitFlash - dt * 2.5);
+    p.flexing = settings.goku && p.ko === 0 && p.lm && isFresh(p) && isFlexing(p.lm);
+
+    // Spinjitzu: a completed 360 runs the tornado for SPIN_SECONDS
+    if (p.lm && isFresh(p)) { trackSpin(p, now); trackSwing(p, now); updateTornadoFrame(p); }
+    const wantSpin = settings.spinjitzu && p.ko === 0 && p.tw && now < p.spinUntil ? 1 : 0;
+    if (wantSpin && !p.spinOn) startSpinjitzu(p);
+    p.spin += (wantSpin - p.spin) * Math.min(1, dt * (wantSpin ? 4 : 1.5));
+    if (!wantSpin && p.spin < 0.05) p.spinOn = false;
+    if (p.spin > 0.2) tornadoDebris(p, dt);
+    updateOrbiters(p, dt);
+    maxSpin = Math.max(maxSpin, p.spin);
+    if (p.ko > 0) {
+      p.ko -= dt;
+      if (p.ko <= 0) { p.ko = 0; p.health = MAX_HEALTH; }
+    }
+    // trailing segment drains down to health, and refills along with it on respawn
+    p.shown += (p.health - p.shown) * Math.min(1, dt * (p.health > p.shown ? 4 : 2));
+  }
+
+  hands = hands.filter(h => {
+    if (now - h.lastSeen <= 300) return true;
+    // Hand vanished: spill any stored charge as a fizzle.
+    burst(h.cx, h.cy, Math.round(h.charge * 40), 250, [120, 220, 255], { life: 0.5 });
+    return false;
+  });
+
+  for (const h of hands) {
+    const p = h.pts;
+    h.cx = (p[0].x + p[5].x + p[9].x + p[13].x + p[17].x) / 5;
+    h.cy = (p[0].y + p[5].y + p[9].y + p[13].y + p[17].y) / 5;
+    h.ps = Math.max(30, dist(p[0], p[9]));
+    h.owner = ownerOf(h);
+    const disabled = h.owner && h.owner.ko > 0;
+    // Repulsor charging and firing are Iron Man only, and pause while the owner flexes:
+    // the fists in a flex would otherwise charge (and later fire) blue repulsors.
+    const armed = !disabled && settings.ironman && !h.owner?.flexing;
+
+    if (h.gesture === "fist" && armed) {
+      h.charge = Math.min(1, h.charge + dt / 1.1);
+      // particles get sucked into the fist
+      const n = 2 + h.charge * 4;
+      for (let k = 0; k < n; k++) {
+        const a = Math.random() * Math.PI * 2, rr = h.ps * rand(1.0, 1.7), life = rand(0.25, 0.4);
+        spawn({ anchor: h, x: Math.cos(a) * rr, y: Math.sin(a) * rr,
+          vx: -Math.cos(a) * rr / life, vy: -Math.sin(a) * rr / life, drag: 1, life,
+          size: rand(1, 2.5), r: 120, g: 225, b: 255 });
+      }
+    } else if (h.gesture === "open" && h.charge > 0.2 && armed) {
+      blast(h);
+    } else {
+      h.charge = Math.max(0, h.charge - dt * 0.7);  // grace period so fist -> open still fires
+    }
+    h.openGlow += ((h.gesture === "open" && armed ? 1 : 0) - h.openGlow) * Math.min(1, dt * 8);
+    maxCharge = Math.max(maxCharge, h.charge);
+
+    // ninja: elemental flames on the hands, and a fast punch / throw shoots a ball
+    if (settings.spinjitzu && !disabled) {
+      handFlames(h, dt);
+      trackThrow(h, now);
+    }
+
+    // spider: holding the web-shooter sign fires a web every WEB_COOLDOWN
+    if (settings.spiderman && !disabled && h.gesture === "web" && now - h.lastWeb > WEB_COOLDOWN) shootWeb(h, now);
+
+    // Holding the palm open fires a continuous beam.
+    h.openTime = h.gesture === "open" ? h.openTime + dt : 0;
+    const firing = h.openTime > 0.35 && armed;
+    h.beam += ((firing ? 1 : 0) - h.beam) * Math.min(1, dt * 12);
+    if (h.beam > 0.05) {
+      beams++;
+      const b = h.geom = beamFor(h);
+      if (b.target) beamDamage(b.target, BEAM_DPS * h.beam * dt);
+      if (b.len > 5) {
+        // sparks spraying back off whatever the beam hits
+        const back = Math.atan2(-b.dy, -b.dx), hot = b.target ? [255, 120, 80] : [170, 235, 255];
+        burst(b.ex, b.ey, b.target ? 5 : 3, 650, hot, { grav: 900, life: rand(0.25, 0.6), drag: 0.97 }, back, 1.1);
+        if (Math.random() < 0.6) {
+          const t = Math.random();
+          spawn({ x: b.x + (b.ex - b.x) * t, y: b.y + (b.ey - b.y) * t, vx: rand(-40, 40), vy: rand(-80, -10),
+            life: rand(0.3, 0.7), size: rand(1, 2), r: 140, g: 220, b: 255, drag: 0.98 });
+        }
+      }
+    }
+  }
+
+  updateBalls(dt);
+  updateFlames(dt);
+  for (let i = webs.length - 1; i >= 0; i--) if ((now - webs[i].born) / 1000 > WEB_LIFE) webs.splice(i, 1);
+
+  // Goku: flex both arms and hold to charge up a stage (yellow, then blue, then white, letting go
+  // and flexing again between each). The aura stays lit, flaring with hand charge / beams, until a K.O. or the
+  // power is switched off.
+  for (const p of persons) {
+    if (!settings.goku || p.ko > 0) p.stage = 0;
+    const flexing = p.flexing;
+    if (!flexing) p.flexReady = true;
+    if (flexing && p.flexReady && p.stage < AURA_STAGES.length - 1) {
+      p.flexCharge = Math.min(1, p.flexCharge + dt / FLEX_SECONDS);
+      chargeUpEffects(p, dt, p.flexCharge, AURA_STAGES[p.stage + 1]);
+      if (p.flexCharge >= 1) transform(p);
+    } else {
+      if (flexing && p.stage > 0) chargeUpEffects(p, dt, 1, AURA_STAGES[p.stage]);   // surge
+      p.flexCharge = Math.max(0, p.flexCharge - dt * 1.5);
+    }
+    maxCharge = Math.max(maxCharge, p.flexCharge);
+
+    let power = flexing ? 1 : 0;   // flexing while powered up flares it to the max
+    for (const h of hands) if (h.owner === p) power = Math.max(power, h.charge, h.beam * 0.8);
+    const target = p.stage > 0 ? 0.55 + 0.45 * power
+      : p.flexCharge * (0.45 + 0.35 * Math.random());   // flickers in while charging
+    p.auraLevel += (target - p.auraLevel) * Math.min(1, dt * 6);
+    updateAura(p, dt);
+  }
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const q = particles[i];
+    q.life -= dt;
+    if (q.life <= 0) { particles.splice(i, 1); continue; }
+    const d = Math.pow(q.drag, dt * 60);
+    q.vx *= d; q.vy = q.vy * d + q.grav * dt;
+    q.x += q.vx * dt; q.y += q.vy * dt;
+  }
+  for (let i = shockwaves.length - 1; i >= 0; i--) {
+    const s = shockwaves[i];
+    s.life -= dt;
+    if (s.life <= 0) { shockwaves.splice(i, 1); continue; }
+    s.d += s.speed * dt;
+    s.r = s.r0 + s.d * (0.3 + 0.7 * s.facing);
+    s.speed *= Math.pow(0.96, dt * 60);
+    if (s.damage && persons.length >= 2) {
+      const g = ring(s);
+      for (const p of persons) {
+        if (p === s.damage.owner || s.damage.hit.has(p)) continue;
+        if (ringHits(p, g)) damage(p, s);
+      }
+    }
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) {
+    const f = floaters[i];
+    f.life -= dt;
+    if (f.life <= 0) floaters.splice(i, 1); else f.y -= dt * (f.big ? 20 : 60);
+  }
+  flash *= Math.exp(-dt * 5);
+  shake *= Math.exp(-dt * 7);
+
+  sfx.setCharge(maxCharge);
+  sfx.setBeam(beams);
+  sfx.setWind(maxSpin);
+}
+
+// ---------------------------------------------------------------- drawing
+
+function glow(x, y, r, stops) {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  stops.forEach(([o, c]) => g.addColorStop(o, c));
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+}
+
+function line(x1, y1, x2, y2, w, style) {
+  ctx.lineWidth = w; ctx.strokeStyle = style;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+}
+
+function drawBeam(h, now) {
+  if (h.beam <= 0.05 || !h.geom) return;
+  const b = h.geom;
+  const w = h.ps * 0.16 * h.beam;
+  const fl = 0.85 + 0.12 * Math.sin(now * 0.06) + Math.random() * 0.1;
+  const facing = 1 - b.side;   // ~1 when the palm points at the camera
+
+  if (b.len > 1) {
+    ctx.lineCap = "round";
+    line(b.x, b.y, b.ex, b.ey, w * 6 * fl, "rgba(40,140,255,0.07)");
+    line(b.x, b.y, b.ex, b.ey, w * 3 * fl, "rgba(60,170,255,0.18)");
+    line(b.x, b.y, b.ex, b.ey, w * 1.5 * fl, "rgba(140,220,255,0.55)");
+    line(b.x, b.y, b.ex, b.ey, w * 0.55 * fl, "rgba(240,252,255,0.95)");
+
+    // two thin strands spiralling around the beam
+    const nx = -b.dy, ny = b.dx;
+    ctx.lineWidth = Math.max(1, w * 0.15);
+    ctx.strokeStyle = "rgba(170,235,255,0.5)";
+    for (const phase of [0, Math.PI]) {
+      ctx.beginPath();
+      for (let s = 0; s <= b.len; s += 10) {
+        const o = Math.sin(s * 0.04 - now * 0.025 + phase) * w * 1.1;
+        const px = b.x + b.dx * s + nx * o, py = b.y + b.dy * s + ny * o;
+        s === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    const hot = b.target ? "255,150,90" : "140,220,255";
+    glow(b.ex, b.ey, w * 4 * fl, [[0, "rgba(255,255,255,0.9)"], [0.25, `rgba(${hot},0.5)`], [1, "rgba(0,80,255,0)"]]);
+  }
+  // muzzle glow, much bigger when the beam is coming straight at the viewer
+  glow(b.x, b.y, w * (3 + facing * 6) * fl, [[0, "rgba(255,255,255,0.95)"],
+    [0.25, "rgba(150,225,255,0.6)"], [1, "rgba(0,100,255,0)"]]);
+}
+
+// Points of a jagged electric arc between two points.
+function jagged(x1, y1, x2, y2, segs, jitter) {
+  const pts = [[x1, y1]];
+  const nx = -(y2 - y1), ny = x2 - x1, nl = Math.hypot(nx, ny) || 1;
+  for (let s = 1; s < segs; s++) {
+    const t = s / segs, o = rand(-jitter, jitter);
+    pts.push([x1 + (x2 - x1) * t + nx / nl * o, y1 + (y2 - y1) * t + ny / nl * o]);
+  }
+  pts.push([x2, y2]);
+  return pts;
+}
+
+function strokePts(pts, style, width) {
+  ctx.strokeStyle = style; ctx.lineWidth = width;
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+  ctx.stroke();
+}
+
+function bolt(x1, y1, x2, y2, segs, jitter) {
+  strokePts(jagged(x1, y1, x2, y2, segs, jitter), ctx.strokeStyle, ctx.lineWidth);
+}
+
+function drawCharge(h, now) {
+  const c = h.charge;
+  if (c <= 0.01) return;
+  const pulse = 1 + 0.08 * Math.sin(now * 0.03);
+  const r = h.ps * (0.12 + 0.32 * c) * pulse;
+  glow(h.cx, h.cy, r * 3, [[0, "rgba(255,255,255,1)"], [0.18, "rgba(170,240,255,0.9)"],
+    [0.45, "rgba(40,170,255,0.35)"], [1, "rgba(0,80,255,0)"]]);
+  if (c > 0.6) {
+    ctx.strokeStyle = `rgba(180,240,255,${0.4 + c * 0.5})`;
+    ctx.lineWidth = 1.5;
+    const arcs = Math.round(c * 5);
+    for (let k = 0; k < arcs; k++) {
+      const a = Math.random() * Math.PI * 2, rr = r * rand(1.6, 3.2);
+      bolt(h.cx, h.cy, h.cx + Math.cos(a) * rr, h.cy + Math.sin(a) * rr, 6, r * 0.35);
+    }
+  }
+}
+
+function drawPalmGlow(h, now) {
+  const o = h.openGlow;
+  if (o <= 0.02) return;
+  const r = h.ps * 0.55 * (1 + 0.05 * Math.sin(now * 0.02));
+  glow(h.cx, h.cy, r, [[0, `rgba(255,255,255,${0.85 * o})`], [0.3, `rgba(140,225,255,${0.5 * o})`],
+    [1, "rgba(0,120,255,0)"]]);
+  // spinning ring lies flat on the palm, tilted the same way the blast will be
+  ctx.strokeStyle = `rgba(140,230,255,${0.6 * o})`;
+  ctx.lineWidth = 2;
+  const spin = now * 0.002, tilt = Math.atan2(h.n.y, h.n.x), squash = Math.max(0.2, Math.abs(h.n.z));
+  for (let k = 0; k < 6; k++) {
+    const a = spin + k * Math.PI / 3;
+    ctx.beginPath(); ctx.ellipse(h.cx, h.cy, r * 0.6 * squash, r * 0.6, tilt, a, a + 0.6); ctx.stroke();
+  }
+}
+
+// Dashed aim line along the palm direction while charging or open (hidden when facing the camera).
+function drawAim(h, now) {
+  const side = Math.hypot(h.n.x, h.n.y);
+  const o = Math.max(h.openGlow, h.charge > 0.2 ? 1 : 0) * clamp((side - 0.3) / 0.3, 0, 1) * (1 - h.beam);
+  if (o <= 0.02) return;
+  const len = h.ps * 4 * side;
+  ctx.setLineDash([6, 10]);
+  ctx.lineDashOffset = -now * 0.06;
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = `rgba(140,230,255,${0.5 * o})`;
+  ctx.beginPath(); ctx.moveTo(h.cx, h.cy); ctx.lineTo(h.cx + h.n.x * len, h.cy + h.n.y * len); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawSkeleton(h) {
+  const p = h.pts;
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(60,200,255,0.18)"; ctx.lineWidth = 7;
+  ctx.beginPath();
+  for (const [a, b] of CONNECTIONS) { ctx.moveTo(p[a].x, p[a].y); ctx.lineTo(p[b].x, p[b].y); }
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(150,235,255,0.7)"; ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = "rgba(200,245,255,0.9)";
+  for (const q of p) { ctx.beginPath(); ctx.arc(q.x, q.y, 2.5, 0, Math.PI * 2); ctx.fill(); }
+}
+
+function drawShockwaves() {
+  for (const s of shockwaves) {
+    const t = s.life / s.max, g = ring(s);
+    ctx.lineWidth = Math.max(1, s.width * t);
+    ctx.strokeStyle = `rgba(${s.color || "160,230,255"},${0.8 * t})`;
+    ctx.beginPath(); ctx.ellipse(g.cx, g.cy, g.rx, g.ry, g.rot, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = Math.max(1, s.width * t * 0.3);
+    ctx.strokeStyle = `rgba(255,255,255,${0.9 * t})`;
+    ctx.stroke();
+    if (t > 0.75) {
+      glow(g.cx, g.cy, (g.rx + g.ry) / 2,
+        [[0, `rgba(255,255,255,${(t - 0.75) * 3})`], [1, "rgba(100,200,255,0)"]]);
+    }
+  }
+}
+
+function drawParticles() {
+  ctx.lineCap = "round";
+  for (const q of particles) {
+    const a = q.life / q.max;
+    const x = q.x + (q.anchor ? q.anchor.cx : 0), y = q.y + (q.anchor ? q.anchor.cy : 0);
+    ctx.strokeStyle = `rgba(${q.r | 0},${q.g | 0},${q.b | 0},${a})`;
+    ctx.lineWidth = q.size;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - q.vx * 0.025, y - q.vy * 0.025); ctx.stroke();
+  }
+}
+
+// Draw one of a person's mask-sized canvases mirrored over the video.
+function drawMaskLayer(img, alpha) {
+  const r = videoRect();
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(r.x + r.w, r.y); ctx.scale(-1, 1);
+  ctx.drawImage(img, 0, 0, r.w, r.h);
+  ctx.restore();
+}
+
+function drawPoseSkeleton(p) {
+  const L = p.lm, [r, g, b] = p.color;
+  ctx.lineCap = "round";
+  ctx.strokeStyle = `rgba(${r},${g},${b},0.75)`; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (const [a, c] of POSE_CONNECTIONS) {
+    if (L[a].v < 0.5 || L[c].v < 0.5) continue;
+    ctx.moveTo(L[a].x, L[a].y); ctx.lineTo(L[c].x, L[c].y);
+  }
+  ctx.stroke();
+  ctx.fillStyle = `rgba(${r},${g},${b},0.95)`;
+  for (const q of L) {
+    if (q.v < 0.5) continue;
+    ctx.beginPath(); ctx.arc(q.x, q.y, 3, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+function drawSilhouette(p) {
+  if (settings.silhouettes && isFresh(p)) drawMaskLayer(p.edge, 0.6);
+}
+
+function drawHitGlow(p) {
+  if (p.hitFlash <= 0.01) return;
+  if (isFresh(p)) drawMaskLayer(p.fill, 0.55 * p.hitFlash);
+  else glow(p.cx, p.cy, p.w * 1.1, [[0, `rgba(255,60,40,${0.6 * p.hitFlash})`], [1, "rgba(255,0,0,0)"]]);
+}
+
+function drawReticle(h, now) {
+  const R = h.ps * 1.25, rot = now / 1000;
+  ctx.strokeStyle = "rgba(90,220,255,0.55)";
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 3; i++) {
+    const a = rot * 0.8 + i * Math.PI * 2 / 3;
+    ctx.beginPath(); ctx.arc(h.cx, h.cy, R, a, a + 1.3); ctx.stroke();
+  }
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    const a = -rot * 1.3 + i * Math.PI / 2;
+    ctx.beginPath(); ctx.arc(h.cx, h.cy, R * 1.1, a, a + 0.35); ctx.stroke();
+  }
+  if (h.charge > 0.01) {
+    ctx.strokeStyle = h.charge >= 1 ? "rgba(255,255,255,0.95)" : "rgba(160,240,255,0.9)";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(h.cx, h.cy, R * 0.9, -Math.PI / 2, -Math.PI / 2 + h.charge * Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // callout label
+  const ax = h.cx + Math.cos(-0.7) * R, ay = h.cy + Math.sin(-0.7) * R;
+  const lx = ax + 30, ly = ay - 30;
+  ctx.strokeStyle = "rgba(90,220,255,0.6)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(lx, ly); ctx.lineTo(lx + 140, ly); ctx.stroke();
+  const disabled = h.owner && h.owner.ko > 0;
+  const state = disabled ? "OFFLINE"
+    : h.owner?.flexing ? "POWERING UP"
+    : h.gesture === "web" && settings.spiderman ? "WEB SHOOTER"
+    : !settings.ironman || h.gesture === "web" ? "TRACKING"
+    : { fist: h.charge >= 1 ? "CHARGED" : "CHARGING", open: h.beam > 0.5 ? "BEAM" : "REPULSOR",
+        none: "TRACKING" }[h.gesture];
+  const who = persons.length >= 2 && h.owner ? `P${h.owner.num} ` : "";
+  ctx.fillStyle = "rgba(170,240,255,0.95)";
+  ctx.font = "12px Consolas, monospace";
+  ctx.fillText(`${who}${h.label} // ${state}`, lx + 2, ly - 6);
+  if (settings.ironman) {
+    ctx.fillStyle = "rgba(120,210,240,0.75)";
+    ctx.fillText(`PWR ${String(Math.round(h.charge * 100)).padStart(3, "0")}%`, lx + 2, ly + 14);
+  }
+}
+
+function healthColor(frac) {
+  return frac > 0.5 ? [90, 220, 255] : frac > 0.25 ? [255, 190, 60] : [255, 60, 50];
+}
+
+function drawPlayer(p, now) {
+  const visible = now - p.lastSeen < 300 ? 1 : 0.35;
+  ctx.globalAlpha = visible;
+
+  // corner brackets around the face
+  const L = p.w * 0.22, pad = p.w * 0.08;
+  const x0 = p.x - pad, y0 = p.y - pad, x1 = p.x + p.w + pad, y1 = p.y + p.h + pad;
+  ctx.strokeStyle = p.ko > 0 ? "rgba(255,80,60,0.8)" : "rgba(90,220,255,0.6)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x0, y0 + L); ctx.lineTo(x0, y0); ctx.lineTo(x0 + L, y0);
+  ctx.moveTo(x1 - L, y0); ctx.lineTo(x1, y0); ctx.lineTo(x1, y0 + L);
+  ctx.moveTo(x0, y1 - L); ctx.lineTo(x0, y1); ctx.lineTo(x0 + L, y1);
+  ctx.moveTo(x1 - L, y1); ctx.lineTo(x1, y1); ctx.lineTo(x1, y1 - L);
+  ctx.stroke();
+
+  // health bar
+  const bw = Math.max(140, p.w * 1.4), bh = 12;
+  const bx = p.cx - bw / 2, by = y0 - 28;
+  const frac = p.health / MAX_HEALTH, shownFrac = clamp(p.shown / MAX_HEALTH, 0, 1);
+  const [r, g, b] = healthColor(frac);
+  ctx.fillStyle = "rgba(0,15,25,0.7)";
+  ctx.fillRect(bx, by, bw, bh);
+  if (shownFrac > frac) {
+    ctx.fillStyle = "rgba(255,240,220,0.85)";
+    ctx.fillRect(bx + bw * frac, by, bw * (shownFrac - frac), bh);
+  }
+  const lowPulse = frac <= 0.25 && p.ko === 0 ? 0.6 + 0.4 * Math.sin(now * 0.015) : 1;
+  ctx.fillStyle = `rgba(${r},${g},${b},${0.9 * lowPulse})`;
+  ctx.fillRect(bx, by, bw * Math.min(frac, shownFrac), bh);
+  ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let k = 1; k < 10; k++) { const tx = bx + bw * k / 10; ctx.moveTo(tx, by); ctx.lineTo(tx, by + bh); }
+  ctx.stroke();
+  ctx.strokeStyle = `rgba(${r},${g},${b},0.9)`;
+  ctx.strokeRect(bx - 0.5, by - 0.5, bw + 1, bh + 1);
+
+  ctx.font = "bold 13px Consolas, monospace";
+  ctx.fillStyle = `rgb(${p.color.join(",")})`;
+  ctx.fillText(`P${p.num}`, bx, by - 6);
+  ctx.fillStyle = "rgba(200,245,255,0.95)";
+  ctx.textAlign = "right";
+  ctx.fillText(p.ko > 0 ? `REBOOT ${p.ko.toFixed(1)}s` : `${Math.ceil(p.health)}`, bx + bw, by - 6);
+  ctx.textAlign = "left";
+  ctx.globalAlpha = 1;
+}
+
+function drawFloaters() {
+  ctx.textAlign = "center";
+  for (const f of floaters) {
+    const a = Math.min(1, f.life / f.max * 2);
+    ctx.font = f.big ? "bold 64px Consolas, monospace" : "bold 26px Consolas, monospace";
+    ctx.fillStyle = `rgba(${f.color || (f.big ? "255,90,60" : "255,120,90")},${a})`;
+    ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.textAlign = "left";
+}
+
+function drawHud(fps) {
+  const m = 22, L = 40;
+  ctx.strokeStyle = "rgba(90,220,255,0.5)"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(m, m + L); ctx.lineTo(m, m); ctx.lineTo(m + L, m);
+  ctx.moveTo(W - m - L, m); ctx.lineTo(W - m, m); ctx.lineTo(W - m, m + L);
+  ctx.moveTo(m, H - m - L); ctx.lineTo(m, H - m); ctx.lineTo(m + L, H - m);
+  ctx.moveTo(W - m - L, H - m); ctx.lineTo(W - m, H - m); ctx.lineTo(W - m, H - m - L);
+  ctx.stroke();
+  ctx.font = "12px Consolas, monospace";
+  ctx.fillStyle = "rgba(150,230,255,0.85)";
+  ctx.fillText(persons.length >= 2 ? "HUD // COMBAT MODE" : "HUD // ONLINE", m + 10, m + 22);
+  ctx.fillText(`PEOPLE ${persons.length}   HANDS ${hands.length}   FPS ${fps.toFixed(0)}`, m + 10, m + 40);
+  let line = m + 58;
+  if (settings.spinjitzu && persons.length) {
+    // what the spin detector sees: facing direction and shoulder width vs. front-on
+    const spin = persons.map(p => `P${p.num} ${p.facing.toUpperCase()} ${Math.round(p.swNow * 100)}%`).join("  ");
+    ctx.fillText(`SPIN ${spin}`, m + 10, line);
+    line += 18;
+  }
+  if (settings.muted) ctx.fillText("AUDIO MUTED", m + 10, line);
+  ctx.textAlign = "right";
+  ctx.fillStyle = "rgba(150,230,255,0.5)";
+  ctx.fillText("P powers panel · F fullscreen", W - m - 10, H - m - 12);
+  ctx.textAlign = "left";
+}
+
+function render(now, fps) {
+  const sx = (Math.random() * 2 - 1) * shake, sy = (Math.random() * 2 - 1) * shake;
+  ctx.setTransform(DPR, 0, 0, DPR, sx * DPR, sy * DPR);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "#000";
+  ctx.fillRect(-50, -50, W + 100, H + 100);
+
+  if (settings.video && video.readyState >= 2) {
+    const r = videoRect();
+    ctx.save();
+    ctx.translate(r.x + r.w, r.y); ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, r.w, r.h);
+    ctx.restore();
+    ctx.fillStyle = "rgba(0,10,20,0.35)";  // dim so the glows pop
+    ctx.fillRect(-50, -50, W + 100, H + 100);
+  }
+
+  ctx.globalCompositeOperation = "lighter";
+  for (const p of persons) {
+    drawTornado(p, now);
+    if (isFresh(p)) drawAura(p, now);
+    drawSilhouette(p);
+    drawHitGlow(p);
+    if (settings.skeleton && p.lm && isFresh(p)) drawPoseSkeleton(p);
+  }
+  for (const h of hands) {
+    if (settings.skeleton) drawSkeleton(h);
+    drawPalmGlow(h, now);
+    drawAim(h, now);
+    if (settings.ironman) drawCharge(h, now);
+    drawBeam(h, now);
+  }
+  drawFlames();
+  drawBalls(now);
+  drawShockwaves();
+  drawParticles();
+  if (flash > 0.01) {
+    ctx.fillStyle = `rgba(${flashColor},${flash * 0.55})`;
+    ctx.fillRect(-50, -50, W + 100, H + 100);
+  }
+
+  ctx.globalCompositeOperation = "source-over";
+  drawWebs(now);
+  for (const h of hands) drawReticle(h, now);
+  for (const p of persons) drawFlexGauge(p);
+  if (persons.length >= 2) for (const p of persons) drawPlayer(p, now);
+  drawFloaters();
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const v = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
+  v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,10,20,0.7)");
+  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  drawHud(fps);
+}
+
+// ---------------------------------------------------------------- main
+
+let handLandmarker = null, poseLandmarker = null;
+const poseCanvas = document.createElement("canvas"), poseCtx = poseCanvas.getContext("2d");
+
+async function createModels() {
+  const fileset = await FilesetResolver.forVisionTasks(WASM_PATH);
+  const make = delegate => Promise.all([
+    HandLandmarker.createFromOptions(fileset, {
+      baseOptions: { modelAssetPath: HAND_MODEL, delegate },
+      runningMode: "VIDEO",
+      numHands: 4,
+      minHandDetectionConfidence: 0.5,
+      minHandPresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    }),
+    // Pose stays on CPU: GPU segmentation masks can read back as all zeros on some machines,
+    // and the lite model on a 320px frame is cheap anyway.
+    PoseLandmarker.createFromOptions(fileset, {
+      baseOptions: { modelAssetPath: POSE_MODEL, delegate: "CPU" },
+      runningMode: "VIDEO",
+      numPoses: 4,
+      outputSegmentationMasks: true,
+      minPoseDetectionConfidence: 0.5,
+      minPosePresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    }),
+  ]);
+  try {
+    return await make("GPU");
+  } catch (e) {
+    console.warn("GPU delegate failed, falling back to CPU", e);
+    return await make("CPU");
+  }
+}
+
+let lastVideoTime = -1, lastFrame = performance.now(), fps = 60;
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, Math.max(0.001, (now - lastFrame) / 1000));
+  lastFrame = now;
+  fps += (1 / dt - fps) * 0.05;
+  clock = now;
+
+  if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+    lastVideoTime = video.currentTime;
+    poseCtx.drawImage(video, 0, 0, poseCanvas.width, poseCanvas.height);
+    // masks are only valid inside the callback, so they're copied out there
+    poseLandmarker.detectForVideo(poseCanvas, now, result => ingestPoses(result, now));
+    ingestHands(handLandmarker.detectForVideo(video, now), now);
+  }
+  update(dt, now);
+  render(now, fps);
+}
+
+goBtn.addEventListener("click", async () => {
+  goBtn.disabled = true;
+  try {
+    if (!sfx.ready) sfx.init();
+    statusEl.textContent = "requesting camera…";
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" }, audio: false,
+    });
+    video.srcObject = stream;
+    await video.play();
+    statusEl.textContent = "loading tracking models…";
+    poseCanvas.width = POSE_WIDTH;
+    poseCanvas.height = Math.round(POSE_WIDTH * video.videoHeight / video.videoWidth);
+    [handLandmarker, poseLandmarker] = await createModels();
+    startEl.style.display = "none";
+    uiEl.hidden = false;
+    requestAnimationFrame(loop);
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = "Failed: " + (e.message || e) + " (camera needs localhost or https)";
+    goBtn.disabled = false;
+  }
+});
+
+// ---------------------------------------------------------------- side panel
+
+const uiEl = document.getElementById("ui");
+const panelEl = document.getElementById("panel");
+const tabEl = document.getElementById("tab");
+const toggles = [...document.querySelectorAll("[data-setting]")];
+const swatches = [...document.querySelectorAll(".swatch")];
+const spinPick = document.getElementById("spinPick");
+const spinCard = document.getElementById("spinCard");
+
+const hexToRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).join(",");
+const rgbToHex = c => "#" + c.split(",").map(n => (+n).toString(16).padStart(2, "0")).join("");
+
+function syncPanel() {
+  for (const el of toggles) {
+    const on = settings[el.dataset.setting];
+    el.setAttribute("aria-pressed", String(el.hasAttribute("data-invert") ? !on : on));
+  }
+  // the Spinjitzu card and swatches follow the chosen tornado color
+  for (const sw of swatches) sw.setAttribute("aria-pressed", String(sw.dataset.color === settings.spinColor));
+  spinPick.value = rgbToHex(settings.spinColor);
+  spinCard.style.setProperty("--accent", `rgb(${settings.spinColor})`);
+  spinCard.style.setProperty("--glow", `rgba(${settings.spinColor},0.2)`);
+}
+
+for (const sw of swatches) {
+  sw.addEventListener("click", () => { setSetting("spinColor", sw.dataset.color); sw.blur(); });
+}
+spinPick.addEventListener("input", () => setSetting("spinColor", hexToRgb(spinPick.value)));
+
+function setSetting(key, value) {
+  settings[key] = value;
+  if (key === "muted") sfx.setMuted(value);
+  syncPanel();
+}
+
+function togglePanel() {
+  const open = panelEl.classList.toggle("collapsed") === false;
+  tabEl.setAttribute("aria-expanded", String(open));
+}
+
+for (const el of toggles) {
+  el.addEventListener("click", () => {
+    setSetting(el.dataset.setting, !settings[el.dataset.setting]);
+    el.blur();   // keep keyboard shortcuts from re-clicking the focused button
+  });
+}
+tabEl.addEventListener("click", () => { togglePanel(); tabEl.blur(); });
+syncPanel();
+
+const KEY_SETTINGS = { i: "ironman", g: "goku", j: "spinjitzu", w: "spiderman", v: "video", h: "skeleton", s: "silhouettes", m: "muted" };
+
+addEventListener("keydown", e => {
+  const k = e.key.toLowerCase();
+  if (KEY_SETTINGS[k]) setSetting(KEY_SETTINGS[k], !settings[KEY_SETTINGS[k]]);
+  else if (k === "p") togglePanel();
+  else if (k === "f") {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen?.();
+  }
+});
+</script>
+</body>
+</html>
