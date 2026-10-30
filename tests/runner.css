@@ -1,0 +1,18 @@
+body { margin: 0; background: #050b10; color: #bfe9f7; font: 13px/1.5 Consolas, "SF Mono", Menlo, monospace; }
+header { padding: 16px; border-bottom: 1px solid #2ad4ff33; }
+h1 { margin: 0; font-size: 16px; font-weight: 400; letter-spacing: .3em; color: #7fe9ff; }
+#summary { margin: 6px 0 0; }
+main { padding: 16px; }
+#view { display: block; width: 100%; max-width: 640px; height: auto; border: 1px solid #2ad4ff33; }
+#results { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 10px; }
+#results li { padding: 10px 12px; border: 1px solid #ffffff1a; border-left: 4px solid #8aa3ad; }
+#results li.pass { border-left-color: #3ddc84; }
+#results li.fail { border-left-color: #ff5a4a; }
+.name { font-weight: bold; color: #fff; }
+.about { opacity: .7; }
+.check { margin-left: 12px; }
+.check.fail { color: #ff8a7a; }
+.check.skip { color: #e8c35a; }
+.shots { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.shots img { width: 240px; max-width: 100%; height: auto; border: 1px solid #ffffff22; }
+pre { white-space: pre-wrap; color: #ff8a7a; }
