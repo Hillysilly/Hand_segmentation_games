@@ -17,6 +17,24 @@ python serve.py            # http://localhost:8000/
 Use `serve.py` rather than `python -m http.server`: it serves `.js` with a JavaScript MIME type
 (Python on Windows sometimes doesn't, and the browser then refuses the modules) and turns caching off.
 
+### Let Chrome use the GPU
+
+Tracking and the suit run on the GPU, so Chrome must be allowed to use it, or everything lags.
+
+1. In Chrome, open `chrome://settings/system` and turn on **Use graphics acceleration when
+   available**, then relaunch Chrome.
+2. On a laptop with two GPUs (e.g. integrated AMD/Intel plus an NVIDIA card), point Chrome at the
+   fast one: Windows **Settings > System > Display > Graphics**, add
+   `C:\Program Files\Google\Chrome\Application\chrome.exe`, choose **Options > High performance**
+   and save. (This is the registry value `C:\Program Files\Google\Chrome\Application\chrome.exe` =
+   `GpuPreference=2;` under `HKCU\Software\Microsoft\DirectX\UserGpuPreferences`.)
+3. Fully quit Chrome (including any copy left running in the background) and reopen it.
+4. Check `chrome://gpu`: the WebGL renderer line should name the fast card, and the HUD's
+   `MS` line shows how long each stage takes.
+
+Body tracking currently runs on the CPU either way (its GPU version returns empty masks), so expect
+roughly 55–70 ms per frame from it even on a good GPU.
+
 ## Suit model
 
 The suit is a rigged humanoid glTF posed every frame from the tracked body (`js/powers/suitmodel.js`).
