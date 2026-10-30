@@ -13,6 +13,7 @@ import { handFlames, trackThrow, updateBalls, updateFlames } from "./powers/ninj
 import { WEB_COOLDOWN, shootWeb, updateWebs } from "./powers/spider.js";
 import { updateRepulsor, updateBeam } from "./powers/ironman.js";
 import { updateArmor } from "./powers/armor.js";
+import { updateNanotech } from "./powers/nanotech.js";
 import { updateCloak } from "./powers/cloak.js";
 
 export function update(dt, now) {
@@ -47,7 +48,8 @@ export function update(dt, now) {
     const disabled = h.owner && h.owner.ko > 0;
     // Repulsor charging and firing are Iron Man only, and pause while the owner flexes:
     // the fists in a flex would otherwise charge (and later fire) blue repulsors.
-    const armed = !disabled && settings.ironman && !h.owner?.flexing;
+    // ...and while the hand is held on the chest for the nanotech suit-up
+    const armed = !disabled && settings.ironman && !h.owner?.flexing && !h.owner?.nano?.hold;
 
     updateRepulsor(h, dt, armed);
     maxCharge = Math.max(maxCharge, h.charge);
@@ -73,6 +75,7 @@ export function update(dt, now) {
   updateShockwaves(dt);
   updateFloaters(dt);
   decayScreenFx(dt);
+  timed("nano", () => updateNanotech(dt));
   timed("suit", () => updateArmor(dt));
   timed("cloak", updateCloak);
 

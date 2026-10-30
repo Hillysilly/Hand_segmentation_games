@@ -53,6 +53,12 @@ The model needs Mixamo bone names (Hips, Spine, Spine2, Neck, Head, Left/Right S
 Hand, UpLeg, Leg, Foot; Sketchfab's `_NN` suffixes are fine); if any are missing the browser console says which, and the suit falls
 back to just the reactor and hand armour.
 
+NANOTECH (key N): hold a hand flat on your chest for a moment and the suit flows out of the arc
+reactor over your body, chest first and helmet last; do it again to put it away. Every vertex of
+the model has its distance from the reactor baked in (over the skeleton), and the shader draws
+only what the front has reached, with liquid silver at the edge. Turn NANOTECH off to just wear the
+suit.
+
 CLOAK (key C) paints the room back over your body so only the suit shows. It learns the room from
 what the camera sees around you, so step out of shot (or move around) once at the start.
 

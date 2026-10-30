@@ -9,12 +9,24 @@
 //   - torso, neck and head: whole-frame rotations from the hip line, shoulder line and ears/nose
 //   - arms and legs: each bone swung onto its landmark segment and stretched to its length, with
 //     the upper bone twisted so the elbow / knee bends in the plane the landmarks bend in
+//   - nanotech: every vertex carries its distance from the arc reactor along the body, and the
+//     shader draws only what the suit-up front has reached (see setNano)
 //   - hands: the gauntlets, every finger bone swung onto the hand tracker's landmarks; without hand
 //     tracking, just the hand's angle from the pose's wrist / index / pinky
+
+import { steady } from "../filter.js";
 
 const MODELS = ["assets/models/suit.glb", "assets/models/xbot.glb"];
 const ROOT_URL = new URL("../../", import.meta.url);
 const NOSE_TILT = 0.15;   // radians the nose sits below the ear line
+const REACTOR = /reactor/i;  // material name of a model's own arc reactor
+// nanotech front, in units of the farthest vertex's distance from the reactor
+const NANO_EDGE = 0.05;      // width of the liquid-silver band behind the front
+const NANO_PLATES = 0.035;   // how far ahead or behind the front each little plate locks in
+const NANO_REACH = 1 + NANO_EDGE + NANO_PLATES;   // front position at level 1: everything formed
+// how slowly the suit travels up the neck and down the legs (1 = as fast as everywhere else): the
+// helmet closes near the end, as in the films, and the legs keep pace with the arms
+const NANO_PACE = { Neck: 2.2, LeftUpLeg: 0.7, RightUpLeg: 0.7 };
 const HEAD_PER_EAR = 1.5; // helmet width per ear-to-ear distance: a little bigger than the real head, to cover it
 const GAUNTLET = 1.15;    // gauntlet size over the tracked hand's, to cover it
 // [upper, lower, end] bones and the [pose] landmarks they follow, per model side
@@ -77,8 +89,115 @@ function prepare(scene, url) {
     if (!o.isMesh) return;
     o.frustumCulled = false;   // bind-pose bounds don't follow the posed, pixel-sized body
     if (xbot) o.material = /joint/i.test(o.name) ? gold : red;
+    else if (REACTOR.test(o.material.name)) {   // light up the model's own arc reactor
+      o.material.emissive = new T.Color(0xbfefff);
+      o.material.emissiveMap = o.material.map;
+      o.material.emissiveIntensity = 1.6;
+    }
   });
+  bakeNanoDist(scene);
   return scene;
+}
+
+// Every vertex's distance from the arc reactor over the body, as a 0..1 "nanoDist" attribute: straight
+// through the torso, then out along the skeleton (up the neck, down the arms and legs), so the
+// nanotech suit spreads from the reactor like a flood fill over the body. Blended by skin weight, so
+// it runs smoothly across the joints. Also records the model's height, which scales the plate
+// pattern in the shader.
+function bakeNanoDist(scene) {
+  scene.updateMatrixWorld(true);
+  const bones = {};
+  scene.traverse(o => { if (o.isBone) bones[boneName(o.name)] = o; });
+  const at = b => b.getWorldPosition(V());
+  const R = reactorWorld(scene)?.centre ?? at(bones.Spine2);
+  const torso = new Set(["Hips", "Spine", "Spine1", "Spine2"].map(n => bones[n]).filter(Boolean));
+  // limb / neck bone -> [distance from the reactor to its joint over the skeleton, pace along it]
+  const reach = new Map();
+  const out = (b, d, k) => {
+    reach.set(b, [d, k]);
+    for (const c of b.children) if (c.isBone && !torso.has(c)) out(c, d + k * at(b).distanceTo(at(c)), k);
+  };
+  for (const b of torso) {
+    for (const c of b.children) {
+      if (!c.isBone || torso.has(c)) continue;
+      const k = NANO_PACE[boneName(c.name)] ?? 1;
+      out(c, at(b).distanceTo(R) + k * at(b).distanceTo(at(c)), k);
+    }
+  }
+  const v = V(), meshes = [];
+  let far = 0;
+  scene.traverse(m => {
+    if (!m.isSkinnedMesh) return;
+    const pos = m.geometry.attributes.position, si = m.geometry.attributes.skinIndex, sw = m.geometry.attributes.skinWeight;
+    const d = new Float32Array(pos.count);
+    for (let i = 0; i < pos.count; i++) {
+      m.applyBoneTransform(i, v.fromBufferAttribute(pos, i)).applyMatrix4(m.matrixWorld);
+      let sum = 0, wsum = 0;
+      for (let c = 0; c < 4; c++) {
+        const w = sw.getComponent(i, c);
+        if (!w) continue;
+        const b = m.skeleton.bones[si.getComponent(i, c)];
+        const r = reach.get(b);
+        sum += w * (r ? r[0] + r[1] * v.distanceTo(at(b)) : v.distanceTo(R));
+        wsum += w;
+      }
+      d[i] = wsum ? sum / wsum : v.distanceTo(R);
+      if (d[i] > far) far = d[i];
+    }
+    meshes.push([m, d]);
+  });
+  for (const [m, d] of meshes) {
+    for (let i = 0; i < d.length; i++) d[i] /= far || 1;
+    m.geometry.setAttribute("nanoDist", new T.BufferAttribute(d, 1));
+  }
+  // height in the meshes' own units, which is what the shader's positions are in
+  let tall = 0;
+  for (const [m] of meshes) {
+    m.geometry.computeBoundingBox();
+    tall = Math.max(tall, m.geometry.boundingBox.max.y - m.geometry.boundingBox.min.y);
+  }
+  scene.userData.height = tall || 1;
+}
+
+// The suit's materials, taught the nanotech front: hide what it hasn't reached yet, and turn the band
+// just behind it into glowing liquid silver. u holds this rig's uniforms.
+function nanoMaterial(base, u) {
+  const m = base.clone();
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nattribute float nanoDist;\nvarying float vNanoDist;\nvarying vec3 vNanoPos;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvNanoDist = nanoDist;\nvNanoPos = position;");
+    sh.fragmentShader = sh.fragmentShader
+      .replace("#include <common>", `#include <common>
+uniform float uNanoFront, uNanoTime, uNanoScale;
+varying float vNanoDist;
+varying vec3 vNanoPos;
+float nanoHash(vec3 c) { return fract(sin(dot(c, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }`)
+      .replace("#include <clipping_planes_fragment>", `#include <clipping_planes_fragment>
+vec3 nanoP = vNanoPos * uNanoScale;
+// little plates (cells of the body) each lock in a bit early or late, so the front is ragged
+float nanoBehind = uNanoFront - vNanoDist - ${NANO_PLATES.toFixed(4)} * (nanoHash(floor(nanoP * 45.0)) * 2.0 - 1.0);
+if (nanoBehind < 0.0) discard;
+float nanoSilver = 1.0 - smoothstep(0.0, ${NANO_EDGE.toFixed(4)}, nanoBehind);
+float nanoHot = 1.0 - smoothstep(0.0, ${(NANO_EDGE * 0.35).toFixed(4)}, nanoBehind);`)
+      .replace("#include <color_fragment>", `#include <color_fragment>
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.88, 0.92), nanoSilver);`)
+      .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
+roughnessFactor = mix(roughnessFactor, 0.12, nanoSilver);`)
+      .replace("#include <metalnessmap_fragment>", `#include <metalnessmap_fragment>
+metalnessFactor = mix(metalnessFactor, 1.0, nanoSilver);`)
+      .replace("#include <emissivemap_fragment>", `#include <emissivemap_fragment>
+float nanoRipple = 0.55 + 0.45 * sin(vNanoDist * 220.0 - uNanoTime * 16.0 + nanoP.x * 60.0);
+totalEmissiveRadiance += vec3(0.75, 0.85, 1.0) * (nanoHot * 3.0 + nanoSilver * nanoRipple * 0.6);`);
+  };
+  return m;
+}
+
+// Set how far the nanotech suit has formed (level 0..1) on this rig; t is the time in seconds.
+export function setNano(r, level, t) {
+  r.nano.uNanoFront.value = level * NANO_REACH;
+  r.nano.uNanoTime.value = t;
 }
 
 export const modelReady = () => !!template;
@@ -107,6 +226,13 @@ export function makeBodyRig(scene) {
   model.traverse(o => { if (o.isBone) bones[boneName(o.name)] = o; });
   const rest = new Map();
   for (const b of Object.values(bones)) rest.set(b, { q: b.quaternion.clone(), p: b.position.clone(), s: b.scale.clone() });
+  const nano = { uNanoFront: { value: NANO_REACH }, uNanoTime: { value: 0 }, uNanoScale: { value: 1 / template.userData.height } };
+  const own = new Map();   // this rig's copy of each material, carrying its own nanotech front
+  model.traverse(m => {
+    if (!m.isMesh || !m.geometry.attributes.nanoDist) return;
+    if (!own.has(m.material)) own.set(m.material, nanoMaterial(m.material, nano));
+    m.material = own.get(m.material);
+  });
 
   holder.updateMatrixWorld(true);
   const wp = n => bones[n].getWorldPosition(V());
@@ -135,7 +261,7 @@ export function makeBodyRig(scene) {
   }
   const eyes = bones.LeftEye && bones.RightEye ? wp("LeftEye").distanceTo(wp("RightEye")) : 0;
   return {
-    holder, bones, rest, offset, hinge, eyes, head: headWidth(model, bones, body),
+    holder, bones, rest, offset, hinge, eyes, nano, head: headWidth(model, bones, body), reactor: findReactor(model),
     torso: up.length(), width: wp("LeftArm").distanceTo(wp("RightArm")),
     s: 0, headFrame: Q(), gauntlet: { Left: false, Right: false },
   };
@@ -161,6 +287,43 @@ function headWidth(model, bones, f) {
     }
   });
   return hi > lo ? hi - lo : 0;
+}
+
+// The model's own arc reactor, if it has one: the bone it rides on, and its centre and rim in that
+// bone's space.
+function findReactor(model) {
+  const r = reactorWorld(model);
+  return r && { bone: r.bone, centre: r.bone.worldToLocal(r.centre), rim: r.bone.worldToLocal(r.rim) };
+}
+
+// ...and in world space, in the rest pose.
+function reactorWorld(model) {
+  const v = V(), lo = V().setScalar(Infinity), hi = V().setScalar(-Infinity);
+  const weight = new Map();
+  model.traverse(m => {
+    if (!m.isSkinnedMesh || !REACTOR.test(m.material.name)) return;
+    const pos = m.geometry.attributes.position, si = m.geometry.attributes.skinIndex, sw = m.geometry.attributes.skinWeight;
+    for (let i = 0; i < pos.count; i += 7) {
+      m.applyBoneTransform(i, v.fromBufferAttribute(pos, i)).applyMatrix4(m.matrixWorld);
+      lo.min(v); hi.max(v);
+      for (let c = 0; c < 4; c++) {
+        const b = m.skeleton.bones[si.getComponent(i, c)];
+        weight.set(b, (weight.get(b) || 0) + sw.getComponent(i, c));
+      }
+    }
+  });
+  if (!weight.size) return null;
+  const bone = [...weight].sort((a, b) => b[1] - a[1])[0][0];
+  const centre = mid(lo, hi);
+  return { bone, centre, rim: centre.clone().add(V().set((hi.x - lo.x) / 2, 0, 0)) };
+}
+
+// Screen position and radius of the model's own arc reactor (null if it has none).
+export function reactorPoint(r) {
+  if (!r.reactor || !r.holder.visible) return null;
+  const { bone, centre, rim } = r.reactor;
+  const c = bone.localToWorld(centre.clone()), e = bone.localToWorld(rim.clone());
+  return { x: c.x, y: -c.y, size: c.distanceTo(e) };
 }
 
 export function removeBodyRig(scene, r) { scene.remove(r.holder); }
@@ -221,7 +384,7 @@ function poseGauntlet(r, side, H) {
 
 // Pose the model onto one person. P(j) gives pose landmark j as a hybrid point; hands[side], when
 // the hand tracker has that hand, gives its 21 landmarks as hybrid points.
-export function poseBody(r, P, hands, a) {
+export function poseBody(r, P, hands, dt) {
   const b = r.bones;
   for (const [bone, s] of r.rest) { bone.quaternion.copy(s.q); bone.position.copy(s.p); bone.scale.copy(s.s); }
   r.holder.visible = true;
@@ -229,7 +392,7 @@ export function poseBody(r, P, hands, a) {
   const hips = mid(P(23), P(24)), shoulders = mid(P(11), P(12)), up = shoulders.clone().sub(hips);
   const width = P(12).distanceTo(P(11));
   const s = (up.length() + width) / (r.torso + r.width);
-  r.s = r.s ? r.s + (s - r.s) * a : s;
+  r.s = steady(r.s, s, dt);
   r.holder.scale.setScalar(r.s);
   r.holder.position.set(0, 0, 0);
 

@@ -7,6 +7,7 @@ import { flames, balls } from "./powers/ninja.js";
 import { webs } from "./powers/spider.js";
 import { resetArmor } from "./powers/armor.js";
 import { resetCloak } from "./powers/cloak.js";
+import { resetNanotech } from "./powers/nanotech.js";
 
 // source.poll(now, t) feeds this frame's detections in through ingestPoses / ingestHands.
 export function step(source, dt, now, t) {
@@ -23,4 +24,5 @@ export function resetWorld() {
   mic.reset();
   resetArmor();
   resetCloak();
+  resetNanotech();
 }

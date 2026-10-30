@@ -13,9 +13,15 @@ import { ctx, W, H, DPR, clock, persons, hands } from "../state.js";
 import { dist, clamp } from "../util.js";
 import { glow } from "../gfx.js";
 import { isFresh } from "../people.js";
-import { loadSuitModel, modelReady, modelStatus, makeBodyRig, poseBody, hideBody, boneScreen } from "./suitmodel.js";
+import { loadSuitModel, modelReady, modelStatus, makeBodyRig, poseBody, hideBody, boneScreen, reactorPoint, setNano } from "./suitmodel.js";
+import { suitLevel } from "./nanotech.js";
+import { PointsFilter, steady } from "../filter.js";
 
 const REACTOR_OUT = 0.21;    // metres the reactor sits in front of the torso's midline
+// One Euro [minCutoff Hz, beta per px/s] for the landmarks the suit follows: screen x/y, and depth
+// (noisier, so smoothed harder)
+const BODY_XY = [1.2, 0.004], BODY_Z = [0.6, 0.002];
+const HAND_XY = [1.5, 0.006], HAND_Z = [1.0, 0.003];
 const FINGER_BONES = [[1, 2], [2, 3], [3, 4], [5, 6], [6, 7], [7, 8], [9, 10], [10, 11], [11, 12],
   [13, 14], [14, 15], [15, 16], [17, 18], [18, 19], [19, 20]];
 
@@ -159,7 +165,13 @@ function settle(o, pos, quat, scale, a) {
   o.visible = true;
 }
 
-function poseSuit(r, p, gauntlets, a) {
+function hideSuit(r) {
+  hide(r.reactor);
+  if (r.body) hideBody(r.body);
+  r.ownReactor = null;
+}
+
+function poseSuit(r, p, gauntlets, a, dt) {
   const L = p.lm, w = p.world;
   // pixels per metre: on-screen lengths over the same world lengths flattened onto the image plane
   let px = 0, m = 0;
@@ -168,17 +180,16 @@ function poseSuit(r, p, gauntlets, a) {
     px += dist(L[i], L[j]);
     m += Math.hypot(w[i].x - w[j].x, w[i].y - w[j].y);
   }
-  if (m > 0.05) r.k = r.k ? r.k + (px / m - r.k) * 0.3 : px / m;
+  if (m > 0.05) r.k = steady(r.k, px / m, dt);
   if (!r.k) { hide(r.reactor); if (r.body) hideBody(r.body); return; }
   const k = r.k;
-  // landmarks as screen x/y plus world depth, eased toward their new spots to damp jitter
-  const target = L.map((l, j) => vec(l.x, -l.y, -w[j].z * k));
-  if (!r.pts) r.pts = target;
-  else r.pts.forEach((v, j) => v.lerp(target[j], a));
+  // landmarks as screen x/y plus world depth, filtered to take out the jitter
+  if (!r.filter) r.filter = new PointsFilter(L.length, BODY_XY, BODY_Z);
+  r.pts = r.filter.apply(L.map((l, j) => vec(l.x, -l.y, -w[j].z * k)), dt);
   const P = j => r.pts[j].clone();
 
   if (r.body) {
-    poseBody(r.body, P, gauntlets, a);
+    poseBody(r.body, P, gauntlets, dt);
     const face = clamp(vec(0, 0, 1).applyQuaternion(r.body.headFrame).z * 2, 0, 1);   // eyes glow toward the viewer
     const size = P(7).distanceTo(P(8));
     for (const n of ["LeftEye", "RightEye"]) {
@@ -187,8 +198,15 @@ function poseSuit(r, p, gauntlets, a) {
     }
   }
 
-  // Arc reactor: on the sternum, in the torso's frame from the shoulders and hips.
-  if (L[11].v > 0.5 && L[12].v > 0.5) {
+  // Arc reactor: the model's own if it has one (just add the glow), otherwise ours on the sternum,
+  // in the torso's frame from the shoulders and hips.
+  const own = r.body && reactorPoint(r.body);
+  r.ownReactor = own || null;
+  if (own) {
+    hide(r.reactor);
+    const facing = clamp(vec(0, 0, 1).applyQuaternion(r.body.bones.Spine2.getWorldQuaternion(new T.Quaternion())).z * 2, 0, 1);
+    glows.push({ x: own.x, y: own.y, r: own.size * 1.4, rgb: "150,220,255", a: 0.9 * facing });
+  } else if (L[11].v > 0.5 && L[12].v > 0.5) {
     const tx = worldDir(w, 11, 12).normalize();
     const up = vec(-(w[11].x + w[12].x - w[23].x - w[24].x) / 2, -(w[11].y + w[12].y - w[23].y - w[24].y) / 2,
       -(w[11].z + w[12].z - w[23].z - w[24].z) / 2);
@@ -204,12 +222,12 @@ function poseSuit(r, p, gauntlets, a) {
   } else hide(r.reactor);
 }
 
-// The hand's landmarks as hybrid points (r.pts), eased toward where they are now.
-function trackHand(r, h, a) {
+// The hand's landmarks as hybrid points (r.pts), filtered to take out the jitter.
+function trackHand(r, h, dt) {
   const wl = h.world, pts = h.pts;
   const px = dist(pts[0], pts[9]) + dist(pts[5], pts[17]);
   const m = Math.hypot(wl[9].x - wl[0].x, wl[9].y - wl[0].y) + Math.hypot(wl[17].x - wl[5].x, wl[17].y - wl[5].y);
-  if (m > 0.02) r.k = r.k ? r.k + (px / m - r.k) * 0.3 : px / m;
+  if (m > 0.02) r.k = steady(r.k, px / m, dt);
   if (!r.k) { r.pts = null; return; }
   // depth: the owner's pose wrist places the hand, its own world landmarks shape it
   let base = 150;
@@ -218,9 +236,8 @@ function trackHand(r, h, a) {
     const wi = dist(pts[0], h.owner.lm[15]) < dist(pts[0], h.owner.lm[16]) ? 15 : 16;
     base = -h.owner.world[wi].z * suit.k;
   }
-  const target = pts.map((q, j) => vec(q.x, -q.y, base - (wl[j].z - wl[0].z) * r.k));
-  if (!r.pts) r.pts = target;
-  else r.pts.forEach((v, j) => v.lerp(target[j], a));
+  if (!r.filter) r.filter = new PointsFilter(pts.length, HAND_XY, HAND_Z);
+  r.pts = r.filter.apply(pts.map((q, j) => vec(q.x, -q.y, base - (wl[j].z - wl[0].z) * r.k)), dt);
 }
 
 // The repulsor glow, plus the simple hand armour when the hand isn't worn by a suit model's gauntlet.
@@ -262,11 +279,11 @@ export function updateArmor(dt) {
   if (!settings.armor) { resetArmor(); return; }
   const a = 1 - Math.exp(-dt * 25);
   const live = new Set();
-  const armoured = hands.filter(h => h.world && clock - h.lastSeen <= 300);
+  const armoured = hands.filter(h => h.world && clock - h.lastSeen <= 300 && (!h.owner || suitLevel(h.owner) > 0));
   for (const h of armoured) {
     if (!rigs.has(h)) rigs.set(h, makeHandRig());
     const r = rigs.get(h);
-    trackHand(r, h, a);
+    trackHand(r, h, dt);
     r.onModel = false;
     live.add(h);
   }
@@ -274,6 +291,8 @@ export function updateArmor(dt) {
     if (!p.lm || !p.world || !isFresh(p)) continue;
     if (!rigs.has(p)) rigs.set(p, makeSuit());
     const suit = rigs.get(p);
+    live.add(p);
+    if (suitLevel(p) === 0) { hideSuit(suit); continue; }   // kept, so suiting up doesn't stall on building it
     // the gauntlets the tracked hands go into (mirrored: the person's right wrist is the model's left)
     const gauntlets = {};
     for (const h of armoured) {
@@ -282,8 +301,8 @@ export function updateArmor(dt) {
       gauntlets[dist(h.pts[0], p.lm[16]) < dist(h.pts[0], p.lm[15]) ? "Left" : "Right"] = hr.pts.map(v => v.clone());
       hr.onModel = true;
     }
-    poseSuit(suit, p, gauntlets, a);
-    live.add(p);
+    poseSuit(suit, p, gauntlets, a, dt);
+    if (suit.body) setNano(suit.body, suitLevel(p), clock / 1000);
   }
   for (const h of armoured) {
     const r = rigs.get(h);
@@ -347,7 +366,8 @@ export function armorDebug() {
         body = { visible: b.holder.visible, joints, headForward: [f.x, f.y, f.z],
           gauntlet: { ...b.gauntlet } };
       }
-      out.suits.push({ num: key.num, reactor: info(r.reactor), body });
+      const reactor = r.ownReactor && b?.holder.visible ? { visible: true, x: r.ownReactor.x, y: r.ownReactor.y, own: true } : info(r.reactor);
+      out.suits.push({ num: key.num, reactor, body });
     } else out.hands.push({ owner: key.owner?.num ?? null, onModel: r.onModel, plate: info(r.plate), disc: info(r.disc) });
   }
   return out;

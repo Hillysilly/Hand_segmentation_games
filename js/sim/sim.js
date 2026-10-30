@@ -55,12 +55,14 @@ export class SimSource {
     const hands = { landmarks: [], worldLandmarks: [], handedness: [] };
     for (const { pose: ps, body } of people) {
       const { lm, world } = poseLandmarks(body, ps);
+      if (ps.noise) shake(lm, world, ps.noise);
       pose.landmarks.push(lm);
       pose.worldLandmarks.push(world);
       pose.segmentationMasks.push(this.mask(body, ps));
       if (ps.hideHands) continue;
       for (const hand of body.hands) {
         const h = handLandmarks(hand, ps);
+        if (ps.noise) shake(h.lm, h.world, { xy: ps.noise.xy, z: ps.noise.z / 3 });
         const w = h.lm[0];
         if (w.x < 0 || w.x > 1 || w.y < 0 || w.y > 1) continue;   // wrist out of frame: no detection
         hands.landmarks.push(h.lm);
@@ -76,7 +78,7 @@ export class SimSource {
   mask(body, ps) {
     const c = this.mctx, { width: w, height: h } = this.maskCanvas;
     c.fillStyle = "#000"; c.fillRect(0, 0, w, h);
-    for (const s of shapes(body, ps, w, h)) s.draw(c, "#fff");
+    if (!ps.maskGlitch) for (const s of shapes(body, ps, w, h)) s.draw(c, "#fff");
     const px = c.getImageData(0, 0, w, h).data, data = new Float32Array(w * h);
     for (let i = 0; i < data.length; i++) data[i] = px[i * 4] / 255;
     return { width: w, height: h, getAsFloat32Array: () => data };
@@ -137,4 +139,15 @@ function polygon(c, pts, round, color) {
   c.beginPath();
   pts.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y));
   c.closePath(); c.fill(); c.stroke();
+}
+
+// Tracking noise like MediaPipe's: every landmark jiggles a little each frame (xy in normalised image
+// units, z in metres; z is much the noisier, as in the real thing).
+function shake(lm, world, { xy, z }) {
+  const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
+  lm.forEach((l, j) => {
+    const dx = gauss() * xy, dy = gauss() * xy, dz = gauss() * z;
+    l.x += dx; l.y += dy;
+    world[j].z += dz;
+  });
 }

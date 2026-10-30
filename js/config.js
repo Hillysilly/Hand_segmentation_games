@@ -26,6 +26,6 @@ export const CONNECTIONS = [
   [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17],
 ];
 
-export const DEFAULT_SETTINGS = { ironman: true, armor: true, cloak: true, goku: true, spinjitzu: true, spinColor: "255,70,40",
+export const DEFAULT_SETTINGS = { ironman: true, armor: true, nanotech: true, cloak: true, goku: true, spinjitzu: true, spinColor: "255,70,40",
   spiderman: true, video: true, skeleton: true, silhouettes: true, muted: false };
 export const settings = { ...DEFAULT_SETTINGS };

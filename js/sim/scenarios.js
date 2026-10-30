@@ -23,6 +23,8 @@ const DOWN = { upper: [0.15, 0], fore: [0.12, 0.3], hand: { palm: "in", curl: CU
 const FLEX = { upper: [PI / 2, 0], fore: [PI * 0.95, 0], hand: { palm: "in", curl: CURL.fist } };
 // straight out to the side with the hand bent back, palm facing outward: the repulsor stance
 const AIM = curl => ({ upper: [PI / 2, 0], fore: [PI / 2, 0], hand: { dir: [PI, 0], palm: "out", curl } });
+// upper arm hanging forward, forearm across the body: the hand flat on the chest
+const ON_CHEST = { upper: [0.1, 0.6], fore: [-2.07, 0], hand: { palm: "back", curl: CURL.open } };
 const WEB_SIGN = { upper: [1.3, 0.3], fore: [1.5, 0.4], hand: { palm: "front", curl: CURL.web } };
 
 // Framings: whole body for two players, close-up for the suit.
@@ -38,6 +40,16 @@ const gt = (got, than, what = "") => got > than || `${what} expected > ${than}, 
 const lt = (got, than, what = "") => got < than || `${what} expected < ${than}, got ${fmt(got)}`;
 const fmt = v => typeof v === "number" ? Math.round(v * 100) / 100 : v;
 const all = (...results) => results.find(r => r !== true) ?? true;
+
+// Average frame-to-frame movement (px) of a set of points sampled over time.
+const jitter = { suit: [], raw: [] };
+function spread(samples) {
+  let sum = 0, n = 0;
+  for (let i = 1; i < samples.length; i++) {
+    samples[i].forEach((p, k) => { sum += Math.hypot(p.x - samples[i - 1][k].x, p.y - samples[i - 1][k].y); n++; });
+  }
+  return n ? sum / n : 0;
+}
 
 // The suit should sit on the body: the model's head on the person's head, its shoulders, elbows and
 // wrists on theirs (mirrored: the model's left follows the person's right), the reactor on the chest.
@@ -222,6 +234,48 @@ export const scenarios = [
     snapshots: [[1.4, "suit-front"], [2.9, "suit-head-turned"]],
   },
   {
+    name: "jitter",
+    about: "Standing still with noisy tracking: the suit holds steady instead of shaking with the landmarks",
+    duration: 3,
+    people: [() => closeUp({ left: FLEX, right: FLEX, noise: { xy: 0.002, z: 0.03 } })],
+    checks: [
+      // sample the suit's joints and the raw landmarks they follow over the last second and a half
+      ...Array.from({ length: 45 }, (_, i) => [1.5 + i / 30, "sample", w => {
+        const J = w.armor.suits[0].body.joints, L = w.p(1).lm;
+        jitter.suit.push([J.LeftForeArm, J.RightForeArm, J.LeftHand, J.RightHand, J.Head]);
+        jitter.raw.push([L[14], L[13], L[16], L[15], { x: (L[7].x + L[8].x) / 2, y: (L[7].y + L[8].y) / 2 }]);
+        return true;
+      }]),
+      [2.99, "suit at most a third as shaky as the landmarks", w => {
+        const s = spread(jitter.suit), r = spread(jitter.raw);
+        jitter.suit = []; jitter.raw = [];
+        return s < r / 3 || `suit moves ${fmt(s)}px per frame vs landmarks ${fmt(r)}px`;
+      }],
+    ],
+    snapshots: [[2.5, "still"]],
+  },
+  {
+    name: "nanotech",
+    about: "A hand held on the chest flows the suit out from the reactor; doing it again takes it back in",
+    duration: 6.2,
+    settings: { nanotech: true },
+    people: [t => closeUp({ right: (t > 0.5 && t < 1.4) || (t > 3.8 && t < 4.7) ? ON_CHEST : DOWN })],
+    checks: [
+      [0.45, "no suit yet", w => all(eq(w.p(1).nano.level, 0, "level"), eq(w.armor.suits[0]?.body.visible ?? false, false, "suit shown"))],
+      [1.0, "hand on the chest isn't enough on its own", w => eq(w.p(1).nano.level, 0, "level")],
+      [1.6, "suit forming", w => all(gt(w.p(1).nano.level, 0.1, "level"), lt(w.p(1).nano.level, 0.6, "level"))],
+      [1.6, "formed from the chest out: chest covered, hands not yet", w => {
+        const j = w.armor.suits[0].body.joints;
+        return all(w.drawsArmor({ x: (j.Spine2.x + j.Hips.x) / 2, y: (j.Spine2.y + j.Hips.y) / 2 }),
+          w.drawsArmor(j.LeftHand) !== true || "hand already covered");
+      }],
+      [3.6, "suit fully on", w => all(eq(w.p(1).nano.level, 1, "level"), suitFits(w, 1))],
+      [3.6, "one arc reactor", w => w.armor.suits[0].reactor.own || "the model's reactor isn't the one shown"],
+      [6.1, "suit back in the reactor", w => all(eq(w.p(1).nano.level, 0, "level"), eq(w.armor.suits[0].body.visible, false, "suit shown"))],
+    ],
+    snapshots: [[1.0, "hand-on-chest"], [1.5, "forming-start"], [2.0, "forming"], [2.5, "forming-late"], [2.9, "helmet-closing"], [3.6, "formed"], [5.0, "retracting"]],
+  },
+  {
     name: "cloak",
     about: "The room is learned while nobody is in shot, then painted over the body so only the suit shows",
     duration: 2.5,
@@ -231,6 +285,14 @@ export const scenarios = [
       [1.4, "body painted out", w => gt(w.cloak, 0.95, "covered share")],
     ],
     snapshots: [[1.4, "cloaked"], [2.4, "cloaked-aim"]],
+  },
+  {
+    name: "cloak-ghost",
+    about: "A glitched mask for a few frames doesn't teach the cloak the person as room (it would paint them back as a ghost)",
+    duration: 2.5,
+    paintFrames: true,
+    people: [t => body({ maskGlitch: t >= 1 && t < 1.17 })],
+    checks: [[2.4, "none of the body learned as room", w => lt(w.cloak, 0.05, "body share learned")]],
   },
   {
     name: "armor-off",

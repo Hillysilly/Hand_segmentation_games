@@ -2,7 +2,7 @@
 import { settings } from "./config.js";
 import { sfx } from "./audio.js";
 
-const KEY_SETTINGS = { i: "ironman", a: "armor", c: "cloak", g: "goku", j: "spinjitzu", w: "spiderman", v: "video",
+const KEY_SETTINGS = { i: "ironman", a: "armor", n: "nanotech", c: "cloak", g: "goku", j: "spinjitzu", w: "spiderman", v: "video",
   h: "skeleton", s: "silhouettes", m: "muted" };
 
 const hexToRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).join(",");

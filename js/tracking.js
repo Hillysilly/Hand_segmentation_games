@@ -70,6 +70,11 @@ export class CameraSource {
   constructor(video) {
     this.video = video;
     this.lastTime = -1;
+    // Tracking takes tens of ms and the video keeps playing meanwhile, so the screen shows a copy of
+    // the frame the trackers saw (not the live video): the picture, the masks and the landmarks
+    // then all line up.
+    this.snap = document.createElement("canvas");
+    this.snapCtx = this.snap.getContext("2d");
     this.poseCanvas = document.createElement("canvas");
     this.poseCtx = this.poseCanvas.getContext("2d");
     this.poseCanvas.width = POSE_WIDTH;
@@ -81,9 +86,14 @@ export class CameraSource {
     if (v.readyState < 2 || v.currentTime === this.lastTime) return;
     this.lastTime = v.currentTime;
     frame.w = v.videoWidth || 1280; frame.h = v.videoHeight || 720;
-    this.poseCtx.drawImage(v, 0, 0, this.poseCanvas.width, this.poseCanvas.height);
+    if (this.snap.width !== frame.w || this.snap.height !== frame.h) {
+      this.snap.width = frame.w; this.snap.height = frame.h;
+    }
+    this.snapCtx.drawImage(v, 0, 0, frame.w, frame.h);
+    frame.img = this.snap;
+    this.poseCtx.drawImage(this.snap, 0, 0, this.poseCanvas.width, this.poseCanvas.height);
     // masks are only valid inside the callback, so they're copied out there
     timed("pose", () => this.pose.detectForVideo(this.poseCanvas, now, result => ingestPoses(result, now)));
-    ingestHands(timed("hands", () => this.hand.detectForVideo(v, now)), now);
+    ingestHands(timed("hands", () => this.hand.detectForVideo(this.snap, now)), now);
   }
 }

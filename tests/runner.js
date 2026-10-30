@@ -58,7 +58,8 @@ function world(now) {
 async function runScenario(sc) {
   const started = performance.now();
   Math.random = seeded(1234);
-  Object.assign(settings, DEFAULT_SETTINGS, sc.settings);
+  // the suit is simply on unless a scenario is about suiting up
+  Object.assign(settings, DEFAULT_SETTINGS, { nanotech: false }, sc.settings);
   resetWorld();
   const src = new SimSource(sc);
   src.attach();
@@ -70,7 +71,8 @@ async function runScenario(sc) {
     const t = i * DT, now = T0 + t * 1000;
     const due = list => list.filter(x => !x.done && t >= x.t - 1e-6);
     const dueSnaps = due(snaps), dueChecks = due(checks);
-    src.drawFrames = bench || dueSnaps.length > 0 || dueChecks.length > 0;   // only paint the fake camera when it's seen
+    // only paint the fake camera when it's seen (or the scenario looks at every frame)
+    src.drawFrames = bench || sc.paintFrames || dueSnaps.length > 0 || dueChecks.length > 0;
     if (bench && i === 15) for (const k in perf) delete perf[k];   // drop warm-up (shader compiles)
     step(src, DT, now, t);
     if (bench) timed("draw", () => render(now, 30));

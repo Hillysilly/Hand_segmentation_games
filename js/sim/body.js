@@ -8,7 +8,8 @@
 // A pose is { x, y, height, yaw, headYaw, headPitch, left, right, hideHands }: (x, y) is where the
 // hip centre sits in the normalised image, height is how many metres the frame spans top to bottom
 // at the person's distance, yaw turns the whole body (positive = toward their left), and left /
-// right are arms (see limbDir and handPoints).
+// right are arms (see limbDir and handPoints). noise: { xy, z } adds tracking jitter (see sim.js);
+// maskGlitch blanks their segmentation mask, as the real segmenter sometimes does for a frame or two.
 
 export const V = (x, y, z) => ({ x, y, z });
 const add = (a, b) => V(a.x + b.x, a.y + b.y, a.z + b.z);
