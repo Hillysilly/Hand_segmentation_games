@@ -10,6 +10,7 @@
 // at the person's distance, yaw turns the whole body (positive = toward their left), and left /
 // right are arms (see limbDir and handPoints). noise: { xy, z } adds tracking jitter (see sim.js);
 // maskGlitch blanks their segmentation mask, as the real segmenter sometimes does for a frame or two.
+// face: { open: [right eye, left eye], frown, raise } feeds the face tracker an expression (see sim.js).
 
 export const V = (x, y, z) => ({ x, y, z });
 const add = (a, b) => V(a.x + b.x, a.y + b.y, a.z + b.z);

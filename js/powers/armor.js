@@ -8,12 +8,13 @@
 // through an orthographic camera. World landmarks are raw camera space (x right in the unmirrored
 // image, y down, z away from the camera); the screen is mirrored, so a world vector (x, y, z)
 // becomes (-x, -y, -z) here.
-import { settings } from "../config.js";
-import { ctx, W, H, DPR, clock, persons, hands } from "../state.js";
+import { settings, wearing } from "../config.js";
+import { ctx, W, H, DPR, clock, persons, hands, unseenFor } from "../state.js";
 import { dist, clamp } from "../util.js";
 import { glow } from "../gfx.js";
 import { isFresh } from "../people.js";
-import { loadSuitModel, modelReady, modelStatus, makeBodyRig, poseBody, hideBody, boneScreen, reactorPoint, setNano } from "./suitmodel.js";
+import { loadSuitModel, modelReady, modelStatus, makeBodyRig, poseBody, hideBody, boneScreen, reactorPoint, setNano, setEyes, setMaskOff } from "./suitmodel.js";
+import { maskLevel } from "./unmask.js";
 import { suitLevel } from "./nanotech.js";
 import { PointsFilter, steady } from "../filter.js";
 
@@ -30,7 +31,7 @@ let renderer = null, scene = null, camera = null, geo = null, mat = null;
 let drawn = { w: 0, h: 0, dpr: 0 };
 const rigs = new Map();      // Person or Hand -> its armour rig
 let glows = [];              // glowing bits, drawn in 2D over the suit: { x, y, r, rgb, a }
-export const armorStatus = { loaded: false, webgl: false, model: "", error: "" };
+export const armorStatus = { loaded: false, webgl: false, model: "", spiderman: "", error: "" };
 
 export async function initArmor() {
   if (T) return armorStatus;
@@ -49,8 +50,9 @@ export async function initArmor() {
   key.position.set(-0.4, 1, 0.9);
   scene.add(key);
   buildParts();
-  if (await loadSuitModel(T)) Object.assign(armorStatus, { model: modelStatus.url, skipped: modelStatus.skipped });
-  else armorStatus.error = `no suit model, only the reactor and hands: ${modelStatus.error}`;
+  if (!await loadSuitModel(T)) armorStatus.error = `no suit model, only the reactor and hands: ${modelStatus.ironman?.error}`;
+  Object.assign(armorStatus, { model: modelStatus.ironman?.url, skipped: modelStatus.ironman?.skipped,
+    spiderman: modelStatus.spiderman?.url || `none: ${modelStatus.spiderman?.error}` });
   armorStatus.loaded = true;
   try {
     renderer = new T.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
@@ -124,9 +126,9 @@ function makeReactor() {
   return g;
 }
 
-function makeSuit() {
+function makeSuit(wear) {
   const root = new T.Group();
-  const r = { kind: "suit", root, reactor: makeReactor(), body: modelReady() ? makeBodyRig(root) : null, k: 0, pts: null };
+  const r = { kind: "suit", wear, root, reactor: makeReactor(), body: modelReady(wear) ? makeBodyRig(root, wear) : null, k: 0, pts: null };
   root.add(r.reactor);
   hide(r.reactor);
   scene.add(root);
@@ -188,8 +190,9 @@ function poseSuit(r, p, gauntlets, a, dt) {
   r.pts = r.filter.apply(L.map((l, j) => vec(l.x, -l.y, -w[j].z * k)), dt);
   const P = j => r.pts[j].clone();
 
+  if (r.body) poseBody(r.body, P, gauntlets, dt);
+  if (r.wear !== "ironman") { hide(r.reactor); r.ownReactor = null; return; }   // the rest is Iron Man's
   if (r.body) {
-    poseBody(r.body, P, gauntlets, dt);
     const face = clamp(vec(0, 0, 1).applyQuaternion(r.body.headFrame).z * 2, 0, 1);   // eyes glow toward the viewer
     const size = P(7).distanceTo(P(8));
     for (const n of ["LeftEye", "RightEye"]) {
@@ -241,8 +244,8 @@ function trackHand(r, h, dt) {
 }
 
 // The repulsor glow, plus the simple hand armour when the hand isn't worn by a suit model's gauntlet.
-function poseHand(r, h) {
-  if (!r.pts) { for (const o of r.root.children) hide(o); return; }
+function poseHand(r, h, wear) {
+  if (!r.pts || wear !== "ironman") { for (const o of r.root.children) hide(o); return; }
   const k = r.k, P = j => r.pts[j].clone();
 
   // back plate in the palm's frame: fingers along +y, palm normal (the repulsor side) along +z
@@ -276,10 +279,13 @@ function poseHand(r, h) {
 export function updateArmor(dt) {
   if (!T) return;
   glows = [];
-  if (!settings.armor) { resetArmor(); return; }
+  const wear = wearing();
+  if (!wear) { resetArmor(); return; }
   const a = 1 - Math.exp(-dt * 25);
   const live = new Set();
-  const armoured = hands.filter(h => h.world && clock - h.lastSeen <= 300 && (!h.owner || suitLevel(h.owner) > 0));
+  // hands in a suit; Spider-Man's are only ever the model's own, so a hand needs its owner's suit
+  const armoured = hands.filter(h => h.world && unseenFor(h.lastSeen) <= 300 &&
+    (h.owner ? suitLevel(h.owner) > 0 : wear === "ironman"));
   for (const h of armoured) {
     if (!rigs.has(h)) rigs.set(h, makeHandRig());
     const r = rigs.get(h);
@@ -289,7 +295,10 @@ export function updateArmor(dt) {
   }
   for (const p of persons) {
     if (!p.lm || !p.world || !isFresh(p)) continue;
-    if (!rigs.has(p)) rigs.set(p, makeSuit());
+    if (rigs.get(p)?.wear !== wear) {   // new, or changed suits
+      if (rigs.has(p)) scene.remove(rigs.get(p).root);
+      rigs.set(p, makeSuit(wear));
+    }
     const suit = rigs.get(p);
     live.add(p);
     if (suitLevel(p) === 0) { hideSuit(suit); continue; }   // kept, so suiting up doesn't stall on building it
@@ -302,18 +311,22 @@ export function updateArmor(dt) {
       hr.onModel = true;
     }
     poseSuit(suit, p, gauntlets, a, dt);
-    if (suit.body) setNano(suit.body, suitLevel(p), clock / 1000);
+    if (suit.body) {
+      setNano(suit.body, suitLevel(p), clock / 1000);
+      setEyes(suit.body, p.face, clock, dt);
+      setMaskOff(suit.body, 1 - maskLevel(p));
+    }
   }
   for (const h of armoured) {
     const r = rigs.get(h);
     if (r.onModel && !rigs.get(h.owner)?.body?.holder.visible) r.onModel = false;   // suit not drawn this frame
-    poseHand(r, h);
+    poseHand(r, h, wear);
   }
   for (const [key, r] of rigs) if (!live.has(key)) { scene.remove(r.root); rigs.delete(key); }
 }
 
 // Is this hand drawn as the suit's gauntlet (so its tracking lines would only hide it)?
-export const inGauntlet = h => !!(renderer && settings.armor && rigs.get(h)?.onModel);
+export const inGauntlet = h => !!(renderer && wearing() && rigs.get(h)?.onModel);
 
 export function resetArmor() {
   for (const r of rigs.values()) scene.remove(r.root);
@@ -323,7 +336,7 @@ export function resetArmor() {
 
 // Paint the suit into the 2D canvas (with its current transform, so it shakes with everything else).
 export function drawArmor() {
-  if (!renderer || !settings.armor || !rigs.size) return;
+  if (!renderer || !wearing() || !rigs.size) return;
   if (drawn.w !== W || drawn.h !== H || drawn.dpr !== DPR) {
     drawn = { w: W, h: H, dpr: DPR };
     renderer.setPixelRatio(DPR);
@@ -337,7 +350,7 @@ export function drawArmor() {
 
 // Eyes, reactor core and palm repulsors glow (drawn additively over the suit).
 export function drawArmorGlows() {
-  if (!renderer || !settings.armor) return;
+  if (!renderer || !wearing()) return;
   for (const g of glows) {
     if (g.a <= 0.02) continue;
     glow(g.x, g.y, g.r, [[0, `rgba(255,255,255,${g.a})`], [0.3, `rgba(${g.rgb},${0.6 * g.a})`], [1, `rgba(${g.rgb},0)`]]);
@@ -364,10 +377,11 @@ export function armorDebug() {
         for (const n of JOINTS) joints[n] = boneScreen(b, n);
         const f = vec(0, 0, 1).applyQuaternion(b.headFrame);
         body = { visible: b.holder.visible, joints, headForward: [f.x, f.y, f.z],
-          gauntlet: { ...b.gauntlet } };
+          gauntlet: { ...b.gauntlet },
+          eyes: b.eyes3 && { open: [b.eyes3.uOpen.value.x, b.eyes3.uOpen.value.y], frown: b.eyes3.uBrow.value.x, raise: b.eyes3.uBrow.value.y } };
       }
       const reactor = r.ownReactor && b?.holder.visible ? { visible: true, x: r.ownReactor.x, y: r.ownReactor.y, own: true } : info(r.reactor);
-      out.suits.push({ num: key.num, reactor, body });
+      out.suits.push({ num: key.num, wear: r.wear, reactor, body });
     } else out.hands.push({ owner: key.owner?.num ?? null, onModel: r.onModel, plate: info(r.plate), disc: info(r.disc) });
   }
   return out;

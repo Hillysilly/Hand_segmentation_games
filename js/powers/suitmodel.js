@@ -1,6 +1,6 @@
-// The suit body: a rigged humanoid glTF (Mixamo bone names) posed every frame from the tracked
-// landmarks. Drop your own rigged model at assets/models/suit.glb (or pass ?model=<url>) and it is
-// used instead of the default Xbot, which gets an Iron Man paint job.
+// The suit bodies: rigged humanoid glTFs (Mixamo bone names) posed every frame from the tracked
+// landmarks. Two suits: Iron Man (assets/models/suit.glb, or ?model=<url>; else the Xbot with an
+// Iron Man paint job) and Spider-Man (assets/models/spiderman.glb).
 //
 // Posing works in the armour scene's pixel space (see armor.js) on "hybrid" points: screen x/y from
 // the 2D landmarks, depth from the world landmarks, so the model lines up with the person on screen.
@@ -11,23 +11,36 @@
 //     the upper bone twisted so the elbow / knee bends in the plane the landmarks bend in
 //   - nanotech: every vertex carries its distance from the arc reactor along the body, and the
 //     shader draws only what the suit-up front has reached (see setNano)
+//   - eyes: a suit with eye lenses (Spider-Man) squints, blinks, widens and frowns with the face
+//     tracker's expression (see setEyes)
+//   - mask: a suit with eye lenses (Spider-Man) can take its mask off, peeling from the neck up
+//     (see setMaskOff)
 //   - hands: the gauntlets, every finger bone swung onto the hand tracker's landmarks; without hand
 //     tracking, just the hand's angle from the pose's wrist / index / pinky
 
 import { steady } from "../filter.js";
 
-const MODELS = ["assets/models/suit.glb", "assets/models/xbot.glb"];
+// Each suit: the files to try in order, and how wide its head is drawn per ear-to-ear distance (a
+// helmet a little bigger than the real head, to cover it; a mask hugs it).
+const SUITS = {
+  ironman: { files: ["assets/models/suit.glb", "assets/models/xbot.glb"], headPerEar: 1.5 },
+  spiderman: { files: ["assets/models/spiderman.glb"], headPerEar: 1.3 },
+};
 const ROOT_URL = new URL("../../", import.meta.url);
 const NOSE_TILT = 0.15;   // radians the nose sits below the ear line
 const REACTOR = /reactor/i;  // material name of a model's own arc reactor
+const LENS = /^eyes/i;       // material name of a suit's eye lenses, which follow the face's expression
+const LENS_PARTS = /^(eyes|glass)/i;   // ...and the glass over them, which gets the same lids
+const EYES_EASE = 0.04;      // seconds the lenses take to follow the face (fast enough for a blink)
+const EYES_STALE = 400;      // ms without a face before the lenses relax back to neutral
+const OPEN_MAX = 1.15;       // widest the lenses open (any more and they'd outgrow their frames)
 // nanotech front, in units of the farthest vertex's distance from the reactor
 const NANO_EDGE = 0.05;      // width of the liquid-silver band behind the front
-const NANO_PLATES = 0.035;   // how far ahead or behind the front each little plate locks in
+const NANO_PLATES = 0.035;   // how far the ragged front runs ahead of or behind where it is
 const NANO_REACH = 1 + NANO_EDGE + NANO_PLATES;   // front position at level 1: everything formed
 // how slowly the suit travels up the neck and down the legs (1 = as fast as everywhere else): the
 // helmet closes near the end, as in the films, and the legs keep pace with the arms
 const NANO_PACE = { Neck: 2.2, LeftUpLeg: 0.7, RightUpLeg: 0.7 };
-const HEAD_PER_EAR = 1.5; // helmet width per ear-to-ear distance: a little bigger than the real head, to cover it
 const GAUNTLET = 1.15;    // gauntlet size over the tracked hand's, to cover it
 // [upper, lower, end] bones and the [pose] landmarks they follow, per model side
 const LIMBS = {
@@ -36,45 +49,58 @@ const LIMBS = {
 };
 // model finger bones 1..4 and the hand landmark at bone 1 (the next three follow it)
 const FINGERS = [["Thumb", 1], ["Index", 5], ["Middle", 9], ["Ring", 13], ["Pinky", 17]];
+const SPINE = ["Spine", "Spine1", "Spine2", "Spine3"];   // as many of these as the rig has, hips to chest
 const REQUIRED = ["Hips", "Spine", "Spine2", "Neck", "Head",
   ..."Shoulder Arm ForeArm Hand UpLeg Leg Foot".split(" ").flatMap(b => [`Left${b}`, `Right${b}`])];
 
-let T = null, template = null, clone = null;
-export const modelStatus = { url: "", error: "", skipped: "" };   // skipped: models that failed before `url` loaded
+let T = null, clone = null;
+const templates = {};   // suit -> its loaded model, to clone for each person
+// per suit: { url, error, skipped }; skipped: files that failed before `url` loaded
+export const modelStatus = {};
 
-// "mixamorig:LeftArm", "mixamorigLeftArm" and Sketchfab's "mixamorig:LeftArm_09" are all "LeftArm"
-const boneName = n => n.replace(/^.*?mixamorig[:_]?/i, "").replace(/_\d+$/, "");
+// "mixamorig:LeftArm", "mixamorigLeftArm" and Sketchfab's "mixamorig:LeftArm_09" are all "LeftArm";
+// some rigs call the hips the pelvis, and the top of the head Head_end
+const ALIAS = { Pelvis: "Hips", Head_end: "HeadTop_End" };
+const boneName = n => {
+  const b = n.replace(/^.*?mixamorig[:_]?/i, "").replace(/_\d+$/, "");
+  return ALIAS[b] || b;
+};
 
+// Load every suit's model; true if at least one loaded.
 export async function loadSuitModel(three) {
   T = three;
+  let loader;
   try {
     const [{ GLTFLoader }, { DRACOLoader }, utils] = await Promise.all([
       import("three/addons/loaders/GLTFLoader.js"), import("three/addons/loaders/DRACOLoader.js"),
       import("three/addons/utils/SkeletonUtils.js")]);
     clone = utils.clone;
-    const loader = new GLTFLoader();
+    loader = new GLTFLoader();
     loader.setDRACOLoader(new DRACOLoader().setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.6/"));
-    const wanted = new URLSearchParams(location.search).get("model");
+  } catch (e) {
+    for (const kind in SUITS) modelStatus[kind] = { url: "", error: `model loaders failed to load: ${e.message}`, skipped: "" };
+    return false;
+  }
+  const wanted = new URLSearchParams(location.search).get("model");
+  await Promise.all(Object.entries(SUITS).map(async ([kind, suit]) => {
+    const st = modelStatus[kind] = { url: "", error: "", skipped: "" };
     const errors = [];
-    for (const url of wanted ? [wanted] : MODELS) {
+    for (const url of kind === "ironman" && wanted ? [wanted] : suit.files) {
       try {
         const gltf = await loader.loadAsync(new URL(url, ROOT_URL).href);
-        template = prepare(gltf.scene, url);
-        modelStatus.url = url;
-        modelStatus.error = "";
-        modelStatus.skipped = errors.join("; ");
-        if (errors.length) console.warn(`suit model fallback: ${modelStatus.skipped}`);
-        return true;
+        templates[kind] = prepare(gltf.scene, url);
+        st.url = url;
+        st.skipped = errors.join("; ");
+        if (errors.length) console.warn(`${kind} model fallback: ${st.skipped}`);
+        return;
       } catch (e) {
         errors.push(`${url}: ${e.message || e}`);
       }
     }
-    modelStatus.error = errors.join("; ");
-  } catch (e) {
-    modelStatus.error = `model loaders failed to load: ${e.message}`;
-  }
-  console.warn(modelStatus.error);
-  return false;
+    st.error = errors.join("; ");
+    console.warn(`no ${kind} model: ${st.error}`);
+  }));
+  return Object.keys(templates).length > 0;
 }
 
 function prepare(scene, url) {
@@ -96,7 +122,103 @@ function prepare(scene, url) {
     }
   });
   bakeNanoDist(scene);
+  scene.userData.lenses = findLenses(scene);
+  if (scene.userData.lenses) bakeMask(scene);
   return scene;
+}
+
+// Which vertices are the mask (skinned mostly to the head) and how high up it each one is, as a
+// "maskAt" attribute: 1 at the bottom of the head to 2 at the top, 0 for everything else (so a mesh
+// without the attribute, which reads as 0, is never part of the mask).
+function bakeMask(scene) {
+  const parts = [];
+  let lo = Infinity, hi = -Infinity;
+  const v = V();
+  scene.traverse(m => {
+    if (!m.isSkinnedMesh) return;
+    const head = m.skeleton.bones.map((b, i) => (["Head", "HeadTop_End"].includes(boneName(b.name)) ? i : -1)).filter(i => i >= 0);
+    const pos = m.geometry.attributes.position, si = m.geometry.attributes.skinIndex, sw = m.geometry.attributes.skinWeight;
+    const ys = new Float32Array(pos.count).fill(NaN);
+    for (let i = 0; i < pos.count; i++) {
+      let w = 0;
+      for (let c = 0; c < 4; c++) if (head.includes(si.getComponent(i, c))) w += sw.getComponent(i, c);
+      if (w < 0.5) continue;
+      ys[i] = m.applyBoneTransform(i, v.fromBufferAttribute(pos, i)).applyMatrix4(m.matrixWorld).y;
+      lo = Math.min(lo, ys[i]); hi = Math.max(hi, ys[i]);
+    }
+    parts.push([m, ys]);
+  });
+  for (const [m, ys] of parts) {
+    m.geometry.setAttribute("maskAt", new T.BufferAttribute(ys.map(y => (Number.isNaN(y) ? 0 : 1 + (y - lo) / (hi - lo || 1))), 1));
+  }
+}
+
+// The two eye lenses' centres and half sizes [cx, cy, half width, half height], in the lens mesh's
+// own space (the model's left eye on +x), or null if the suit has none.
+function findLenses(scene) {
+  const sides = [[], []];   // [model's left (+x), right]
+  scene.traverse(m => {
+    if (!m.isMesh || !LENS.test(m.material.name)) return;
+    const pos = m.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) sides[pos.getX(i) > 0 ? 0 : 1].push([pos.getX(i), pos.getY(i)]);
+  });
+  if (!sides[0].length || !sides[1].length) return null;
+  return sides.map(pts => {
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+    return [(x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2];
+  });
+}
+
+// A lens's material (already taught nanotech), with eyelids painted over it in the frame's glossy
+// black: the upper lid comes down as the eye closes (the lower one comes up a little), a frown
+// tips the upper lid down at the inner corner, raised inner brows tip it up. Nothing moves, so the
+// mask never shows a gap. At their usual openness the lid sits just inside the lens's top, leaving
+// room to open wider. u holds this rig's eye uniforms.
+function lensMaterial(m, u) {
+  const nano = m.onBeforeCompile;
+  m.onBeforeCompile = (sh, renderer) => {
+    nano(sh, renderer);
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vLensPos;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvLensPos = position.xy;");
+    sh.fragmentShader = sh.fragmentShader
+      .replace("#include <common>", `#include <common>
+uniform vec4 uLensL, uLensR;   // centre and half size of the model's left / right lens
+uniform vec2 uOpen;            // how open its left / right eye is (1 = their usual)
+uniform vec2 uBrow;            // frown, raised inner brows
+varying vec2 vLensPos;`)
+      .replace("#include <color_fragment>", `#include <color_fragment>
+float lensLid;
+{
+  bool left = vLensPos.x > 0.0;
+  vec4 lens = left ? uLensL : uLensR;
+  float open = left ? uOpen.x : uOpen.y;
+  vec2 n = (vLensPos - lens.xy) / lens.zw;   // -1..1 across the lens
+  float inner = clamp(0.5 - (left ? 0.5 : -0.5) * n.x, 0.0, 1.0);   // 1 at the nose side
+  float top = open < 1.0 ? -0.35 + (open - 0.1) * 1.444 : 0.95 + (open - 1.0) * 0.4;
+  top += inner * (uBrow.y * 0.25 - uBrow.x * 0.9);
+  float bottom = -1.0 + 0.3 * clamp(1.0 - open, 0.0, 1.0);
+  lensLid = max(smoothstep(top - 0.05, top + 0.05, n.y), 1.0 - smoothstep(bottom - 0.05, bottom + 0.05, n.y));
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.025), lensLid);
+}`)
+      .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
+roughnessFactor = mix(roughnessFactor, 0.3, lensLid);`);
+  };
+  return m;
+}
+
+// Ease the rig's lenses toward this face's expression (p.face from face.js; neutral once it's
+// stale). now in ms, dt in seconds.
+export function setEyes(r, face, now, dt) {
+  if (!r.eyes3) return;
+  const fresh = face && now - face.at < EYES_STALE;
+  const k = 1 - Math.exp(-dt / EYES_EASE), u = r.eyes3;
+  const toward = (v, t) => v + (t - v) * k;
+  const open = side => Math.min(OPEN_MAX, Math.max(0.1, fresh ? face.open[side] : 1));
+  u.uOpen.value.set(toward(u.uOpen.value.x, open(0)), toward(u.uOpen.value.y, open(1)));
+  u.uBrow.value.set(toward(u.uBrow.value.x, fresh ? face.browDown : 0), toward(u.uBrow.value.y, fresh ? face.browUp : 0));
 }
 
 // Every vertex's distance from the arc reactor over the body, as a 0..1 "nanoDist" attribute: straight
@@ -110,7 +232,7 @@ function bakeNanoDist(scene) {
   scene.traverse(o => { if (o.isBone) bones[boneName(o.name)] = o; });
   const at = b => b.getWorldPosition(V());
   const R = reactorWorld(scene)?.centre ?? at(bones.Spine2);
-  const torso = new Set(["Hips", "Spine", "Spine1", "Spine2"].map(n => bones[n]).filter(Boolean));
+  const torso = new Set(["Hips", ...SPINE].map(n => bones[n]).filter(Boolean));
   // limb / neck bone -> [distance from the reactor to its joint over the skeleton, pace along it]
   const reach = new Map();
   const out = (b, d, k) => {
@@ -166,19 +288,41 @@ function nanoMaterial(base, u) {
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, u);
     sh.vertexShader = sh.vertexShader
-      .replace("#include <common>", "#include <common>\nattribute float nanoDist;\nvarying float vNanoDist;\nvarying vec3 vNanoPos;")
-      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvNanoDist = nanoDist;\nvNanoPos = position;");
+      .replace("#include <common>", "#include <common>\nattribute float nanoDist, maskAt;\nvarying float vNanoDist, vMaskAt;\nvarying vec3 vNanoPos;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvNanoDist = nanoDist;\nvMaskAt = maskAt;\nvNanoPos = position;");
     sh.fragmentShader = sh.fragmentShader
       .replace("#include <common>", `#include <common>
-uniform float uNanoFront, uNanoTime, uNanoScale;
-varying float vNanoDist;
+uniform float uNanoFront, uNanoTime, uNanoScale, uMaskOff;
+varying float vNanoDist, vMaskAt;
 varying vec3 vNanoPos;
-float nanoHash(vec3 c) { return fract(sin(dot(c, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }`)
+float nanoHash(vec3 c) { return fract(sin(dot(c, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
+// smooth value noise, 0..1
+float nanoNoise(vec3 p) {
+  vec3 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  vec2 e = vec2(1.0, 0.0);
+  return mix(mix(mix(nanoHash(i), nanoHash(i + e.xyy), f.x), mix(nanoHash(i + e.yxy), nanoHash(i + e.xxy), f.x), f.y),
+             mix(mix(nanoHash(i + e.yyx), nanoHash(i + e.xyx), f.x), mix(nanoHash(i + e.yxx), nanoHash(i + e.xxx), f.x), f.y), f.z);
+}`)
       .replace("#include <clipping_planes_fragment>", `#include <clipping_planes_fragment>
 vec3 nanoP = vNanoPos * uNanoScale;
-// little plates (cells of the body) each lock in a bit early or late, so the front is ragged
-float nanoBehind = uNanoFront - vNanoDist - ${NANO_PLATES.toFixed(4)} * (nanoHash(floor(nanoP * 45.0)) * 2.0 - 1.0);
-if (nanoBehind < 0.0) discard;
+// the front runs a bit ahead here and behind there, so it's ragged: broad tongues of it with a fine
+// grainy edge, smooth noise rather than cells so nothing pops in as a block. Only while it forms:
+// the noise is most of this shader's cost, and once formed there's no front.
+float nanoBehind = 1.0;
+if (uNanoFront < ${NANO_REACH.toFixed(4)}) {
+  float nanoRag = 0.6 * nanoNoise(nanoP * 14.0) + 0.3 * nanoNoise(nanoP * 45.0) + 0.1 * nanoNoise(nanoP * 140.0);
+  nanoBehind = uNanoFront - vNanoDist - ${NANO_PLATES.toFixed(4)} * (nanoRag * 2.0 - 1.0);
+  if (nanoBehind < 0.0) discard;
+}
+// the mask peeling off, from the neck up (vMaskAt: 1 at the bottom of the head, 2 at the top)
+if (vMaskAt > 0.5 && vMaskAt - 1.0 < uMaskOff * 1.1 - 0.05) discard;
+#ifndef FLAT_SHADED
+// While it forms, the gaps would show the suit's inside (the far wall of the shell, seen from
+// within): skip surfaces facing away from the camera, so the real body shows through instead. By
+// the model's normals (view space, camera down -z), not triangle winding, which models get wrong.
+if (uNanoFront < ${NANO_REACH.toFixed(4)} && vNormal.z < 0.0) discard;
+#endif
 float nanoSilver = 1.0 - smoothstep(0.0, ${NANO_EDGE.toFixed(4)}, nanoBehind);
 float nanoHot = 1.0 - smoothstep(0.0, ${(NANO_EDGE * 0.35).toFixed(4)}, nanoBehind);`)
       .replace("#include <color_fragment>", `#include <color_fragment>
@@ -194,13 +338,16 @@ totalEmissiveRadiance += vec3(0.75, 0.85, 1.0) * (nanoHot * 3.0 + nanoSilver * n
   return m;
 }
 
+// How far the mask is off (0 on, 1 off), for a suit that has one.
+export function setMaskOff(r, off) { r.nano.uMaskOff.value = off; }
+
 // Set how far the nanotech suit has formed (level 0..1) on this rig; t is the time in seconds.
 export function setNano(r, level, t) {
   r.nano.uNanoFront.value = level * NANO_REACH;
   r.nano.uNanoTime.value = t;
 }
 
-export const modelReady = () => !!template;
+export const modelReady = kind => !!templates[kind];
 
 // ---------------------------------------------------------------- math helpers
 
@@ -217,8 +364,9 @@ function frame(xv, yv) {
 
 // ---------------------------------------------------------------- one rig per person
 
-export function makeBodyRig(scene) {
+export function makeBodyRig(scene, kind) {
   const holder = new T.Group();
+  const template = templates[kind];
   const model = clone(template);
   holder.add(model);
   scene.add(holder);
@@ -226,11 +374,18 @@ export function makeBodyRig(scene) {
   model.traverse(o => { if (o.isBone) bones[boneName(o.name)] = o; });
   const rest = new Map();
   for (const b of Object.values(bones)) rest.set(b, { q: b.quaternion.clone(), p: b.position.clone(), s: b.scale.clone() });
-  const nano = { uNanoFront: { value: NANO_REACH }, uNanoTime: { value: 0 }, uNanoScale: { value: 1 / template.userData.height } };
-  const own = new Map();   // this rig's copy of each material, carrying its own nanotech front
+  const nano = { uNanoFront: { value: NANO_REACH }, uNanoTime: { value: 0 }, uNanoScale: { value: 1 / template.userData.height },
+    uMaskOff: { value: 0 } };
+  const lenses = template.userData.lenses;
+  const eyes3 = lenses && { uLensL: { value: new T.Vector4(...lenses[0]) }, uLensR: { value: new T.Vector4(...lenses[1]) },
+    uOpen: { value: new T.Vector2(1, 1) }, uBrow: { value: new T.Vector2(0, 0) } };
+  const own = new Map();   // this rig's copy of each material, carrying its own nanotech front (and eyes)
   model.traverse(m => {
     if (!m.isMesh || !m.geometry.attributes.nanoDist) return;
-    if (!own.has(m.material)) own.set(m.material, nanoMaterial(m.material, nano));
+    if (!own.has(m.material)) {
+      const mat = nanoMaterial(m.material, nano);
+      own.set(m.material, eyes3 && LENS_PARTS.test(m.material.name) ? lensMaterial(mat, eyes3) : mat);
+    }
     m.material = own.get(m.material);
   });
 
@@ -242,7 +397,7 @@ export function makeBodyRig(scene) {
   const bodyInv = body.clone().invert();
   // each frame-driven bone's rest rotation relative to the frame that drives it
   const offset = {};
-  for (const n of ["Hips", "Spine", "Spine1", "Spine2", "Neck", "Head"]) {
+  for (const n of ["Hips", ...SPINE, "Neck", "Head"]) {
     if (bones[n]) offset[n] = bodyInv.clone().multiply(wq(n));
   }
   const hinge = {};
@@ -261,7 +416,8 @@ export function makeBodyRig(scene) {
   }
   const eyes = bones.LeftEye && bones.RightEye ? wp("LeftEye").distanceTo(wp("RightEye")) : 0;
   return {
-    holder, bones, rest, offset, hinge, eyes, nano, head: headWidth(model, bones, body), reactor: findReactor(model),
+    kind, holder, bones, rest, offset, hinge, eyes, nano, eyes3, headPerEar: SUITS[kind].headPerEar,
+    spine: SPINE.filter(n => bones[n]), head: headWidth(model, bones, body), reactor: findReactor(model),
     torso: up.length(), width: wp("LeftArm").distanceTo(wp("RightArm")),
     s: 0, headFrame: Q(), gauntlet: { Left: false, Right: false },
   };
@@ -404,8 +560,9 @@ export function poseBody(r, P, hands, dt) {
   const headF = Q().setFromRotationMatrix(new T.Matrix4().makeBasis(x, V().crossVectors(z, x), z));
   r.headFrame.copy(headF);
   const along = (f0, f1, t) => f0.clone().slerp(f1, t);
-  const drive = { Hips: hipF, Spine: along(hipF, chestF, 1 / 3), Spine1: along(hipF, chestF, 2 / 3),
-    Spine2: chestF, Neck: along(chestF, headF, 0.5), Head: headF };
+  // the spine bones turn by steps from the hips' frame to the chest's
+  const drive = { Hips: hipF, Neck: along(chestF, headF, 0.5), Head: headF };
+  r.spine.forEach((n, i) => { drive[n] = along(hipF, chestF, (i + 1) / r.spine.length); });
   for (const [n, f] of Object.entries(drive)) if (b[n] && r.offset[n]) setWorld(b[n], f.clone().multiply(r.offset[n]));
 
   // the model's shoulders to the person's width, then its shoulder midpoint onto theirs
@@ -417,7 +574,7 @@ export function poseBody(r, P, hands, dt) {
   const at = mid(b.LeftArm.getWorldPosition(V()), b.RightArm.getWorldPosition(V()));
   r.holder.position.copy(shoulders.sub(at));
   if (r.head) {
-    const k = P(8).distanceTo(P(7)) * HEAD_PER_EAR / (r.head * r.s);
+    const k = P(8).distanceTo(P(7)) * r.headPerEar / (r.head * r.s);
     b.Head.scale.multiplyScalar(Math.min(2, Math.max(0.7, k)));
   }
 

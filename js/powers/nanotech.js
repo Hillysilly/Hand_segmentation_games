@@ -4,7 +4,7 @@
 // Each person's suit has a level from 0 (no suit) to 1 (fully on). The flowing itself happens on the
 // 3D model (see suitmodel.js): every vertex knows how far it is from the reactor along the body, and
 // the shader shows only what the front has reached, with a band of liquid silver at the front.
-import { settings } from "../config.js";
+import { settings, wearing } from "../config.js";
 import { persons, hands } from "../state.js";
 import { dist, clamp } from "../util.js";
 import { isFresh } from "../people.js";
@@ -17,8 +17,12 @@ const RETRACT = 1.4;     // ...and to pull back in
 const CLOAK_FROM = 0.9;  // the cloak fades the real body out over the last stretch of forming
 
 const level = p => (settings.nanotech ? p.nano?.level ?? 0 : 1);
-// How much of the suit this person has on (0..1); the suit isn't drawn at all at 0.
-export const suitLevel = p => (settings.armor ? level(p) : 0);
+// How much of the suit this person has on (0..1); the suit isn't drawn at all at 0. Only Iron Man's
+// suit forms with nanotech; Spider-Man's is simply on.
+export const suitLevel = p => {
+  const wear = wearing();
+  return wear === "ironman" ? level(p) : wear ? 1 : 0;
+};
 // How strongly the cloak hides this person's real body (0..1): only once the suit has nearly formed.
 export const cloakFade = p => clamp((suitLevel(p) - CLOAK_FROM) / (1 - CLOAK_FROM), 0, 1);
 
@@ -45,7 +49,7 @@ export function updateNanotech(dt) {
   for (const p of persons) {
     if (!p.nano) p.nano = { level: 0, dir: 0, hold: 0 };
     const n = p.nano;
-    if (!settings.nanotech || !settings.armor || !p.lm || !isFresh(p) || p.ko > 0) { n.hold = 0; continue; }
+    if (!settings.nanotech || wearing() !== "ironman" || !p.lm || !isFresh(p) || p.ko > 0) { n.hold = 0; continue; }
     if (handOnChest(p)) {
       if (n.hold >= 0 && (n.hold += dt) >= HOLD) {
         n.dir = n.level < 0.5 && n.dir <= 0 ? 1 : -1;

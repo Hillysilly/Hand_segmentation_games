@@ -25,6 +25,9 @@ const FLEX = { upper: [PI / 2, 0], fore: [PI * 0.95, 0], hand: { palm: "in", cur
 const AIM = curl => ({ upper: [PI / 2, 0], fore: [PI / 2, 0], hand: { dir: [PI, 0], palm: "out", curl } });
 // upper arm hanging forward, forearm across the body: the hand flat on the chest
 const ON_CHEST = { upper: [0.1, 0.6], fore: [-2.07, 0], hand: { palm: "back", curl: CURL.open } };
+// a fist on top of the head (gripping a mask), and a fist pulled down past the chest
+const GRIP = { upper: [PI, 0.2], fore: [-PI / 2, 0.2], hand: { palm: "down", curl: CURL.fist } };
+const PULLED = { upper: [0.2, 0.3], fore: [0.3, 0.6], hand: { palm: "in", curl: CURL.fist } };
 const WEB_SIGN = { upper: [1.3, 0.3], fore: [1.5, 0.4], hand: { palm: "front", curl: CURL.web } };
 
 // Framings: whole body for two players, close-up for the suit.
@@ -40,6 +43,14 @@ const gt = (got, than, what = "") => got > than || `${what} expected > ${than}, 
 const lt = (got, than, what = "") => got < than || `${what} expected < ${than}, got ${fmt(got)}`;
 const fmt = v => typeof v === "number" ? Math.round(v * 100) / 100 : v;
 const all = (...results) => results.find(r => r !== true) ?? true;
+
+// The newest web landed on one of these surfaces (and is behind its shooter, or not, if given).
+function newestWeb(w, surfaces, behind) {
+  const web = w.webs[w.webs.length - 1];
+  if (!web) return "no webs";
+  return all(surfaces.includes(web.surface) || `landed on the ${web.surface}`,
+    behind === undefined || web.behind === behind || `behind: ${web.behind}`);
+}
 
 // Average frame-to-frame movement (px) of a set of points sampled over time.
 const jitter = { suit: [], raw: [] };
@@ -71,8 +82,8 @@ function suitFits(w, num) {
     near("left shoulder", J.LeftArm, L[12], 0.08), near("right shoulder", J.RightArm, L[11], 0.08),
     near("left elbow", J.LeftForeArm, L[14], 0.08), near("right elbow", J.RightForeArm, L[13], 0.08),
     near("left wrist", J.LeftHand, L[16], 0.08), near("right wrist", J.RightHand, L[15], 0.08),
-    suit.reactor.visible || "reactor hidden",
-    (suit.reactor.y > shoulderY && suit.reactor.y < hipY) || "reactor not on the chest",
+    suit.wear !== "ironman" || suit.reactor.visible || "reactor hidden",
+    suit.wear !== "ironman" || (suit.reactor.y > shoulderY && suit.reactor.y < hipY) || "reactor not on the chest",
   );
 }
 
@@ -191,6 +202,22 @@ export const scenarios = [
     snapshots: [[1.9, "webs"]],
   },
   {
+    name: "web-room",
+    about: "Webs land where they'd hit the room: a side wall, the floor behind, the back wall (behind the person), the camera's glass",
+    duration: 4,
+    paintFrames: true,
+    // the web-shooter sign held up, the hand aimed: [out, toward the camera]
+    people: [t => body({ right: { upper: [1.3, 0.3], fore: [1.5, 0.4],
+      hand: { dir: at(t, [[0, [PI / 2, 0]], [1, [0.25, -0.6]], [2, [PI * 0.75, -1.0]], [3, [PI / 2, 1.45]]]), palm: "front", curl: CURL.web } } })],
+    checks: [
+      [0.95, "aimed sideways: a side wall", w => newestWeb(w, ["left", "right"])],
+      [1.95, "aimed down and away: the floor, behind them", w => newestWeb(w, ["floor"], true)],
+      [2.95, "aimed away: the back wall, behind them", w => newestWeb(w, ["back"], true)],
+      [3.95, "aimed at the camera: the glass", w => newestWeb(w, ["glass"], false)],
+    ],
+    snapshots: [[0.95, "side-wall"], [1.95, "floor"], [2.95, "back-wall"], [3.95, "glass"]],
+  },
+  {
     name: "spin",
     about: "A full 360 turn starts the Spinjitzu tornado",
     duration: 3,
@@ -295,10 +322,82 @@ export const scenarios = [
     checks: [[2.4, "none of the body learned as room", w => lt(w.cloak, 0.05, "body share learned")]],
   },
   {
+    name: "spiderman-suit",
+    about: "With SPIDER-MAN switched on last, people wear the Spider-Man suit: straight away, no reactor, no Iron Man hands",
+    duration: 2,
+    settings: { prefer: "spiderman" },
+    paintFrames: true,
+    people: [t => closeUp({ left: FLEX, right: t < 1 ? FLEX : AIM(CURL.web) })],
+    checks: [
+      [0.5, "Spider-Man suit on, straight away", w => all(eq(w.armor.suits[0]?.wear, "spiderman", "suit"),
+        eq(w.armor.status.spiderman, "assets/models/spiderman.glb", "model"), suitFits(w, 1))],
+      [0.5, "no arc reactor", w => eq(w.armor.suits[0].reactor.visible, false, "reactor shown")],
+      [0.5, "his own hands on the tracked hands, no Iron Man hand armour", w => all(
+        eq(w.armor.hands.filter(h => h.onModel).length, 2, "hands in the suit"),
+        eq(w.armor.hands.filter(h => h.plate.visible).length, 0, "Iron Man hand plates"))],
+      [0.5, "suit covers the stomach", w => {
+        const j = w.armor.suits[0].body.joints;
+        return w.drawsArmor({ x: (j.Spine2.x + j.Hips.x) / 2, y: (j.Spine2.y + j.Hips.y) / 2 });
+      }],
+    ],
+    snapshots: [[0.5, "spidey-flex"], [1.9, "spidey-web"]],
+  },
+  {
+    name: "spidey-eyes",
+    about: "Spider-Man's lenses follow the face: squint and frown, a wink (mirrored onto his other eye), surprise",
+    duration: 4,
+    settings: { prefer: "spiderman" },
+    paintFrames: true,
+    people: [t => closeUp({ face: at(t, [[0, { open: [1, 1] }], [1, { open: [0.35, 0.35], frown: 0.8 }],
+      [2, { open: [0.05, 1] }], [3, { open: [1.3, 1.3], raise: 0.9 }]]) })],
+    checks: [
+      [0.9, "neutral: lenses as modelled", w => {
+        const e = w.armor.suits[0]?.body?.eyes;
+        return !e ? "no lens expression" : all(lt(Math.abs(e.open[0] - 1), 0.1, "left open - 1"), lt(Math.abs(e.open[1] - 1), 0.1, "right open - 1"), lt(e.frown, 0.1, "frown"));
+      }],
+      [1.9, "squint and frown", w => {
+        const e = w.armor.suits[0].body.eyes;
+        return all(lt(e.open[0], 0.5, "left open"), lt(e.open[1], 0.5, "right open"), gt(e.frown, 0.6, "frown"));
+      }],
+      [2.9, "a wink with their right eye closes his left lens (the mirror)", w => {
+        const e = w.armor.suits[0].body.eyes;
+        return all(lt(e.open[0], 0.3, "his left lens open"), gt(e.open[1], 0.8, "his right lens open"));
+      }],
+      [3.9, "surprise: wide eyes, raised brows", w => {
+        const e = w.armor.suits[0].body.eyes;
+        return all(gt(e.open[0], 1.08, "left open"), gt(e.open[1], 1.08, "right open"), gt(e.raise, 0.7, "raised"));
+      }],
+    ],
+    snapshots: [[0.9, "neutral"], [1.9, "squint"], [2.9, "wink"], [3.9, "surprise"]],
+  },
+  {
+    name: "unmask",
+    about: "Spider-Man pulls his mask off (a fist on the head, pulled down past the chest) and back on (the reverse); a flex isn't a pull",
+    duration: 5.5,
+    settings: { prefer: "spiderman" },
+    paintFrames: true,
+    people: [t => body(at(t, [[0, {}], [0.4, { left: FLEX, right: FLEX }], [1.3, { left: PULLED, right: PULLED }],
+      [2.0, { right: GRIP }], [2.6, { right: PULLED }], [4.0, { right: GRIP }], [4.8, {}]]))],
+    checks: [
+      [1.95, "flexing and dropping the fists leaves the mask on", w => eq(w.p(1).unmask.level, 1, "mask")],
+      [3.5, "gripped and pulled down: mask off", w => eq(w.p(1).unmask.level, 0, "mask")],
+      [3.5, "the real head shows", w => {
+        const J = w.armor.suits[0].body.joints;
+        return w.drawsArmor({ x: (J.Head.x + J.HeadTop_End.x) / 2, y: (J.Head.y + J.HeadTop_End.y) / 2 }) !== true || "the mask still covers the head";
+      }],
+      [3.5, "the body's still in the suit", w => {
+        const J = w.armor.suits[0].body.joints;
+        return w.drawsArmor({ x: (J.Spine2.x + J.Hips.x) / 2, y: (J.Spine2.y + J.Hips.y) / 2 });
+      }],
+      [5.4, "pulled back up: mask on", w => eq(w.p(1).unmask.level, 1, "mask")],
+    ],
+    snapshots: [[2.4, "gripping"], [3.5, "unmasked"], [5.4, "masked-again"]],
+  },
+  {
     name: "armor-off",
     about: "With the suit switched off, nothing is rigged",
     duration: 1,
-    settings: { armor: false },
+    settings: { armor: false, spiderman: false },
     people: [() => closeUp()],
     checks: [[0.9, "no armour", w => eq(w.armor.suits.length + w.armor.hands.length, 0, "rigs")]],
   },

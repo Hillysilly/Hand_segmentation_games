@@ -1,6 +1,6 @@
 // Per-frame game logic: advance every person, hand, power and effect by dt.
 import { settings, MAX_HEALTH } from "./config.js";
-import { persons, hands, prune, timed } from "./state.js";
+import { persons, hands, prune, timed, unseenFor } from "./state.js";
 import { dist } from "./util.js";
 import { sfx } from "./audio.js";
 import { burst, updateParticles, updateFloaters, decayScreenFx } from "./effects.js";
@@ -14,12 +14,15 @@ import { WEB_COOLDOWN, shootWeb, updateWebs } from "./powers/spider.js";
 import { updateRepulsor, updateBeam } from "./powers/ironman.js";
 import { updateArmor } from "./powers/armor.js";
 import { updateNanotech } from "./powers/nanotech.js";
+import { updateUnmask } from "./powers/unmask.js";
+import { updateRoom } from "./room.js";
 import { updateCloak } from "./powers/cloak.js";
 
 export function update(dt, now) {
   let maxCharge = 0, beams = 0, maxSpin = 0;
 
-  prune(persons, p => now - p.lastSeen < 1500);
+  prune(persons, p => unseenFor(p.lastSeen) < 1500);
+  updateRoom(dt);
   for (const p of persons) {
     p.hitFlash = Math.max(0, p.hitFlash - dt * 2.5);
     p.flexing = settings.goku && p.ko === 0 && p.lm && isFresh(p) && isFlexing(p.lm);
@@ -33,7 +36,7 @@ export function update(dt, now) {
   }
 
   prune(hands, h => {
-    if (now - h.lastSeen <= 300) return true;
+    if (unseenFor(h.lastSeen) <= 300) return true;
     // Hand vanished: spill any stored charge as a fizzle.
     burst(h.cx, h.cy, Math.round(h.charge * 40), 250, [120, 220, 255], { life: 0.5 });
     return false;
@@ -76,6 +79,7 @@ export function update(dt, now) {
   updateFloaters(dt);
   decayScreenFx(dt);
   timed("nano", () => updateNanotech(dt));
+  updateUnmask(dt);
   timed("suit", () => updateArmor(dt));
   timed("cloak", updateCloak);
 

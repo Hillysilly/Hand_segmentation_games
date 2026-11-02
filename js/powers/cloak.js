@@ -10,11 +10,12 @@
 // over them as a ghost: it skips anywhere someone has been in the last second (suited or not, or
 // just lost by the tracker), skips frames where someone's mask glitches (and keeps using their last
 // good mask meanwhile), and only takes pixels that have held still since the last look.
-import { POSE_WIDTH, settings } from "../config.js";
+import { POSE_WIDTH, settings, wearing } from "../config.js";
 import { ctx, frame, persons, clock } from "../state.js";
 import { videoRect, dist } from "../util.js";
 import { isFresh } from "../people.js";
 import { cloakFade } from "./nanotech.js";
+import { maskLevel, headZone } from "./unmask.js";
 
 const LEARN_EVERY = 4;   // frames between looks at the room
 const LEARN = 0.3;       // how far the plate moves toward what it sees, per look
@@ -55,11 +56,19 @@ function resize(mw, mh) {
 
 export function resetCloak() { w = h = 0; shown = false; frames = 0; }
 
-// Look at the room wherever nobody has been lately and nothing is moving. Reading the frame back
-// from the GPU is the slow part (a few ms for a camera frame), hence only every LEARN_EVERY frames.
-function learn(img) {
+// The frame's pixels at the mask size: the copy the tracker sent along, or (without one) read back
+// from the frame. Reading back stalls the GPU, and the tracking models with it, until everything
+// queued on it is done.
+function pixels(img) {
+  const f = frame.pixels;
+  if (f && f.width === w && f.height === h) return f.data;
   gctx.drawImage(img, 0, 0, w, h);
-  const px = gctx.getImageData(0, 0, w, h).data, o = outImg.data, last = prev;
+  return gctx.getImageData(0, 0, w, h).data;
+}
+
+// Look at the room wherever nobody has been lately and nothing is moving (every LEARN_EVERY frames).
+function learn(img) {
+  const px = pixels(img), o = outImg.data, last = prev;
   prev = px;
   if (!last) return;   // nothing to compare with yet
   for (let i = 0; i < body.length; i++) {
@@ -131,6 +140,21 @@ function steadyMask(p) {
   return { mask: m, glitch: false };
 }
 
+// Stop painting over an ellipse (a head, in screen coords), by `amount`, with a soft edge.
+function uncover(z, amount) {
+  const r = videoRect(), k = w / r.w;
+  const cx = (1 - (z.x - r.x) / r.w) * w, cy = (z.y - r.y) / r.h * h, rx = z.rx * k, ry = z.ry * k;
+  const x0 = Math.max(0, cx - rx * 1.3 | 0), x1 = Math.min(w - 1, cx + rx * 1.3 | 0);
+  const y0 = Math.max(0, cy - ry * 1.3 | 0), y1 = Math.min(h - 1, cy + ry * 1.3 | 0);
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0, i = y * w + x0; x <= x1; x++, i++) {
+      const d = Math.hypot((x - cx) / rx, (y - cy) / ry);   // 1 at the edge of the ellipse
+      const keep = 1 - amount * Math.min(1, Math.max(0, (1.3 - d) / 0.3));
+      body[i] *= keep;
+    }
+  }
+}
+
 // How fast this person is moving (screen px/s): their fastest joint, held briefly at its peak so
 // the padding doesn't snap back between frames.
 function speedOf(p) {
@@ -149,7 +173,7 @@ function speedOf(p) {
 export function updateCloak() {
   shown = false;
   const img = frame.img;
-  if (!settings.armor || !settings.cloak || !img || (img.readyState !== undefined && img.readyState < 2)) return;
+  if (!wearing() || !settings.cloak || !img || (img.readyState !== undefined && img.readyState < 2)) return;
   const tracked = persons.filter(p => p.mask);   // anyone seen in the last moment, suited or not
   const mw = tracked[0]?.mw || POSE_WIDTH, mh = tracked[0]?.mh || Math.round(POSE_WIDTH * frame.h / frame.w);
   if (mw !== w || mh !== h) resize(mw, mh);
@@ -186,6 +210,8 @@ export function updateCloak() {
     }
   }
   if (any) pad(body, Math.round(grow), FEATHER);
+  // the unmasked keep their real head: no painting over it
+  for (const p of now.keys()) if (p.lm && isFresh(p) && maskLevel(p) < 1) uncover(headZone(p), 1 - maskLevel(p));
 
   const o = outImg.data;
   if (frames++ % LEARN_EVERY === 0 && !glitch) learn(img);
@@ -199,7 +225,7 @@ export function updateCloak() {
 
 // Paint the learned room over the bodies, mirrored like the video.
 export function drawCloak() {
-  if (!shown || !settings.armor || !settings.cloak) return;
+  if (!shown || !wearing() || !settings.cloak) return;
   const r = videoRect();
   ctx.save();
   ctx.translate(r.x + r.w, r.y); ctx.scale(-1, 1);

@@ -30,6 +30,9 @@ export function initPanel() {
 
   function setSetting(key, value) {
     settings[key] = value;
+    // switching a suit's power on puts that suit on (see wearing)
+    if (value && key === "armor") settings.prefer = "ironman";
+    if (value && key === "spiderman") settings.prefer = "spiderman";
     if (key === "muted") sfx.setMuted(value);
     syncPanel();
   }

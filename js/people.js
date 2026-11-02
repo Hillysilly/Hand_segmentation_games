@@ -1,6 +1,6 @@
 // People: pose tracks matched across frames, with their segmentation silhouettes.
 import { PLAYER_COLORS, MAX_HEALTH, STAGE_HEALTH } from "./config.js";
-import { H, clock, persons } from "./state.js";
+import { H, frame, persons, unseenFor } from "./state.js";
 import { dist, clamp, videoRect, toScreen, rayToEdge, greedyMatch } from "./util.js";
 
 export class Person {
@@ -66,6 +66,7 @@ function headBox(lm) {
 }
 
 export function ingestPoses(result, now) {
+  frame.seen = now;
   const r = videoRect();
   const dets = result.landmarks.map(lms => lms.map(l => ({ ...toScreen(l, r), v: l.visibility ?? 1 })));
   const boxes = dets.map(headBox);
@@ -114,7 +115,7 @@ function setMask(p, data, mw, mh) {
   p.fill.getContext("2d").putImageData(p.fillImg, 0, 0);
 }
 
-export const isFresh = p => p.mask && clock - p.lastSeen < 300;
+export const isFresh = p => p.mask && unseenFor(p.lastSeen) < 300;
 
 // Silhouette value (0..255) under a screen point.
 export function maskAt(p, sx, sy, r) {

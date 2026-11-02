@@ -27,5 +27,10 @@ export const CONNECTIONS = [
 ];
 
 export const DEFAULT_SETTINGS = { ironman: true, armor: true, nanotech: true, cloak: true, goku: true, spinjitzu: true, spinColor: "255,70,40",
-  spiderman: true, video: true, skeleton: true, silhouettes: true, muted: false };
+  spiderman: true, prefer: "ironman", video: true, skeleton: true, silhouettes: true, muted: false };
 export const settings = { ...DEFAULT_SETTINGS };
+
+// Which suit people wear: Iron Man with SUIT on, Spider-Man with SPIDER-MAN on, and with both on,
+// whichever was switched on last (settings.prefer). "" for none.
+export const wearing = () => (settings.armor && settings.spiderman ? settings.prefer
+  : settings.armor ? "ironman" : settings.spiderman ? "spiderman" : "");

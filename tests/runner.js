@@ -43,8 +43,9 @@ function world(now) {
     drawsArmor(piece) {
       if (!armorStatus.webgl) return `SKIP: ${armorStatus.error || "no WebGL"}`;
       const x = Math.round(piece.x), y = Math.round(piece.y);
+      const suits = { armor: settings.armor, spiderman: settings.spiderman };
       const sample = on => {
-        settings.armor = on;
+        Object.assign(settings, on ? suits : { armor: false, spiderman: false });
         render(now, 30);
         return ctx.getImageData(x, y, 1, 1).data;
       };

@@ -1,6 +1,6 @@
 // Hands: landmark tracks matched across frames, gesture classification, palm direction, ownership.
 import { FINGERS } from "./config.js";
-import { clock, persons, hands } from "./state.js";
+import { frame, persons, hands, unseenFor } from "./state.js";
 import { dist, videoRect, toScreen, greedyMatch } from "./util.js";
 import { hitsSelf } from "./people.js";
 
@@ -39,6 +39,7 @@ export class Hand {
 }
 
 export function ingestHands(result, now) {
+  frame.seen = now;
   const r = videoRect();
   const dets = result.landmarks.map(lms => lms.map(l => toScreen(l, r)));
   const match = greedyMatch(dets, hands, (pts, h) => {
@@ -122,7 +123,7 @@ export function ingestHands(result, now) {
 export function ownerOf(h) {
   let best = null, bestD = Infinity;
   for (const p of persons) {
-    if (!p.lm || clock - p.lastSeen > 300) continue;
+    if (!p.lm || unseenFor(p.lastSeen) > 300) continue;
     const d = Math.min(dist(h.pts[0], p.lm[15]), dist(h.pts[0], p.lm[16]));
     if (d < bestD) { bestD = d; best = p; }
   }

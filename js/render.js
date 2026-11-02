@@ -1,6 +1,6 @@
 // Drawing a frame: camera, auras, suit, hand effects, then the HUD on top.
-import { POSE_CONNECTIONS, CONNECTIONS, MAX_HEALTH, settings } from "./config.js";
-import { ctx, W, H, DPR, frame, fx, persons, hands, particles, shockwaves, floaters, perf, timed } from "./state.js";
+import { POSE_CONNECTIONS, CONNECTIONS, MAX_HEALTH, settings, wearing } from "./config.js";
+import { ctx, W, H, DPR, frame, fx, persons, hands, particles, shockwaves, floaters, perf, timed, tracker, unseenFor } from "./state.js";
 import { clamp, videoRect } from "./util.js";
 import { glow } from "./gfx.js";
 import { mic } from "./audio.js";
@@ -9,7 +9,8 @@ import { ring } from "./combat.js";
 import { AURA_STAGES, drawAura, drawFlexGauge } from "./powers/goku.js";
 import { drawTornado } from "./powers/spinjitzu.js";
 import { drawFlames, drawBalls } from "./powers/ninja.js";
-import { drawWebs } from "./powers/spider.js";
+import { drawWebs, drawWebsBehind } from "./powers/spider.js";
+import { room } from "./room.js";
 import { drawBeam, drawCharge, drawPalmGlow, drawAim } from "./powers/ironman.js";
 import { drawArmor, drawArmorGlows, inGauntlet } from "./powers/armor.js";
 import { drawCloak } from "./powers/cloak.js";
@@ -83,7 +84,7 @@ function drawPoseSkeleton(p) {
 
 function drawSilhouette(p) {
   // a cloaked body is replaced by the suit, so its outline would just trace the old body
-  if (settings.silhouettes && isFresh(p) && !(settings.armor && settings.cloak)) drawMaskLayer(p.edge, 0.6);
+  if (settings.silhouettes && isFresh(p) && !(wearing() && settings.cloak)) drawMaskLayer(p.edge, 0.6);
 }
 
 function drawHitGlow(p) {
@@ -140,7 +141,7 @@ function healthColor(frac) {
 }
 
 function drawPlayer(p, now) {
-  const visible = now - p.lastSeen < 300 ? 1 : 0.35;
+  const visible = unseenFor(p.lastSeen) < 300 ? 1 : 0.35;
   ctx.globalAlpha = visible;
 
   // corner brackets around the face
@@ -219,10 +220,19 @@ function drawHud(fps) {
   ctx.fillText(persons.length >= 2 ? "HUD // COMBAT MODE" : "HUD // ONLINE", m + 10, m + 22);
   ctx.fillText(`PEOPLE ${persons.length}   HANDS ${hands.length}   FPS ${fps.toFixed(0)}`, m + 10, m + 40);
   let line = m + 58;
+  if (tracker.where) {
+    ctx.fillText(`TRACK ${tracker.fps.toFixed(0)} FPS   ${tracker.where}`, m + 10, line);
+    line += 18;
+  }
   // where the frame time goes: tracking models, suit posing, cloak, 3D draw, everything else drawn
-  const ms = ["pose", "hands", "suit", "cloak", "3d", "draw"].filter(k => perf[k] !== undefined);
+  const ms = ["pose", "hands", "face", "suit", "cloak", "3d", "draw"].filter(k => perf[k] !== undefined);
   if (ms.length) {
     ctx.fillText(`MS ${ms.map(k => `${k.toUpperCase()} ${perf[k].toFixed(1)}`).join("  ")}`, m + 10, line);
+    line += 18;
+  }
+  if (settings.spiderman && room.seen) {
+    // the room the webs land in, as guessed from the people in it (see room.js)
+    ctx.fillText(`ROOM FLOOR ${room.floor.toFixed(1)} M BELOW CAM  BACK WALL ${room.back.toFixed(1)} M  WIDTH ${(room.side * 2).toFixed(1)} M`, m + 10, line);
     line += 18;
   }
   if (settings.spinjitzu && persons.length) {
@@ -271,6 +281,7 @@ export function render(now, fps) {
     ctx.fillStyle = "rgba(0,10,20,0.35)";  // dim so the glows pop
     ctx.fillRect(-50, -50, W + 100, H + 100);
   }
+  drawWebsBehind(now);   // webs on the walls and floor behind people: under them and everything on them
 
   ctx.globalCompositeOperation = "lighter";
   for (const p of persons) {

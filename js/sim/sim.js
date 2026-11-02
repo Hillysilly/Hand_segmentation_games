@@ -6,8 +6,9 @@ import { frame } from "../state.js";
 import { mic } from "../audio.js";
 import { ingestPoses } from "../people.js";
 import { ingestHands } from "../hands.js";
+import { ingestFaces } from "../face.js";
 import { resetWorld } from "../engine.js";
-import { buildBody, project, poseLandmarks, handLandmarks } from "./body.js";
+import { V, buildBody, project, poseLandmarks, handLandmarks } from "./body.js";
 
 const SKIN = "#c8906e", SHIRT = "#3a4352", PANTS = "#262b36";
 
@@ -45,6 +46,7 @@ export class SimSource {
     const r = this.frameAt(t);
     ingestPoses(r.pose, now);
     ingestHands(r.hands, now);
+    if (r.faces.length) ingestFaces(r.faces, now);
   }
 
   frameAt(t) {
@@ -53,9 +55,11 @@ export class SimSource {
       .map(pose => ({ pose, body: buildBody(pose) }));
     const pose = { landmarks: [], worldLandmarks: [], segmentationMasks: [] };
     const hands = { landmarks: [], worldLandmarks: [], handedness: [] };
+    const faces = [];
     for (const { pose: ps, body } of people) {
       const { lm, world } = poseLandmarks(body, ps);
       if (ps.noise) shake(lm, world, ps.noise);
+      if (ps.face) faces.push(faceLandmarks(body, ps));
       pose.landmarks.push(lm);
       pose.worldLandmarks.push(world);
       pose.segmentationMasks.push(this.mask(body, ps));
@@ -71,7 +75,7 @@ export class SimSource {
       }
     }
     if (this.drawFrames) this.paintFrame(people);
-    return { pose, hands };
+    return { pose, hands, faces };
   }
 
   // Segmentation mask in MediaPipe's shape: { width, height, getAsFloat32Array() }, raw frame space.
@@ -150,4 +154,19 @@ function shake(lm, world, { xy, z }) {
     l.x += dx; l.y += dy;
     world[j].z += dz;
   });
+}
+
+// What the face tracker would report for a pose with an expression, face: { open: [their right eye,
+// left eye] (1 = usual, 0 = shut), frown, raise } (see face.js for the shape).
+function faceLandmarks(body, ps) {
+  const f = ps.face, J = body.joints;
+  const pt = q => { const p = project(q, ps); return { x: p.x, y: p.y }; };
+  const eye = (c, open, [a, b, up, down]) => ({
+    [a]: pt(V(c.x - 0.016, c.y, c.z)), [b]: pt(V(c.x + 0.016, c.y, c.z)),
+    [up]: pt(V(c.x, c.y + 0.006 * open, c.z)), [down]: pt(V(c.x, c.y - 0.006 * open, c.z)),
+  });
+  return {
+    pts: { 1: pt(J[0]), ...eye(J[5], f.open?.[0] ?? 1, [33, 133, 159, 145]), ...eye(J[2], f.open?.[1] ?? 1, [263, 362, 386, 374]) },
+    shapes: { browDownLeft: f.frown || 0, browDownRight: f.frown || 0, browInnerUp: f.raise || 0 },
+  };
 }
