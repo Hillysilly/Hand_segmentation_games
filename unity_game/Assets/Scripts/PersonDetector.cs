@@ -27,6 +27,7 @@ namespace Repulsor
         const float MinScore = 0.5f;
         const int SnapshotsKept = 6;
         const float BodyDepth = 0.12f;
+        const float SecondsBeforeCameraRestart = 3f;
         const float BodyHalfWidth = 0.2f;
 
         // Where the camera sits on the head. It's the same side as the eye the default image comes from.
@@ -60,6 +61,7 @@ namespace Repulsor
         float nextSnapshot;
         int snapshotNumber;
         int imageFailures;
+        float failingSince = -1f;
         bool busy;
 
         public void Init(RoomSense roomSense) => room = roomSense;
@@ -97,12 +99,19 @@ namespace Repulsor
             {
                 // The camera checks its permission only as it starts, so start it again.
                 Debug.Log("[Person] Camera permission granted");
-                cameraManager.enabled = false;
-                cameraManager.enabled = true;
+                RestartCamera();
             };
             callbacks.PermissionDenied += _ => Debug.Log("[Person] Camera permission denied");
             Permission.RequestUserPermission(CameraPermission, callbacks);
 #endif
+        }
+
+        /// <summary>Starts the camera again. The system can close it at any time, and it won't come back alone.</summary>
+        public void RestartCamera()
+        {
+            Debug.Log("[Person] Restarting the camera");
+            cameraManager.enabled = false;
+            cameraManager.enabled = true;
         }
 
         void Update()
@@ -116,8 +125,18 @@ namespace Repulsor
                 imageFailures++;
                 if (imageFailures % 40 == 1)
                     Debug.Log($"[Person] No camera image yet ({imageFailures} tries), subsystem running: {cameraManager.subsystem?.running}");
+
+                if (failingSince < 0f)
+                    failingSince = Time.time;
+                else if (Time.time - failingSince >= SecondsBeforeCameraRestart)
+                {
+                    failingSince = Time.time;
+                    RestartCamera();
+                }
                 return;
             }
+
+            failingSince = -1f;
 
             // The image is from about now, so this is close to where the camera was when it was taken.
             Transform head = cameraManager.transform;

@@ -130,7 +130,8 @@ namespace Repulsor
 
 #if DEVELOPMENT_BUILD
         // Lights the aura with no hands, so it can be captured over adb from a headset nobody is wearing.
-        // The file holds a distance in metres, then optionally a style number and a colour like #2080FF.
+        // The file holds a distance in metres, then optionally a style number, a colour like #2080FF, and
+        // "restart" to restart the camera.
         // Remove the file to put the aura out.
         void CheckAuraTestFile()
         {
@@ -165,6 +166,8 @@ namespace Repulsor
                 aura.ShowStyle(style - 1);
             if (parts.Length > 2 && ColorUtility.TryParseHtmlString(parts[2], out Color testTint))
                 aura.SetTint(testTint.linear, false);
+            if (parts.Length > 3 && parts[3] == "restart")
+                person.RestartCamera();
             room.TryDistance(head.position, forward, out float surface);
             Debug.Log($"[Repulsor] Aura test '{command}': head {head.position}, forward {forward}, surface {surface:0.00} m");
         }
