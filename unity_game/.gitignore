@@ -32,3 +32,7 @@
 
 # Android build cache
 /.utmp/
+
+# Licensed suit models and everything derived from them stay on this machine.
+/Assets/Suits/
+/Assets/Suits.meta

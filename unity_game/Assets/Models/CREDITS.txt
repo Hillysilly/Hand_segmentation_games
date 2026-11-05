@@ -2,3 +2,7 @@ pose_detection.onnx, pose_anchors.csv
   BlazePose detector by Google Research (MediaPipe), under the Apache License 2.0,
   as packaged by Unity at https://huggingface.co/unity/inference-engine-blaze-pose
   License text: https://www.apache.org/licenses/LICENSE-2.0
+
+pose_landmarks_detector_lite.onnx, pose_landmarks_detector_full.onnx
+  BlazePose landmark models by Google Research (MediaPipe), under the Apache License 2.0,
+  from the same Unity package as above.
