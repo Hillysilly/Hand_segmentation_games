@@ -144,6 +144,7 @@ public static class SuitLab
             AssetDatabase.DeleteAsset(path);
             AssetDatabase.CreateAsset(small, path);
             skinned[i].sharedMesh = small;
+            skinned[i].sharedMaterials = skinned[i].sharedMaterials.Select(m => SuitMaterial(m, name)).ToArray();
             skinned[i].updateWhenOffscreen = true;
             skinned[i].shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             skinned[i].receiveShadows = false;
@@ -153,6 +154,40 @@ public static class SuitLab
         PrefabUtility.SaveAsPrefabAsset(copy, $"{ResourceFolder}/{name}.prefab");
         Object.DestroyImmediate(copy);
         return $"{name}: {original} triangles to {triangles} at level {level}, {vertices} vertices, {skinned.Length} parts";
+    }
+
+    /// <summary>The same look as an imported material, on the headset-friendly suit shader.</summary>
+    static Material SuitMaterial(Material source, string suit)
+    {
+        string path = $"{MeshFolder}/{suit}_{source.name.Replace(':', '_').Replace('.', '_')}.mat";
+        var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (material != null)
+            return material;
+
+        material = new Material(Shader.Find("Repulsor/Suit")) { name = source.name };
+        CopyTexture(source, "baseColorTexture", material, "_BaseMap");
+        CopyTexture(source, "metallicRoughnessTexture", material, "_MetalRoughMap");
+        CopyTexture(source, "normalTexture", material, "_NormalMap");
+        CopyTexture(source, "emissiveTexture", material, "_EmissionMap");
+        if (source.HasProperty("baseColorFactor"))
+            material.SetColor("_BaseColor", source.GetColor("baseColorFactor"));
+        if (source.HasProperty("metallicFactor"))
+            material.SetFloat("_Metallic", source.GetFloat("metallicFactor"));
+        if (source.HasProperty("roughnessFactor"))
+            material.SetFloat("_Roughness", source.GetFloat("roughnessFactor"));
+        if (source.HasProperty("emissiveFactor"))
+            material.SetColor("_Emission", source.GetColor("emissiveFactor"));
+
+        Debug.Log($"[Suit] {source.name}: base {material.GetColor("_BaseColor")}, metal {material.GetFloat("_Metallic"):0.00}, rough {material.GetFloat("_Roughness"):0.00}, "
+            + $"textures {material.GetTexture("_BaseMap")?.name} {material.GetTexture("_MetalRoughMap")?.name} {material.GetTexture("_NormalMap")?.name} {material.GetTexture("_EmissionMap")?.name}");
+        AssetDatabase.CreateAsset(material, path);
+        return material;
+    }
+
+    static void CopyTexture(Material source, string from, Material target, string to)
+    {
+        if (source.HasProperty(from) && source.GetTexture(from) != null)
+            target.SetTexture(to, source.GetTexture(from));
     }
 
     static int TrianglesAt(Mesh mesh, int level)
