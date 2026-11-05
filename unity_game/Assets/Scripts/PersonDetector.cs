@@ -1,6 +1,6 @@
 using System;
-using System.Globalization;
 using System.IO;
+using System.Linq;
 using Unity.Collections;
 using Unity.InferenceEngine;
 using UnityEngine;
@@ -13,56 +13,73 @@ using UnityEngine.XR.ARSubsystems;
 namespace Repulsor
 {
     /// <summary>
-    /// Finds a person with a model: it runs BlazePose's detector on the headset's camera a few times a
-    /// second, then uses live depth along that direction to place them in the room. Development builds also
-    /// save what the model saw to the app's files. Lines tagged [Person] appear in the headset's log.
+    /// Finds a person with BlazePose on the headset's camera, then uses live depth to place their body in the
+    /// room. Development builds can replay saved pictures in place of the camera, so the whole path can be
+    /// measured with nobody wearing the headset. Lines tagged [Person] appear in the headset's log.
     /// </summary>
     public sealed class PersonDetector : MonoBehaviour
     {
         const string CameraPermission = "horizonos.permission.HEADSET_CAMERA";
-        const int InputSize = 224;
-        const int AnchorCount = 2254;
-        const float SecondsBetweenRuns = 0.25f;
-        const float SecondsBetweenSnapshots = 2f;
-        const float MinScore = 0.5f;
-        const int SnapshotsKept = 6;
-        const float BodyDepth = 0.12f;
+        const int ImageSize = 640;
+        const float SecondsBetweenSlowRuns = 0.25f;
+        const float SecondsBetweenFastRuns = 0.05f;
         const float SecondsBeforeCameraRestart = 3f;
-        const float BodyHalfWidth = 0.2f;
+        const float SecondsBetweenReports = 1f;
+        const float BodyDepth = 0.12f;
+        const float ReplayVerticalFov = 60f;
+        const int HipLeft = 23, HipRight = 24, ShoulderLeft = 11, ShoulderRight = 12;
 
         // Where the camera sits on the head. It's the same side as the eye the default image comes from.
         static readonly Vector3 LensOffset = new Vector3(-0.032f, -0.02f, 0.06f);
 
-        // Along the line from the hips towards the upper body. Rays can slip past a body, so try several.
-        static readonly float[] BodyPoints = { 0f, 0.25f, 0.5f };
+        // Along the line from the hips to the shoulders. Rays can slip past a body, so try several.
+        static readonly float[] BodyPoints = { 0f, 0.3f, 0.6f };
 
         [SerializeField] ModelAsset model;
+        [SerializeField] ModelAsset landmarkModel;
         [SerializeField] TextAsset anchorsCsv;
         [SerializeField] ARCameraManager cameraManager;
 
-        /// <summary>Set while something needs tracking, since the model costs frame rate.</summary>
-        public bool Running { get; set; }
-
-        readonly float[] pixels = new float[InputSize * InputSize * 3];
+        readonly BodyFrame frame = new BodyFrame();
+        BodyTracker tracker;
         RoomSense room;
         XRCameraIntrinsics intrinsics;
         bool hasIntrinsics;
-        Vector2Int imageSize;
-        Vector2Int imageCorner;
-        float imageScale;
+        byte[] rgba;
+        NativeArray<byte> converted;
+        int imageWidth;
+        int imageHeight;
+        Vector2 focalLength;
+        Vector2 centre;
         Vector3 capturedPosition;
         Quaternion capturedRotation;
         Vector3 sighting;
         bool hasSighting;
-        float[,] anchors;
-        Worker worker;
-        NativeArray<byte> converted;
         float nextRun;
-        float nextSnapshot;
-        int snapshotNumber;
-        int imageFailures;
+        float nextReport;
         float failingSince = -1f;
+        int imageFailures;
         bool busy;
+        string[] replayFiles;
+        int replayNext;
+        Texture2D replayTexture;
+        int runs;
+        int bodies;
+        int detectorRuns;
+        float detectorTotal;
+        float landmarkTotal;
+        float wholeTotal;
+
+        /// <summary>Set while something needs tracking, since the model costs frame rate.</summary>
+        public bool Running { get; set; }
+
+        /// <summary>Run as often as the model can, for a suit, and not just a few times a second.</summary>
+        public bool Fast { get; set; }
+
+        /// <summary>The newest body in the room. Replaced whole each time, and counted by <see cref="BodyVersion"/>.</summary>
+        public Vector3[] Joints { get; } = new Vector3[BodyFrame.JointCount];
+
+        public int BodyVersion { get; private set; }
 
         public void Init(RoomSense roomSense) => room = roomSense;
 
@@ -75,13 +92,21 @@ namespace Repulsor
             return had;
         }
 
+        /// <summary>Uses the pictures in the app's frames folder in place of the camera, on a loop.</summary>
+        public void StartReplay()
+        {
+            string folder = Path.Combine(Application.persistentDataPath, "frames");
+            replayFiles = Directory.Exists(folder) ? Directory.GetFiles(folder, "*.jpg").OrderBy(f => f).ToArray() : Array.Empty<string>();
+            replayNext = 0;
+            replayTexture ??= new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            Debug.Log($"[Person] Replaying {replayFiles.Length} pictures");
+        }
+
         void Start()
         {
-            anchors = LoadAnchors(anchorsCsv.text);
-
-            // The CPU, not the GPU: the model takes about as long, but drawing doesn't have to wait for it.
-            worker = new Worker(ModelLoader.Load(model), BackendType.CPU);
-            Debug.Log("[Person] Detector ready");
+            // The CPU, not the GPU: drawing doesn't have to wait for the model.
+            tracker = new BodyTracker(model, landmarkModel, anchorsCsv.text, BackendType.CPU);
+            Debug.Log("[Person] Tracker ready");
             RequestCamera();
         }
 
@@ -116,10 +141,21 @@ namespace Repulsor
 
         void Update()
         {
+            Report();
             if (!Running || busy || Time.time < nextRun)
                 return;
-            nextRun = Time.time + SecondsBetweenRuns;
+            nextRun = Time.time + (Fast ? SecondsBetweenFastRuns : SecondsBetweenSlowRuns);
 
+            Transform head = cameraManager.transform;
+            capturedPosition = head.position + head.rotation * LensOffset;
+            capturedRotation = head.rotation;
+
+            if (replayFiles != null && replayFiles.Length > 0 ? ReadReplay() : ReadCamera())
+                Track();
+        }
+
+        bool ReadCamera()
+        {
             if (!cameraManager.TryAcquireLatestCpuImage(out XRCpuImage image))
             {
                 imageFailures++;
@@ -127,39 +163,32 @@ namespace Repulsor
                     Debug.Log($"[Person] No camera image yet ({imageFailures} tries), subsystem running: {cameraManager.subsystem?.running}");
 
                 if (failingSince < 0f)
+                {
                     failingSince = Time.time;
+                }
                 else if (Time.time - failingSince >= SecondsBeforeCameraRestart)
                 {
                     failingSince = Time.time;
                     RestartCamera();
                 }
-                return;
+                return false;
             }
 
             failingSince = -1f;
-
-            // The image is from about now, so this is close to where the camera was when it was taken.
-            Transform head = cameraManager.transform;
-            capturedPosition = head.position + head.rotation * LensOffset;
-            capturedRotation = head.rotation;
-
-            float started = Time.realtimeSinceStartup;
             using (image)
-                FillInput(image);
-            float prepared = Time.realtimeSinceStartup;
-
-            Detect(started, prepared);
+                Convert(image);
+            return true;
         }
 
-        /// <summary>Shrinks the image to fit the model's square input, keeping its shape, with black bars.</summary>
-        void FillInput(XRCpuImage image)
+        /// <summary>Copies the camera image out at the size the tracker works at.</summary>
+        void Convert(XRCpuImage image)
         {
             int longest = Mathf.Max(image.width, image.height);
-            int width = image.width * InputSize / longest;
-            int height = image.height * InputSize / longest;
+            imageWidth = image.width * ImageSize / longest;
+            imageHeight = image.height * ImageSize / longest;
             var conversion = new XRCpuImage.ConversionParams(image, TextureFormat.RGBA32, XRCpuImage.Transformation.None)
             {
-                outputDimensions = new Vector2Int(width, height),
+                outputDimensions = new Vector2Int(imageWidth, imageHeight),
             };
 
             int size = image.GetConvertedDataSize(conversion);
@@ -168,77 +197,67 @@ namespace Repulsor
                 if (converted.IsCreated)
                     converted.Dispose();
                 converted = new NativeArray<byte>(size, Allocator.Persistent);
+                rgba = new byte[size];
             }
             image.Convert(conversion, converted);
+            converted.CopyTo(rgba);
 
-            Array.Clear(pixels, 0, pixels.Length);
-            int left = (InputSize - width) / 2, top = (InputSize - height) / 2;
-            imageSize = new Vector2Int(image.width, image.height);
-            imageCorner = new Vector2Int(left, top);
-            imageScale = longest / (float)InputSize;
-            for (int y = 0; y < height; y++)
-            {
-                for (int x = 0; x < width; x++)
-                {
-                    int from = (y * width + x) * 4;
-                    int to = ((y + top) * InputSize + x + left) * 3;
-                    pixels[to] = converted[from] / 255f;
-                    pixels[to + 1] = converted[from + 1] / 255f;
-                    pixels[to + 2] = converted[from + 2] / 255f;
-                }
-            }
-
-            if (imageFailures >= 0)
+            if (!hasIntrinsics)
             {
                 hasIntrinsics = cameraManager.TryGetIntrinsics(out intrinsics);
                 Debug.Log($"[Person] Camera image {image.width}x{image.height} format {image.format}, lens {hasIntrinsics}: "
                     + $"focal {intrinsics.focalLength}, centre {intrinsics.principalPoint}, size {intrinsics.resolution}");
-                imageFailures = -1;
             }
+
+            var toImage = new Vector2(imageWidth / (float)intrinsics.resolution.x, imageHeight / (float)intrinsics.resolution.y);
+            focalLength = Vector2.Scale(intrinsics.focalLength, toImage);
+            centre = Vector2.Scale(intrinsics.principalPoint, toImage);
         }
 
-        async void Detect(float started, float prepared)
+        bool ReadReplay()
+        {
+            replayTexture.LoadImage(File.ReadAllBytes(replayFiles[replayNext]));
+            replayNext = (replayNext + 1) % replayFiles.Length;
+            imageWidth = replayTexture.width;
+            imageHeight = replayTexture.height;
+
+            int size = imageWidth * imageHeight * 4;
+            if (rgba == null || rgba.Length != size)
+                rgba = new byte[size];
+
+            // Textures start at the bottom row, and the tracker wants the top row first.
+            NativeArray<byte> pixels = replayTexture.GetRawTextureData<byte>();
+            int stride = imageWidth * 4;
+            for (int y = 0; y < imageHeight; y++)
+                NativeArray<byte>.Copy(pixels, (imageHeight - 1 - y) * stride, rgba, y * stride, stride);
+
+            float focal = imageHeight * 0.5f / Mathf.Tan(ReplayVerticalFov * 0.5f * Mathf.Deg2Rad);
+            focalLength = new Vector2(focal, focal);
+            centre = new Vector2(imageWidth, imageHeight) * 0.5f;
+            return true;
+        }
+
+        async void Track()
         {
             busy = true;
+            float started = Time.realtimeSinceStartup;
             try
             {
-                using var input = new Tensor<float>(new TensorShape(1, InputSize, InputSize, 3), pixels);
-                worker.Schedule(input);
-
-                using Tensor<float> boxes = await (worker.PeekOutput(0) as Tensor<float>).ReadbackAndCloneAsync();
-                using Tensor<float> scores = await (worker.PeekOutput(1) as Tensor<float>).ReadbackAndCloneAsync();
-                float finished = Time.realtimeSinceStartup;
-
-                int best = 0;
-                float bestScore = float.MinValue;
-                for (int i = 0; i < AnchorCount; i++)
+                bool found = await tracker.RunAsync(rgba, imageWidth, imageHeight, frame);
+                runs++;
+                wholeTotal += Time.realtimeSinceStartup - started;
+                landmarkTotal += tracker.LandmarkMilliseconds;
+                if (tracker.DetectorMilliseconds > 0f)
                 {
-                    if (scores[0, i, 0] > bestScore)
-                    {
-                        bestScore = scores[0, i, 0];
-                        best = i;
-                    }
+                    detectorRuns++;
+                    detectorTotal += tracker.DetectorMilliseconds;
                 }
 
-                float score = 1f / (1f + Mathf.Exp(-bestScore));
-                float anchorX = InputSize * anchors[best, 0], anchorY = InputSize * anchors[best, 1];
-                float hipX = anchorX + boxes[0, best, 4], hipY = anchorY + boxes[0, best, 5];
-                float aboveX = anchorX + boxes[0, best, 6], aboveY = anchorY + boxes[0, best, 7];
-                float radius = Vector2.Distance(new Vector2(hipX, hipY), new Vector2(aboveX, aboveY));
-
-                Debug.Log($"[Person] {(score >= MinScore ? "FOUND" : "none")} score {score:0.00}, hips ({hipX:0}, {hipY:0}), "
-                    + $"radius {radius:0}, prepare {(prepared - started) * 1000f:0} ms, model {(finished - prepared) * 1000f:0} ms");
-
-                if (score >= MinScore)
-                    Locate(new Vector2(hipX, hipY), new Vector2(aboveX, aboveY));
-
-#if DEVELOPMENT_BUILD
-                if (Time.time >= nextSnapshot)
+                if (found)
                 {
-                    nextSnapshot = Time.time + SecondsBetweenSnapshots;
-                    SaveSnapshot(score, hipX, hipY, radius);
+                    bodies++;
+                    Locate();
                 }
-#endif
             }
             catch (Exception exception)
             {
@@ -247,95 +266,72 @@ namespace Repulsor
             busy = false;
         }
 
-        /// <summary>Turns where the model saw someone into a point in the room, using live depth.</summary>
-        void Locate(Vector2 hips, Vector2 upperBody)
+        /// <summary>Places the body in the room: live depth for how far away, or its size if that has no answer.</summary>
+        void Locate()
         {
-            if (!hasIntrinsics || room == null)
-                return;
+            Vector2 hips = (frame.Image[HipLeft] + frame.Image[HipRight]) * 0.5f;
+            Vector2 shoulders = (frame.Image[ShoulderLeft] + frame.Image[ShoulderRight]) * 0.5f;
 
             bool found = false;
             float nearest = float.MaxValue;
             Vector3 direction = Vector3.forward;
-            foreach (float along in BodyPoints)
+            if (replayFiles == null || replayFiles.Length == 0)
             {
-                Vector3 toBody = PixelDirection(Vector2.Lerp(hips, upperBody, along));
-                if (room.TryDistance(capturedPosition, toBody, out float distance) && distance < nearest)
+                foreach (float along in BodyPoints)
                 {
-                    found = true;
-                    nearest = distance;
-                    direction = toBody;
+                    Vector3 toBody = PixelDirection(Vector2.Lerp(hips, shoulders, along));
+                    if (room != null && room.TryDistance(capturedPosition, toBody, out float distance) && distance < nearest)
+                    {
+                        found = true;
+                        nearest = distance;
+                        direction = toBody;
+                    }
                 }
             }
 
-            if (!found)
-                return;
+            float hipDistance;
+            if (found)
+            {
+                Vector3 surface = Quaternion.Inverse(capturedRotation) * (direction * nearest);
+                hipDistance = surface.z + BodyDepth;
+            }
+            else
+            {
+                hipDistance = frame.DistanceFromSize(focalLength.y);
+            }
 
-            Vector3 flat = Vector3.ProjectOnPlane(direction, Vector3.up).normalized;
-            sighting = capturedPosition + direction * nearest + flat * BodyDepth;
+            frame.Place(capturedPosition, capturedRotation, focalLength, centre, hipDistance, Joints);
+            BodyVersion++;
+
+            sighting = (Joints[HipLeft] + Joints[HipRight]) * 0.5f;
             hasSighting = true;
-            Debug.Log($"[Person] Sighting at ({sighting.x:0.00}, {sighting.y:0.00}, {sighting.z:0.00}), {nearest:0.00} m away");
         }
 
-        /// <summary>The direction in the room through a point in the model's picture.</summary>
-        Vector3 PixelDirection(Vector2 modelPixel)
+        /// <summary>The direction in the room through a point in the tracker's picture.</summary>
+        Vector3 PixelDirection(Vector2 pixel)
         {
-            float toLensX = intrinsics.resolution.x / (float)imageSize.x;
-            float toLensY = intrinsics.resolution.y / (float)imageSize.y;
-            float x = (modelPixel.x - imageCorner.x) * imageScale * toLensX;
-            float y = (modelPixel.y - imageCorner.y) * imageScale * toLensY;
-
-            var local = new Vector3(
-                (x - intrinsics.principalPoint.x) / intrinsics.focalLength.x,
-                (intrinsics.principalPoint.y - y) / intrinsics.focalLength.y,
-                1f);
+            var local = new Vector3((pixel.x - centre.x) / focalLength.x, (centre.y - pixel.y) / focalLength.y, 1f);
             return capturedRotation * local.normalized;
         }
 
-        /// <summary>Saves what the model saw, with a green mark on the hips if it found someone.</summary>
-        void SaveSnapshot(float score, float hipX, float hipY, float radius)
+        void Report()
         {
-            var picture = new Texture2D(InputSize, InputSize, TextureFormat.RGB24, false);
-            for (int y = 0; y < InputSize; y++)
-            {
-                for (int x = 0; x < InputSize; x++)
-                {
-                    int i = (y * InputSize + x) * 3;
-                    picture.SetPixel(x, InputSize - 1 - y, new Color(pixels[i], pixels[i + 1], pixels[i + 2]));
-                }
-            }
+            if (Time.time < nextReport)
+                return;
+            nextReport = Time.time + SecondsBetweenReports;
+            if (runs == 0)
+                return;
 
-            Color mark = score >= MinScore ? Color.green : Color.red;
-            for (int angle = 0; angle < 360; angle += 3)
-            {
-                float a = angle * Mathf.Deg2Rad;
-                picture.SetPixel(Mathf.RoundToInt(hipX + Mathf.Cos(a) * radius),
-                    InputSize - 1 - Mathf.RoundToInt(hipY + Mathf.Sin(a) * radius), mark);
-                picture.SetPixel(Mathf.RoundToInt(hipX + Mathf.Cos(a) * 4f),
-                    InputSize - 1 - Mathf.RoundToInt(hipY + Mathf.Sin(a) * 4f), mark);
-            }
-            picture.Apply();
-
-            string path = Path.Combine(Application.persistentDataPath, $"person_{snapshotNumber++ % SnapshotsKept}.png");
-            File.WriteAllBytes(path, picture.EncodeToPNG());
-            Destroy(picture);
-        }
-
-        static float[,] LoadAnchors(string csv)
-        {
-            var result = new float[AnchorCount, 4];
-            string[] lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            for (int i = 0; i < AnchorCount; i++)
-            {
-                string[] values = lines[i].Split(',');
-                for (int j = 0; j < 4; j++)
-                    result[i, j] = float.Parse(values[j], CultureInfo.InvariantCulture);
-            }
-            return result;
+            Debug.Log($"[Person] {runs} runs, {bodies} bodies, {detectorRuns} searches, landmarks {landmarkTotal / runs:0} ms, "
+                + $"search {(detectorRuns > 0 ? detectorTotal / detectorRuns : 0f):0} ms, whole run {wholeTotal / runs * 1000f:0} ms, "
+                + $"presence {frame.Presence:0.00}, hips {(Joints[HipLeft] + Joints[HipRight]) * 0.5f:F2}");
+            runs = bodies = detectorRuns = 0;
+            detectorTotal = landmarkTotal = wholeTotal = 0f;
         }
 
         void OnDestroy()
         {
-            worker?.Dispose();
+            tracker?.Dispose();
             if (converted.IsCreated)
                 converted.Dispose();
         }

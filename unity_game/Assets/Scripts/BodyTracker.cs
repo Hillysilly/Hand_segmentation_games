@@ -66,6 +66,16 @@ namespace Repulsor
         const float MinPresence = 0.5f;
         const float CropScale = 1.25f;
 
+        // Where to search, in turn, as a square's centre across the image and its size against the image's
+        // longest side. Someone far away is too small to find in the whole picture, so most tries zoom in.
+        static readonly Vector3[] SearchWindows =
+        {
+            new Vector3(0.5f, 0.5f, 1f),
+            new Vector3(0.5f, 0.5f, 0.56f),
+            new Vector3(0.3f, 0.5f, 0.56f),
+            new Vector3(0.7f, 0.5f, 0.56f),
+        };
+
         readonly Worker detector;
         readonly Worker landmarker;
         readonly float[,] anchors;
@@ -73,6 +83,10 @@ namespace Repulsor
         readonly float[] landmarkPixels = new float[LandmarkSize * LandmarkSize * 3];
 
         bool tracking;
+        int searchWindow;
+        float windowLeft;
+        float windowTop;
+        float windowScale;
         Vector2 cropCentre;
         float cropRadius;
         float cropSin;
@@ -156,22 +170,27 @@ namespace Repulsor
             return ReadJoints(joints, world, presence, frame);
         }
 
-        /// <summary>Shrinks the image into the detector's square, centred, with black bars.</summary>
+        /// <summary>Shrinks this turn's search window into the detector's square. Anything outside the image is black.</summary>
         void FillDetectorInput(byte[] rgba, int width, int height)
         {
-            Array.Clear(detectorPixels, 0, detectorPixels.Length);
-            float scale = Mathf.Max(width, height) / (float)DetectorSize;
-            float left = (DetectorSize - width / scale) * 0.5f;
-            float top = (DetectorSize - height / scale) * 0.5f;
+            Vector3 window = SearchWindows[searchWindow];
+            searchWindow = (searchWindow + 1) % SearchWindows.Length;
 
+            int longest = Mathf.Max(width, height);
+            float side = longest * window.z;
+            windowLeft = width * window.x - side * 0.5f;
+            windowTop = height * window.y - side * 0.5f;
+            windowScale = side / DetectorSize;
+
+            Array.Clear(detectorPixels, 0, detectorPixels.Length);
             for (int y = 0; y < DetectorSize; y++)
             {
-                int sourceY = (int)((y + 0.5f - top) * scale);
+                int sourceY = (int)(windowTop + (y + 0.5f) * windowScale);
                 if (sourceY < 0 || sourceY >= height)
                     continue;
                 for (int x = 0; x < DetectorSize; x++)
                 {
-                    int sourceX = (int)((x + 0.5f - left) * scale);
+                    int sourceX = (int)(windowLeft + (x + 0.5f) * windowScale);
                     if (sourceX < 0 || sourceX >= width)
                         continue;
                     int from = (sourceY * width + sourceX) * 4;
@@ -200,12 +219,9 @@ namespace Repulsor
             if (1f / (1f + Mathf.Exp(-bestScore)) < MinDetection)
                 return false;
 
-            float scale = Mathf.Max(width, height) / (float)DetectorSize;
-            float left = (DetectorSize - width / scale) * 0.5f;
-            float top = (DetectorSize - height / scale) * 0.5f;
             float anchorX = DetectorSize * anchors[best, 0], anchorY = DetectorSize * anchors[best, 1];
-            var hips = new Vector2((anchorX + boxes[0, best, 4] - left) * scale, (anchorY + boxes[0, best, 5] - top) * scale);
-            var above = new Vector2((anchorX + boxes[0, best, 6] - left) * scale, (anchorY + boxes[0, best, 7] - top) * scale);
+            var hips = new Vector2(windowLeft + (anchorX + boxes[0, best, 4]) * windowScale, windowTop + (anchorY + boxes[0, best, 5]) * windowScale);
+            var above = new Vector2(windowLeft + (anchorX + boxes[0, best, 6]) * windowScale, windowTop + (anchorY + boxes[0, best, 7]) * windowScale);
 
             // The detector's idea of up comes largely from the face, and a headset hides that. People in a
             // room are nearly always upright, so start from upright and use its point only for the size.

@@ -57,6 +57,7 @@ namespace Repulsor
         AudioClip ignite;
         Transform head;
         PersonDetector person;
+        SuitView suits;
         float nextSpawnTime;
         int score;
         int shots;
@@ -77,6 +78,8 @@ namespace Repulsor
             head = origin.Camera.transform;
             person = FindAnyObjectByType<PersonDetector>();
             person.Init(room);
+            suits = new GameObject("Suits").AddComponent<SuitView>();
+            aura.UseSuits(suits);
             zap = Sfx.Zap();
             boom = Sfx.Boom();
             whoosh = Sfx.Whoosh();
@@ -118,20 +121,22 @@ namespace Repulsor
                 aura.SetTint(picked, true);
 
             person.Running = aura.IsLit;
+            person.Fast = aura.IsSuit;
             if (aura.IsLit)
                 aura.MoveTo(auraTracker.Tick(person, dt));
+            if (aura.IsLit && aura.IsSuit)
+                suits.Tick(person, dt);
 
             UpdateHud(dt);
 #if DEVELOPMENT_BUILD
-            if (headTracked)
-                CheckAuraTestFile();
+            CheckAuraTestFile();
 #endif
         }
 
 #if DEVELOPMENT_BUILD
         // Lights the aura with no hands, so it can be captured over adb from a headset nobody is wearing.
         // The file holds a distance in metres, then optionally a style number, a colour like #2080FF, and
-        // "restart" to restart the camera.
+        // "restart" to restart the camera or "replay" to use saved pictures in place of it.
         // Remove the file to put the aura out.
         void CheckAuraTestFile()
         {
@@ -168,6 +173,8 @@ namespace Repulsor
                 aura.SetTint(testTint.linear, false);
             if (parts.Length > 3 && parts[3] == "restart")
                 person.RestartCamera();
+            if (parts.Length > 3 && parts[3] == "replay")
+                person.StartReplay();
             room.TryDistance(head.position, forward, out float surface);
             Debug.Log($"[Repulsor] Aura test '{command}': head {head.position}, forward {forward}, surface {surface:0.00} m");
         }
@@ -395,7 +402,7 @@ namespace Repulsor
                     return "Hold your palm out to fire. OK sign to switch";
                 case Weapon.Aura:
                     return aura.IsLit
-                        ? $"Style {aura.StyleNumber} of {aura.StyleCount}: {aura.StyleName}. OK sign for next, palm to face for colour, fist to put out"
+                        ? $"Style {aura.StyleNumber} of {aura.StyleCount}: {aura.StyleName}. OK sign for next, palm to face for colour, fist to end"
                         : "Hold your palm at someone to ignite. Turn your palm to your face for colour";
                 default:
                     return "Fist to charge, snap open to fire. OK sign to switch";

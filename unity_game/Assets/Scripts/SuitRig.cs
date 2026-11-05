@@ -114,6 +114,20 @@ namespace Repulsor
 
         public bool HasBone(string name) => bones.ContainsKey(name);
 
+        /// <summary>How far each limb's joints are from where they were asked to be, for checking the fit.</summary>
+        public string FitReport(Vector3[] joints)
+        {
+            var report = new System.Text.StringBuilder();
+            foreach (Limb limb in Limbs)
+            {
+                report.Append($"{limb.Upper}: mid {Vector3.Distance(bones[limb.Lower].position, joints[limb.B]):0.00} ")
+                    .Append($"end {Vector3.Distance(bones[limb.End].position, joints[limb.C]):0.00} ")
+                    .Append($"want {joints[limb.A]:F2} {joints[limb.B]:F2} {joints[limb.C]:F2} ")
+                    .Append($"got {bones[limb.Upper].position:F2} {bones[limb.Lower].position:F2} {bones[limb.End].position:F2}; ");
+            }
+            return report.ToString();
+        }
+
         Vector3 Pos(string name) => bones[name].position;
 
         static Vector3 Mid(Vector3 a, Vector3 b) => (a + b) * 0.5f;
@@ -141,11 +155,7 @@ namespace Repulsor
         public void Pose(Vector3[] joints)
         {
             foreach (KeyValuePair<Transform, Rest> pair in rest)
-            {
-                pair.Key.localPosition = pair.Value.Position;
-                pair.Key.localRotation = pair.Value.Rotation;
-                pair.Key.localScale = pair.Value.Scale;
-            }
+                pair.Key.SetLocalPositionAndRotation(pair.Value.Position, pair.Value.Rotation);
 
             Vector3 hips = Mid(joints[HipLeft], joints[HipRight]);
             Vector3 shoulders = Mid(joints[ShoulderLeft], joints[ShoulderRight]);

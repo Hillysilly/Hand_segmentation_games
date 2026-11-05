@@ -88,6 +88,8 @@ public static class ProjectSetup
         var detector = new SerializedObject(detectorObject.GetComponent<PersonDetector>());
         detector.FindProperty("model").objectReferenceValue =
             AssetDatabase.LoadAssetAtPath<Unity.InferenceEngine.ModelAsset>("Assets/Models/pose_detection.onnx");
+        detector.FindProperty("landmarkModel").objectReferenceValue =
+            AssetDatabase.LoadAssetAtPath<Unity.InferenceEngine.ModelAsset>("Assets/Models/pose_landmarks_detector_lite.onnx");
         detector.FindProperty("anchorsCsv").objectReferenceValue =
             AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Models/pose_anchors.csv");
         detector.FindProperty("cameraManager").objectReferenceValue = Object.FindAnyObjectByType<ARCameraManager>();

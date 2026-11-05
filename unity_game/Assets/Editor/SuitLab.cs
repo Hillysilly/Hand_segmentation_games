@@ -87,6 +87,155 @@ public static class SuitLab
         Debug.Log("[Suit] Wrote " + ReportPath);
     }
 
+    const int TriangleBudget = 100000;
+    const int MaxLods = 8;
+    const string ResourceFolder = Folder + "/Resources/Suits";
+    const string MeshFolder = Folder + "/Generated";
+
+    /// <summary>
+    /// Makes headset-sized copies of the suits as prefabs in Assets/Suits/Resources, which the game loads by
+    /// name. Being in an ignored folder, they stay on this machine, and the game runs without them.
+    /// </summary>
+    [MenuItem("Repulsor/Prepare Suits")]
+    public static void Prepare()
+    {
+        Import();
+        Directory.CreateDirectory(ResourceFolder);
+        Directory.CreateDirectory(MeshFolder);
+        var report = new StringBuilder();
+        report.AppendLine(PrepareSuit("suit.glb", "IronMan"));
+        report.AppendLine(PrepareSuit("spiderman.glb", "SpiderMan"));
+        AssetDatabase.SaveAssets();
+        File.WriteAllText("Logs/suit_prepare.txt", report.ToString());
+        Debug.Log("[Suit] Prepared\n" + report);
+    }
+
+    static string PrepareSuit(string file, string name)
+    {
+        GameObject source = AssetDatabase.LoadAssetAtPath<GameObject>($"{Folder}/{file}");
+        GameObject copy = Object.Instantiate(source);
+        copy.name = name;
+        SkinnedMeshRenderer[] skinned = copy.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+
+        // Simplify every part together, then find how far down they must all go to fit the budget.
+        var meshes = new List<Mesh>();
+        foreach (SkinnedMeshRenderer renderer in skinned)
+        {
+            Mesh mesh = Object.Instantiate(renderer.sharedMesh);
+            MeshLodUtility.GenerateMeshLods(mesh, MaxLods);
+            meshes.Add(mesh);
+        }
+
+        int level = 0;
+        int triangles = meshes.Sum(m => TrianglesAt(m, 0));
+        int original = triangles;
+        while (triangles > TriangleBudget && level < meshes.Max(m => m.lodCount) - 1)
+        {
+            level++;
+            triangles = meshes.Sum(m => TrianglesAt(m, Mathf.Min(level, m.lodCount - 1)));
+        }
+
+        int vertices = 0;
+        for (int i = 0; i < skinned.Length; i++)
+        {
+            Mesh small = Compact(meshes[i], Mathf.Min(level, meshes[i].lodCount - 1));
+            vertices += small.vertexCount;
+            string path = $"{MeshFolder}/{name}_{i}.asset";
+            AssetDatabase.DeleteAsset(path);
+            AssetDatabase.CreateAsset(small, path);
+            skinned[i].sharedMesh = small;
+            skinned[i].updateWhenOffscreen = true;
+            skinned[i].shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            skinned[i].receiveShadows = false;
+            Object.DestroyImmediate(meshes[i]);
+        }
+
+        PrefabUtility.SaveAsPrefabAsset(copy, $"{ResourceFolder}/{name}.prefab");
+        Object.DestroyImmediate(copy);
+        return $"{name}: {original} triangles to {triangles} at level {level}, {vertices} vertices, {skinned.Length} parts";
+    }
+
+    static int TrianglesAt(Mesh mesh, int level)
+    {
+        int indices = 0;
+        for (int submesh = 0; submesh < mesh.subMeshCount; submesh++)
+            indices += (int)mesh.GetLod(submesh, level).indexCount;
+        return indices / 3;
+    }
+
+    /// <summary>A new mesh holding one simplified level and only the vertices it uses, because skinning costs per vertex.</summary>
+    static Mesh Compact(Mesh mesh, int level)
+    {
+        Vector3[] positions = mesh.vertices, normals = mesh.normals;
+        Vector4[] tangents = mesh.tangents;
+        Vector2[] uvs = mesh.uv;
+        BoneWeight[] weights = mesh.boneWeights;
+        bool hasNormals = normals.Length == positions.Length;
+        bool hasTangents = tangents.Length == positions.Length;
+        bool hasUvs = uvs.Length == positions.Length;
+
+        var map = new Dictionary<int, int>();
+        var keptPositions = new List<Vector3>();
+        var keptNormals = new List<Vector3>();
+        var keptTangents = new List<Vector4>();
+        var keptUvs = new List<Vector2>();
+        var keptWeights = new List<BoneWeight>();
+        var submeshes = new List<int[]>();
+
+        for (int submesh = 0; submesh < mesh.subMeshCount; submesh++)
+        {
+            int[] levelIndices = mesh.GetIndices(submesh, level, true);
+            var kept = new int[levelIndices.Length];
+            for (int i = 0; i < kept.Length; i++)
+            {
+                int index = levelIndices[i];
+                if (!map.TryGetValue(index, out int newIndex))
+                {
+                    newIndex = keptPositions.Count;
+                    map[index] = newIndex;
+                    keptPositions.Add(positions[index]);
+                    if (hasNormals) keptNormals.Add(normals[index]);
+                    if (hasTangents) keptTangents.Add(tangents[index]);
+                    if (hasUvs) keptUvs.Add(uvs[index]);
+                    keptWeights.Add(weights[index]);
+                }
+                kept[i] = newIndex;
+            }
+            submeshes.Add(kept);
+        }
+
+        var small = new Mesh { name = mesh.name, indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+        small.SetVertices(keptPositions);
+        if (hasNormals) small.SetNormals(keptNormals);
+        if (hasTangents) small.SetTangents(keptTangents);
+        if (hasUvs) small.SetUVs(0, keptUvs);
+        small.boneWeights = keptWeights.ToArray();
+        small.bindposes = mesh.bindposes;
+        small.subMeshCount = submeshes.Count;
+        for (int submesh = 0; submesh < submeshes.Count; submesh++)
+            small.SetTriangles(submeshes[submesh], submesh);
+        small.bounds = mesh.bounds;
+        return small;
+    }
+
+    /// <summary>Lists Unity's mesh simplification functions, whose names differ between versions.</summary>
+    public static void ProbeLods()
+    {
+        var report = new StringBuilder();
+        foreach (Type type in typeof(Editor).Assembly.GetTypes().Concat(typeof(Mesh).Assembly.GetTypes()))
+        {
+            foreach (var method in type.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly))
+            {
+                if (method.Name.Contains("GenerateMeshLods"))
+                    report.AppendLine($"{(type.IsPublic ? "public" : "internal")} {type.FullName}.{method.Name}({string.Join(", ", method.GetParameters().Select(p => p.ParameterType.Name + " " + p.Name))}) public={method.IsPublic}");
+            }
+            if (type.Name.Contains("LodGenerationFlags") || type.Name.Contains("MeshLodGenerationFlags"))
+                report.AppendLine($"flags {type.FullName}: {string.Join(", ", Enum.GetNames(type))}");
+        }
+        Directory.CreateDirectory("Logs");
+        File.WriteAllText("Logs/lod_probe.txt", report.ToString());
+    }
+
     const string FramesFolder = "Logs/frames";
     const string BenchFolder = "Logs/bench";
     const float AssumedVerticalFov = 60f;
@@ -130,8 +279,20 @@ public static class SuitLab
         RenderSettings.ambientLight = new Color(0.6f, 0.6f, 0.6f);
 
         var holder = new GameObject("Suit").transform;
-        Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>($"{Folder}/{suitFile}"), holder);
+        string prefabName = Environment.GetEnvironmentVariable("SUIT_PREFAB");
+        Object.Instantiate(prefabName != null
+            ? AssetDatabase.LoadAssetAtPath<GameObject>($"{ResourceFolder}/{prefabName}.prefab")
+            : AssetDatabase.LoadAssetAtPath<GameObject>($"{Folder}/{suitFile}"), holder);
+        if (prefabName != null)
+            suitFile = prefabName + ".prefab";
         var rig = new SuitRig(holder);
+
+        // Skinned meshes normally refresh in the game loop, which doesn't run here.
+        foreach (SkinnedMeshRenderer skinned in holder.GetComponentsInChildren<SkinnedMeshRenderer>())
+        {
+            skinned.forceMatrixRecalculationPerRender = true;
+            skinned.updateWhenOffscreen = true;
+        }
 
         var picture = GameObject.CreatePrimitive(PrimitiveType.Quad);
         Object.DestroyImmediate(picture.GetComponent<Collider>());
@@ -158,13 +319,7 @@ public static class SuitLab
                 int width = texture.width, height = texture.height;
                 byte[] rgba = TopDownBytes(texture);
 
-                string cropBefore = tracker.CropDescription;
                 bool ok = tracker.Run(rgba, width, height, frame);
-                if (i >= 82 && i <= 100 && i % 3 == 0)
-                {
-                    Debug.Log($"[Suit] frame {i} ok {ok} det {tracker.DetectorMilliseconds:0} before {cropBefore} after {tracker.CropDescription} hip {frame.Image[23]} {frame.Image[24]} shoulder {frame.Image[11]} {frame.Image[12]} nose {frame.Image[0]}");
-                    SaveCrop(tracker.LastCrop, $"{BenchFolder}/crop_{i:000}.png");
-                }
                 float focal = height * 0.5f / Mathf.Tan(AssumedVerticalFov * 0.5f * Mathf.Deg2Rad);
                 float distance = ok ? frame.DistanceFromSize(focal) : 0f;
                 if (ok)

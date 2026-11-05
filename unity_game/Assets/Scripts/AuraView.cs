@@ -4,7 +4,7 @@ namespace Repulsor
 {
     /// <summary>
     /// A burning aura standing at a spot on the floor, with rising embers and a low roar. It has several
-    /// looks to try, each a child object of particle flames. One shows at a time.
+    /// looks to try, each a child object, and one shows at a time. Suits count as further styles.
     /// </summary>
     public sealed class AuraView : MonoBehaviour
     {
@@ -22,14 +22,18 @@ namespace Repulsor
         [SerializeField] ParticleSystem embers;
         [SerializeField] AudioSource roar;
 
+        SuitView suits;
         float power;
         bool lit;
         int style;
 
         public bool IsLit => lit;
-        public int StyleCount => styles.Length;
+        public int StyleCount => styles.Length + (suits == null ? 0 : suits.Count);
         public int StyleNumber => style + 1;
-        public string StyleName => styles[style].name;
+        public string StyleName => IsSuit ? suits.NameOf(style - styles.Length) : styles[style].name;
+
+        /// <summary>Whether the current style is a suit on the person rather than an effect around them.</summary>
+        public bool IsSuit => style >= styles.Length;
         public ColorPicker Picker => picker;
 
         void Awake()
@@ -39,6 +43,8 @@ namespace Repulsor
             SetTint(LoadTint(), false);
             Apply(0f);
         }
+
+        public void UseSuits(SuitView suitView) => suits = suitView;
 
         /// <summary>Colours every style, and remembers the colour for next time if asked to.</summary>
         public void SetTint(Color tint, bool remember)
@@ -56,7 +62,7 @@ namespace Repulsor
         {
             transform.position = new Vector3(point.x, 0f, point.z);
             lit = true;
-            if (!roar.isPlaying)
+            if (!roar.isPlaying && !IsSuit)
                 roar.Play();
         }
 
@@ -69,7 +75,7 @@ namespace Repulsor
             roar.Stop();
         }
 
-        public void NextStyle() => ShowStyle((style + 1) % styles.Length);
+        public void NextStyle() => ShowStyle((style + 1) % StyleCount);
 
         /// <summary>Switches look. Public so the editor preview and development test can pick one.</summary>
         public void ShowStyle(int index)
@@ -77,6 +83,13 @@ namespace Repulsor
             style = index;
             for (int i = 0; i < styles.Length; i++)
                 styles[i].SetActive(i == style && (power > 0f || !Application.isPlaying));
+
+            if (suits != null)
+                suits.Show(IsSuit && lit ? style - styles.Length : -1);
+            if (IsSuit)
+                roar.Stop();
+            else if (lit && !roar.isPlaying)
+                roar.Play();
         }
 
         void Update()
@@ -98,7 +111,7 @@ namespace Repulsor
                 Shader.SetGlobalFloat(GlobalPower, power);
 
             ParticleSystem.EmissionModule emission = embers.emission;
-            emission.enabled = lit;
+            emission.enabled = lit && !IsSuit;
         }
     }
 }
