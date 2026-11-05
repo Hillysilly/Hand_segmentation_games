@@ -1,0 +1,13 @@
+{
+    "name": "Repulsor.Game",
+    "rootNamespace": "Repulsor",
+    "references": [
+        "Unity.XR.Hands",
+        "Unity.XR.CoreUtils",
+        "Unity.XR.ARFoundation",
+        "Unity.XR.ARSubsystems",
+        "UnityEngine.UI",
+        "Unity.InferenceEngine"
+    ],
+    "autoReferenced": true
+}

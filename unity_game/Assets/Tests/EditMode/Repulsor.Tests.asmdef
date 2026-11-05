@@ -1,0 +1,14 @@
+{
+    "name": "Repulsor.Tests",
+    "rootNamespace": "Repulsor.Tests",
+    "references": [
+        "Repulsor.Game",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": ["Editor"],
+    "overrideReferences": true,
+    "precompiledReferences": ["nunit.framework.dll"],
+    "autoReferenced": false,
+    "defineConstraints": ["UNITY_INCLUDE_TESTS"]
+}

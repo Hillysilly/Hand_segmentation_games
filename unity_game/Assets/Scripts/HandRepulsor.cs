@@ -1,0 +1,287 @@
+using UnityEngine;
+using UnityEngine.XR.Hands;
+
+namespace Repulsor
+{
+    /// <summary>One hand's weapons: reads the tracked joints, then charges and fires or runs the laser.</summary>
+    public sealed class HandRepulsor : MonoBehaviour
+    {
+        const float PalmOffset = 0.07f;      // charge orb sits this far off the palm
+        const float MaxOrbDiameter = 0.1f;
+        const float AimLength = 3f;
+        const float LaserFollowSpeed = 18f;
+        const float AuraIgniteSeconds = 0.8f;
+        const float AuraPutOutSeconds = 0.5f;
+        const float AuraMinDistance = 0.6f;   // Anything closer is your own hand or arm, not a target.
+
+        [SerializeField] Handedness handedness = Handedness.Left;
+        [SerializeField] Transform chargeOrb;
+        [SerializeField] LineRenderer aimLine;
+        [SerializeField] LaserBeamView laserBeam;
+        [SerializeField] AudioSource laserHum;
+
+        readonly RepulsorGesture repulsor = new RepulsorGesture();
+        readonly AimLock aim = new AimLock();
+        readonly LaserTrigger laser = new LaserTrigger();
+        readonly BeamLength beamLength = new BeamLength();
+        readonly PinchDetector pinch = new PinchDetector();
+        RepulsorGame game;
+        Transform trackingSpace;
+        HandGesture gesture = HandGesture.None;
+        Weapon weapon;
+        bool lasing;
+        Vector3 laserDirection;
+        Vector3 surfaceNormal;
+        float auraAim;
+        float auraFist;
+        bool auraPlaced;
+        int laserFrames;
+        int surfaceFrames;
+
+        public bool IsTracked { get; private set; }
+        public bool IsOpen => IsTracked && gesture == HandGesture.Open;
+        public Vector3 PalmPosition { get; private set; }
+        public Vector3 PalmNormal { get; private set; }
+        public Vector3 IndexTip { get; private set; }
+
+        public void Init(RepulsorGame owner, Transform handTrackingSpace, AudioClip hum)
+        {
+            game = owner;
+            trackingSpace = handTrackingSpace;
+            laserHum.clip = hum;
+            weapon = game.CurrentWeapon;
+            StopWeapons();
+        }
+
+        public void Tick(XRHand hand, float dt)
+        {
+            if (hand.isTracked != IsTracked)
+            {
+                IsTracked = hand.isTracked;
+                Debug.Log($"[Repulsor] {handedness} hand {(IsTracked ? "tracked" : "lost")}");
+            }
+
+            if (!IsTracked || !TryReadHand(hand, dt, out Vector3 palm, out Vector3 palmNormal, out HandGesture next))
+            {
+                gesture = HandGesture.None;
+                StopWeapons();
+                return;
+            }
+
+            if (next != gesture)
+            {
+                gesture = next;
+                Debug.Log($"[Repulsor] {handedness} gesture {gesture}");
+            }
+
+            if (weapon != game.CurrentWeapon)
+            {
+                weapon = game.CurrentWeapon;
+                StopWeapons();
+            }
+
+            if (weapon == Weapon.Laser)
+                TickLaser(palm, palmNormal, dt);
+            else if (weapon == Weapon.Aura)
+                TickAura(palm, palmNormal, dt);
+            else
+                TickCharged(palm, palmNormal, dt);
+        }
+
+        void TickCharged(Vector3 palm, Vector3 palmNormal, float dt)
+        {
+            // Track the hand live while it's a fist. Once it starts opening the pose can't be trusted,
+            // so the aim line, the orb and the shot all stay on the remembered aim.
+            Vector3 muzzle = palm + palmNormal * PalmOffset;
+            bool fist = gesture == HandGesture.Fist;
+            if (fist)
+                aim.Record(Time.time, muzzle, palmNormal);
+
+            Vector3 shownPosition = fist ? muzzle : aim.Position;
+            Vector3 shownDirection = fist ? palmNormal : aim.Direction;
+
+            float fired = repulsor.Step(gesture, dt);
+            if (fired > 0f)
+            {
+                float offAim = Vector3.Angle(palmNormal, aim.Direction);
+                Debug.Log($"[Repulsor] {handedness} firing: live palm was {offAim:0} degrees from the locked aim");
+                if (weapon == Weapon.Shockwave)
+                    game.FireShockwave(aim.Position, aim.Direction, fired);
+                else
+                    game.Fire(aim.Position, aim.Direction, fired);
+                aim.Clear();
+            }
+
+            UpdateChargeVisuals(shownPosition, shownDirection);
+        }
+
+        void TickAura(Vector3 palm, Vector3 palmNormal, float dt)
+        {
+            auraFist = gesture == HandGesture.Fist ? auraFist + dt : 0f;
+            if (auraFist >= AuraPutOutSeconds && game.AuraLit)
+                game.PutOutAura();
+
+            laser.Step(gesture == HandGesture.Open && game.PointsAwayFromHead(palm, palmNormal), dt);
+            if (!laser.Firing)
+            {
+                auraAim = 0f;
+                auraPlaced = false;
+                aimLine.enabled = false;
+                chargeOrb.gameObject.SetActive(false);
+                return;
+            }
+
+            Vector3 muzzle = palm + palmNormal * PalmOffset;
+            bool surface = game.Room.TryDistance(muzzle, palmNormal, out float distance);
+            aimLine.enabled = true;
+            aimLine.SetPosition(0, muzzle);
+            aimLine.SetPosition(1, muzzle + palmNormal * (surface ? distance : AimLength));
+
+            if (!surface || auraPlaced || distance < AuraMinDistance)
+                return;
+
+            // The orb grows as the aim is held, then the aura lights.
+            auraAim += dt;
+            chargeOrb.gameObject.SetActive(true);
+            chargeOrb.position = muzzle;
+            chargeOrb.localScale = Vector3.one * (MaxOrbDiameter * Mathf.Clamp01(auraAim / AuraIgniteSeconds));
+
+            if (auraAim >= AuraIgniteSeconds)
+            {
+                auraPlaced = true;
+                chargeOrb.gameObject.SetActive(false);
+                game.LightAura(muzzle, palmNormal, distance);
+            }
+        }
+
+        void TickLaser(Vector3 palm, Vector3 palmNormal, float dt)
+        {
+            laser.Step(gesture == HandGesture.Open && game.PointsAwayFromHead(palm, palmNormal), dt);
+            if (!laser.Firing)
+            {
+                StopLaser();
+                return;
+            }
+
+            if (!lasing)
+            {
+                lasing = true;
+                laserDirection = palmNormal;
+                beamLength.Reset();
+                laserFrames = 0;
+                surfaceFrames = 0;
+                laserHum.Play();
+                game.PlayLaserIgnite(palm);
+                Debug.Log($"[Repulsor] {handedness} laser on");
+            }
+
+            // Smoothing keeps the end of a long beam from shaking with every tiny tracking wobble.
+            float follow = 1f - Mathf.Exp(-LaserFollowSpeed * dt);
+            laserDirection = Vector3.Slerp(laserDirection, palmNormal, follow).normalized;
+            Vector3 start = palm + laserDirection * PalmOffset;
+
+            bool surface = game.Room.TryHit(start, laserDirection, out float distance, out Vector3 normal);
+            if (surface)
+                surfaceNormal = normal;
+
+            float reach = beamLength.Step(surface, distance, dt);
+            bool onTarget = game.BurnWithLaser(start, laserDirection, reach, dt, out float length);
+            laserBeam.Aim(start, start + laserDirection * length, onTarget || beamLength.Hitting,
+                onTarget ? -laserDirection : surfaceNormal);
+            game.DimRoom();
+
+            laserFrames++;
+            if (surface)
+                surfaceFrames++;
+        }
+
+        bool TryReadHand(XRHand hand, float dt, out Vector3 palm, out Vector3 palmNormal, out HandGesture result)
+        {
+            palm = default;
+            palmNormal = default;
+            result = HandGesture.None;
+
+            if (!hand.GetJoint(XRHandJointID.Palm).TryGetPose(out Pose palmPose)
+                || !hand.GetJoint(XRHandJointID.Wrist).TryGetPose(out Pose wrist)
+                || !hand.GetJoint(XRHandJointID.ThumbTip).TryGetPose(out Pose thumbTip)
+                || !hand.GetJoint(XRHandJointID.IndexTip).TryGetPose(out Pose indexTip))
+                return false;
+
+            if (!TryExtension(hand, wrist, XRHandJointID.IndexProximal, XRHandJointID.IndexTip, out float index)
+                || !TryExtension(hand, wrist, XRHandJointID.MiddleProximal, XRHandJointID.MiddleTip, out float middle)
+                || !TryExtension(hand, wrist, XRHandJointID.RingProximal, XRHandJointID.RingTip, out float ring)
+                || !TryExtension(hand, wrist, XRHandJointID.LittleProximal, XRHandJointID.LittleTip, out float little))
+                return false;
+
+            float thumbToIndex = Vector3.Distance(thumbTip.position, indexTip.position);
+            if (pinch.Step(thumbToIndex, middle, ring, little, dt))
+                game.OkSign();
+
+            result = GestureClassifier.Classify(index, middle, ring, little);
+            palm = trackingSpace.TransformPoint(palmPose.position);
+            // XR Hands defines a hand's palm direction as local -Y (see XRHandAxis.PalmDirection).
+            palmNormal = trackingSpace.TransformDirection(palmPose.rotation * Vector3.down);
+            PalmPosition = palm;
+            PalmNormal = palmNormal;
+            IndexTip = trackingSpace.TransformPoint(indexTip.position);
+            return true;
+        }
+
+        static bool TryExtension(XRHand hand, Pose wrist, XRHandJointID knuckle, XRHandJointID tip, out float extension)
+        {
+            extension = 0f;
+            if (!hand.GetJoint(knuckle).TryGetPose(out Pose knucklePose)
+                || !hand.GetJoint(tip).TryGetPose(out Pose tipPose))
+                return false;
+
+            float knuckleDistance = Vector3.Distance(knucklePose.position, wrist.position);
+            if (knuckleDistance < 0.001f)
+                return false;
+
+            extension = Vector3.Distance(tipPose.position, wrist.position) / knuckleDistance;
+            return true;
+        }
+
+        void UpdateChargeVisuals(Vector3 muzzle, Vector3 direction)
+        {
+            float charge = repulsor.Charge;
+            bool charging = charge > 0.01f;
+
+            chargeOrb.gameObject.SetActive(charging);
+            if (charging)
+            {
+                chargeOrb.position = muzzle;
+                chargeOrb.localScale = Vector3.one * (MaxOrbDiameter * charge);
+            }
+
+            bool aiming = charge > RepulsorGesture.MinChargeToFire;
+            aimLine.enabled = aiming;
+            if (aiming)
+            {
+                aimLine.SetPosition(0, muzzle);
+                aimLine.SetPosition(1, muzzle + direction * AimLength);
+            }
+        }
+
+        void StopLaser()
+        {
+            if (lasing)
+                Debug.Log($"[Repulsor] {handedness} laser off, surface found on {surfaceFrames}/{laserFrames} frames");
+            lasing = false;
+            laserHum.Stop();
+        }
+
+        void StopWeapons()
+        {
+            repulsor.Reset();
+            aim.Clear();
+            laser.Reset();
+            auraAim = 0f;
+            auraFist = 0f;
+            auraPlaced = false;
+            StopLaser();
+            chargeOrb.gameObject.SetActive(false);
+            aimLine.enabled = false;
+        }
+    }
+}
