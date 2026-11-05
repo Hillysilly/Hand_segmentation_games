@@ -87,9 +87,9 @@ Shader "Repulsor/Suit"
             float3 RoomLight(float3 direction, float blur)
             {
                 float up = direction.y;
-                float3 sky = lerp(float3(0.28, 0.26, 0.24), float3(1.3, 1.25, 1.15), saturate(up * 0.5 + 0.5));
-                float band = exp(-up * up / (0.02 + blur * 0.3));
-                return sky * (0.55 + 0.45 * saturate(up + 0.6)) + band * (0.7 - blur * 0.5);
+                float3 sky = lerp(float3(0.1, 0.09, 0.09), float3(0.95, 0.92, 0.88), smoothstep(-0.2, 0.8, up));
+                float band = exp(-up * up / (0.008 + blur * 0.3));
+                return sky + band * (0.75 - blur * 0.55);
             }
 
             float4 Fragment(Varyings input) : SV_Target
