@@ -61,6 +61,10 @@ The new build is installed. Pick it up and move around until it finds its positi
 5. **Variant batch 1, shields:** DEBUG > VARIANT LAB. Poke A-E, then SAVE PICK for each character you care about.
    PC renders are in `unity_game/Logs/preview_shield_*.png`.
 6. HUD: is it readable, in a good spot, too big or too small?
+7. **When the second Quest arrives:** install the same build on both (`build_and_run.ps1 -NoBuild` with each plugged
+   in), same Wi-Fi. One does CO-OP > CREATE ROOM, the other JOIN ROOM with the code. CALIBRATE: both touch the same
+   table corner with the right index finger and hold still, then a second point. The coloured dots should sit on the
+   other person's head and hands. Then both pick characters and READY.
 
 ## Model candidates for enemies (pick one per enemy)
 
@@ -118,7 +122,7 @@ All of these say CC0 on their pages. I'll check each licence file when downloadi
 | Spawn bubble + waves (5) | ✅ | | | purple bubble grows, enemy fades in |
 | Powerups (charge, invincibility, 1.5x damage) | ✅ | | | touch to take; no glow on you yet |
 | Walls block attacks | ✅ | | | laser, blasts, shockwave and enemy bolts stop at live-depth surfaces |
-| Room objects (proxies, HP, pick up/throw) | | | | |
+| Room objects (proxies, HP, pick up/throw) | ✅ | | | Space Setup furniture boxes; a glowing copy flies and breaks on impact; **needs Space Setup done** |
 
 ### Characters
 
@@ -135,10 +139,10 @@ All of these say CC0 on their pages. I'll check each licence file when downloadi
 
 | Feature | Done | Good enough | Checked by you | Notes |
 |---|---|---|---|---|
-| LAN room code + join | | | | |
-| Colocation | | | | |
-| Player sync (pose, aura, shield, attacks) | | | | |
-| Co-op PVE | | | | |
+| LAN room code + join | ✅ | ✅ | | UDP; the code carries the host's address (same Wi-Fi); loopback test passes |
+| Colocation | ✅ manual | | | both touch the same 2 real points; shared anchors not tried |
+| Player sync (pose, aura, shield, attacks) | ✅ partial | | | HP bar, level, shield, head and palm markers, blasts; no remote aura yet |
+| Co-op PVE | ✅ | | | host runs enemies and waves, client sees copies and its hits count; ends when both are out |
 | PVP (best of 3, friendly fire toggle) | | | | |
 
 ### Submission

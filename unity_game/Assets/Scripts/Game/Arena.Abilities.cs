@@ -41,7 +41,11 @@ namespace Repulsor
         LineRenderer playRing;
 
         /// <summary>The colour attacks are drawn in: yours, except the Ki fighter turns blue at level 3.</summary>
-        Color AttackColor => character == CharacterId.KiFighter && player.Level >= 3 ? KiBlue : PlayerColor;
+        Color AttackColor =>
+            player.BoostFor > 0f ? new Color(1f, 0.15f, 0.1f)          // 1.5x damage: everything you fire turns red
+            : player.InvincibleFor > 0f && phase == Phase.Playing && !player.IsDead && player.InvincibleFor > Fighter.SpawnProtectionSeconds
+                ? new Color(1f, 0.85f, 0.3f)                             // invincible powerup: gold
+            : character == CharacterId.KiFighter && player.Level >= 3 ? KiBlue : PlayerColor;
 
         void CreateAbilityViews()
         {

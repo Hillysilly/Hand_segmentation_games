@@ -46,8 +46,8 @@ namespace Repulsor
     /// </summary>
     public static class GestureClassifier
     {
-        public const float OpenAbove = 1.5f;
-        public const float CurledBelow = 1.3f;
+        public static float OpenAbove = 1.5f;
+        public static float CurledBelow = 1.3f;
 
         public static HandGesture Classify(float index, float middle, float ring, float little)
         {

@@ -17,6 +17,8 @@ namespace Repulsor
         EnemyHit = 9,   // client -> host: I hit this enemy for this much
         EnemyBolt = 10, // host -> client: an enemy fired
         End = 11,       // host -> client: the match is over
+        PlayerHit = 12, // either way: I hit you for this much (PVP or friendly fire)
+        Round = 13,     // host -> client: a PVP round ended
     }
 
     public struct EnemyNet
@@ -53,6 +55,8 @@ namespace Repulsor
         public byte Level;
         public bool ShieldUp;
         public bool Dead;
+        public bool Invincible;
+        public bool Boosted;
         public Color32 Color;
         public byte Character;
         public byte Lives;
@@ -88,10 +92,22 @@ namespace Repulsor
 
         public static byte[] Hello(string name) => Write(NetMessage.Hello, w => w.Write(name ?? ""));
 
-        public static byte[] Welcome(byte slot, int roomCode) => Write(NetMessage.Welcome, w =>
+        public static byte[] Welcome(byte slot, int roomCode, byte mode) => Write(NetMessage.Welcome, w =>
         {
             w.Write(slot);
             w.Write(roomCode);
+            w.Write(mode);
+        });
+
+        public static byte[] PlayerHit(float damage) => Write(NetMessage.PlayerHit, w => w.Write(damage));
+
+        public static byte[] Round(byte round, byte hostWins, byte clientWins, byte winner, bool over) => Write(NetMessage.Round, w =>
+        {
+            w.Write(round);
+            w.Write(hostWins);
+            w.Write(clientWins);
+            w.Write(winner);
+            w.Write(over);
         });
 
         public static byte[] Bye() => Write(NetMessage.Bye, w => { });
@@ -112,7 +128,8 @@ namespace Repulsor
                 WriteQuaternion(w, s.HeadRotation);
                 WriteVector(w, s.LeftPalm);
                 WriteVector(w, s.RightPalm);
-                byte flags = (byte)((s.LeftTracked ? 1 : 0) | (s.RightTracked ? 2 : 0) | (s.ShieldUp ? 4 : 0) | (s.Dead ? 8 : 0));
+                byte flags = (byte)((s.LeftTracked ? 1 : 0) | (s.RightTracked ? 2 : 0) | (s.ShieldUp ? 4 : 0) | (s.Dead ? 8 : 0)
+                    | (s.Invincible ? 16 : 0) | (s.Boosted ? 32 : 0));
                 w.Write(flags);
                 w.Write(s.Hp);
                 w.Write(s.MaxHp);
@@ -240,10 +257,11 @@ namespace Repulsor
 
         public static string ReadHello(BinaryReader r) => r.ReadString();
 
-        public static void ReadWelcome(BinaryReader r, out byte slot, out int roomCode)
+        public static void ReadWelcome(BinaryReader r, out byte slot, out int roomCode, out byte mode)
         {
             slot = r.ReadByte();
             roomCode = r.ReadInt32();
+            mode = r.ReadByte();
         }
 
         public static void ReadStart(BinaryReader r, out int seed, out byte hostCharacter)
@@ -267,6 +285,8 @@ namespace Repulsor
             s.RightTracked = (flags & 2) != 0;
             s.ShieldUp = (flags & 4) != 0;
             s.Dead = (flags & 8) != 0;
+            s.Invincible = (flags & 16) != 0;
+            s.Boosted = (flags & 32) != 0;
             s.Hp = r.ReadSingle();
             s.MaxHp = r.ReadSingle();
             s.Level = r.ReadByte();

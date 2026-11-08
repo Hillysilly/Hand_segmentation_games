@@ -18,6 +18,7 @@ namespace Repulsor
         readonly Text tagText;
         readonly Bar bar;
         readonly Bubble shield;
+        readonly Bubble glow;
         readonly Bubble[] markers = new Bubble[3];
         PlayerSnapshot latest;
         Vector3 shownHead;
@@ -38,6 +39,7 @@ namespace Repulsor
             bar = Ui.Bar(tag, new Vector2(0f, -12f), new Vector2(180f, 16f), new Color(0.05f, 0.05f, 0.07f, 0.9f), new Color(0.3f, 1f, 0.4f));
             bar.Trail = true;
             shield = Bubble.Create("Remote Shield", parent);
+            glow = Bubble.Create("Remote Powerup Glow", parent);
             for (int i = 0; i < markers.Length; i++)
                 markers[i] = Bubble.Create("Remote Marker " + i, parent);
             Hide();
@@ -90,6 +92,13 @@ namespace Repulsor
             shield.transform.localScale = Vector3.one * 1.24f;
             shield.Show(color, BubbleStyle.Hex, shieldShown);
 
+            // Powerups others can see: a gold star-like glow when invincible, red when doing 1.5x damage.
+            bool powered = latest.Invincible || latest.Boosted;
+            glow.transform.position = shownHead + Vector3.down * 0.6f;
+            glow.transform.localScale = new Vector3(0.8f, 1.7f, 0.8f);
+            glow.Show(latest.Invincible ? new Color(1f, 0.85f, 0.3f) : new Color(1f, 0.2f, 0.15f), BubbleStyle.Energy,
+                powered ? 0.45f + 0.15f * Mathf.Sin(Time.time * 10f) : 0f);
+
             ShowMarker(0, shownHead + Vector3.up * 0.15f, 0.06f, color, ShowMarkers);
             ShowMarker(1, shownLeft, 0.04f, color, ShowMarkers && latest.LeftTracked);
             ShowMarker(2, shownRight, 0.04f, color, ShowMarkers && latest.RightTracked);
@@ -106,6 +115,7 @@ namespace Repulsor
         {
             tag.gameObject.SetActive(false);
             shield.Show(Color.white, BubbleStyle.Hex, 0f);
+            glow.Show(Color.white, BubbleStyle.Energy, 0f);
             foreach (Bubble marker in markers)
                 marker.Show(Color.white, BubbleStyle.Energy, 0f);
         }

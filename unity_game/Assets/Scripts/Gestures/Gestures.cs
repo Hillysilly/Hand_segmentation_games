@@ -53,8 +53,8 @@ namespace Repulsor
     /// <summary>Shield: wrists crossed in an X in front of the chest.</summary>
     public sealed class XArmsDetector
     {
-        public const float MaxWristGap = 0.3f;
-        public const float MinCross = 0.02f;
+        public static float MaxWristGap = 0.3f;
+        public static float MinCross = 0.02f;
         readonly HoldTimer hold = new HoldTimer(0.12f, 0.2f);
 
         public bool Held => hold.On;
@@ -83,7 +83,7 @@ namespace Repulsor
     /// <summary>Pause: an OK sign with both hands, held for 2 seconds. Fires once per hold.</summary>
     public sealed class DoubleOkDetector
     {
-        public const float Seconds = 2f;
+        public static float Seconds = 2f;
         readonly HoldTimer hold = new HoldTimer(Seconds, 0.25f);
 
         public float Progress => hold.Progress;
@@ -98,7 +98,7 @@ namespace Repulsor
     /// <summary>Transform: both fists clenched low at your sides for a second.</summary>
     public sealed class PowerUpDetector
     {
-        public const float Seconds = 1f;
+        public static float Seconds = 1f;
         readonly HoldTimer hold = new HoldTimer(Seconds, 0.3f);
 
         public float Progress => hold.Progress;
@@ -126,12 +126,12 @@ namespace Repulsor
     /// <summary>Energy ball: hands held together to charge, then pushed forward together to fire.</summary>
     public sealed class TwoHandChargeDetector
     {
-        public const float MaxGap = 0.16f;
-        public const float FullSeconds = 2f;
-        public const float MinCharge = 0.15f;
-        public const float PushSpeed = 1.2f;
-        public const float ApartGrace = 0.35f;
-        public const float ApartCancel = 0.6f;
+        public static float MaxGap = 0.16f;
+        public static float FullSeconds = 2f;
+        public static float MinCharge = 0.15f;
+        public static float PushSpeed = 1.2f;
+        public static float ApartGrace = 0.35f;
+        public static float ApartCancel = 0.6f;
 
         float apart = ApartCancel;
 
@@ -185,10 +185,10 @@ namespace Repulsor
     /// </summary>
     public sealed class TriangleDetector
     {
-        public const float TipsTouch = 0.05f;
-        public const float MinOpening = 0.04f;
-        public const float ArmedSeconds = 1f;
-        public const float MaxRange = 7f;
+        public static float TipsTouch = 0.05f;
+        public static float MinOpening = 0.04f;
+        public static float ArmedSeconds = 1f;
+        public static float MaxRange = 7f;
         readonly HoldTimer hold = new HoldTimer(0.25f, 0.15f);
         float sinceTriangle;
 
@@ -258,11 +258,11 @@ namespace Repulsor
     /// </summary>
     public sealed class BowDetector
     {
-        public const float FistsTouch = 0.13f;
-        public const float MinReach = 0.3f;
-        public const float FullDraw = 0.5f;
-        public const float MinDraw = 0.12f;
-        public const float LockSeparation = 0.06f;
+        public static float FistsTouch = 0.13f;
+        public static float MinReach = 0.3f;
+        public static float FullDraw = 0.5f;
+        public static float MinDraw = 0.12f;
+        public static float LockSeparation = 0.06f;
         readonly HoldTimer form = new HoldTimer(0.2f, 0.1f);
         readonly HoldTimer frontLost = new HoldTimer(0.25f, 0f);
         int openFrames;
@@ -349,10 +349,10 @@ namespace Repulsor
     /// </summary>
     public sealed class FingerGunDetector
     {
-        public const float FlickDegrees = 22f;
-        public const float FlickWindow = 0.15f;
-        public const float Cooldown = 0.35f;
-        public const float ArmBlend = 0.5f;
+        public static float FlickDegrees = 22f;
+        public static float FlickWindow = 0.15f;
+        public static float Cooldown = 0.35f;
+        public static float ArmBlend = 0.5f;
         const int HistorySize = 24;
 
         struct Sample
@@ -420,8 +420,8 @@ namespace Repulsor
     /// <summary>Dragon fist: a fist moving away from the shoulder faster than <see cref="MinSpeed"/>.</summary>
     public sealed class PunchDetector
     {
-        public const float MinSpeed = 2.5f;
-        public const float Cooldown = 0.5f;
+        public static float MinSpeed = 2.5f;
+        public static float Cooldown = 0.5f;
         float cooldown;
 
         public bool Step(HandPose hand, Stance body, float dt, out Vector3 origin, out Vector3 direction)
@@ -446,7 +446,7 @@ namespace Repulsor
     /// <summary>Web shot: one shot each time the spider sign is made.</summary>
     public sealed class SpiderSignDetector
     {
-        public const float Cooldown = 0.4f;
+        public static float Cooldown = 0.4f;
         readonly HoldTimer hold = new HoldTimer(0.08f, 0.06f);
         float cooldown;
 
@@ -469,7 +469,7 @@ namespace Repulsor
     /// <summary>Force pull: a cupped hand pointed at something lifts it; a fast throw launches it.</summary>
     public sealed class ForceGrabDetector
     {
-        public const float ThrowSpeed = 1.8f;
+        public static float ThrowSpeed = 1.8f;
         readonly HoldTimer shape = new HoldTimer(0.25f, 0.4f);
 
         public bool Holding { get; private set; }
@@ -515,7 +515,7 @@ namespace Repulsor
     /// <summary>Laser sword: the blade comes out of the thumb side of a fist, as if holding a hilt.</summary>
     public sealed class SaberGripDetector
     {
-        public const float ForwardTilt = 0.35f;
+        public static float ForwardTilt = 0.35f;
         readonly HoldTimer hold = new HoldTimer(0.15f, 0.25f);
 
         public bool On => hold.On;
@@ -537,8 +537,8 @@ namespace Repulsor
     /// <summary>Smoke bomb: a fist swung up and forward from below the chest.</summary>
     public sealed class UnderhandThrowDetector
     {
-        public const float MinSpeed = 1.6f;
-        public const float Cooldown = 0.6f;
+        public static float MinSpeed = 1.6f;
+        public static float Cooldown = 0.6f;
         float cooldown;
         float sinceFist = 1f;
 

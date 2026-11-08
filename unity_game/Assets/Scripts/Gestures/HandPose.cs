@@ -25,14 +25,14 @@ namespace Repulsor
         public const int JointCount = 26;
 
         // Finger extension: distance(tip, wrist) / distance(knuckle, wrist). About 1.8 straight, 1.0 curled.
-        public const float OpenAbove = GestureClassifier.OpenAbove;
-        public const float CurledBelow = GestureClassifier.CurledBelow;
-        public const float PinchEngage = 0.025f;
-        public const float PinchRelease = 0.04f;
+        public static float OpenAbove => GestureClassifier.OpenAbove;
+        public static float CurledBelow => GestureClassifier.CurledBelow;
+        public static float PinchEngage = 0.025f;
+        public static float PinchRelease = 0.04f;
         // Thumb tip's distance from the index knuckle, over the hand's length. Tucked about 0.4, out about 0.8.
-        public const float ThumbOutAbove = 0.6f;
-        public const float CupLow = 1.2f;
-        public const float CupHigh = 1.65f;
+        public static float ThumbOutAbove = 0.6f;
+        public static float CupLow = 1.2f;
+        public static float CupHigh = 1.65f;
 
         public readonly Vector3[] Joints = new Vector3[JointCount];
         public readonly bool IsLeft;

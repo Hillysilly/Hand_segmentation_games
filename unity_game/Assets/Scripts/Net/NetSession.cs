@@ -43,7 +43,12 @@ namespace Repulsor
         public event Action<ushort, float> EnemyHitReceived;
         public event Action<Vector3, Vector3> EnemyBoltReceived;
         public event Action<bool> EndReceived;
+        public event Action<float> PlayerHitReceived;
+        public event Action<byte, byte, byte, byte, bool> RoundReceived;
         public event Action PeerJoined;
+
+        /// <summary>The game mode: set by the host, told to the client in the welcome.</summary>
+        public byte Mode { get; set; }
         public event Action PeerLeft;
 
         /// <summary>Starts hosting. Returns false if the port is taken or there's no network.</summary>
@@ -154,7 +159,7 @@ namespace Repulsor
                         bool fresh = peer == null || !peer.Equals(from) || !Connected;
                         peer = from;
                         sinceHeard = 0f;
-                        Send(NetProtocol.Welcome(1, RoomCode));
+                        Send(NetProtocol.Welcome(1, RoomCode, Mode));
                         if (fresh)
                         {
                             Status = $"{NetProtocol.ReadHello(reader)} joined";
@@ -162,7 +167,8 @@ namespace Repulsor
                         }
                         break;
                     case NetMessage.Welcome when Role == NetRole.Client:
-                        NetProtocol.ReadWelcome(reader, out byte slot, out _);
+                        NetProtocol.ReadWelcome(reader, out byte slot, out _, out byte mode);
+                        Mode = mode;
                         bool first = !Connected;
                         Slot = slot;
                         sinceHeard = 0f;
@@ -197,6 +203,8 @@ namespace Repulsor
                     case NetMessage.EnemyHit:
                     case NetMessage.EnemyBolt:
                     case NetMessage.End:
+                    case NetMessage.PlayerHit:
+                    case NetMessage.Round:
                         if (!FromPeer(from))
                             return;
                         HandleGame(type, reader);
@@ -230,6 +238,12 @@ namespace Repulsor
                     NetProtocol.ReadEnemyBolt(reader, out Vector3 origin, out Vector3 direction);
                     EnemyBoltReceived?.Invoke(origin, direction);
                     return true;
+                case NetMessage.PlayerHit:
+                    PlayerHitReceived?.Invoke(reader.ReadSingle());
+                    return true;
+                case NetMessage.Round when Role == NetRole.Client:
+                    RoundReceived?.Invoke(reader.ReadByte(), reader.ReadByte(), reader.ReadByte(), reader.ReadByte(), reader.ReadBoolean());
+                    return true;
                 case NetMessage.End when Role == NetRole.Client:
                     EndReceived?.Invoke(NetProtocol.ReadEnd(reader));
                     return true;
@@ -253,6 +267,18 @@ namespace Repulsor
         {
             if (Connected)
                 Send(NetProtocol.EnemyBolt(origin, direction));
+        }
+
+        public void SendPlayerHit(float damage)
+        {
+            if (Connected)
+                Send(NetProtocol.PlayerHit(damage));
+        }
+
+        public void SendRound(byte round, byte hostWins, byte clientWins, byte winner, bool over)
+        {
+            if (Connected)
+                Send(NetProtocol.Round(round, hostWins, clientWins, winner, over));
         }
 
         public void SendEnd(bool won)

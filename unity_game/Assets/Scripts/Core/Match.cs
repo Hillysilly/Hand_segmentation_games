@@ -155,6 +155,15 @@ namespace Repulsor
             wins = new int[players];
         }
 
+        /// <summary>A tracker already part way through, as the host reported it.</summary>
+        public static RoundTracker At(int round, int hostWins, int clientWins, int roundsToWin)
+        {
+            var tracker = new RoundTracker(2, roundsToWin) { Round = round };
+            tracker.wins[0] = hostWins;
+            tracker.wins[1] = clientWins;
+            return tracker;
+        }
+
         public int Round { get; private set; } = 1;
         public int Winner { get; private set; } = -1;
         public bool Over => Winner >= 0;

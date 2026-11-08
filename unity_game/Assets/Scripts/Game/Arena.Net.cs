@@ -166,7 +166,9 @@ namespace Repulsor
 
             net.PeerJoined += () =>
             {
-                Log($"Network: {net.Status}");
+                if (net.Role == NetRole.Client)
+                    mode = (GameMode)net.Mode;
+                Log($"Network: {net.Status}, mode {mode}");
                 if (phase == Phase.Lobby)
                     ShowLobby();
             };
@@ -266,6 +268,8 @@ namespace Repulsor
                     Color = PlayerColor,
                     Character = (byte)character,
                     Lives = (byte)Mathf.Max(0, player.Lives),
+                    Invincible = phase == Phase.Playing && player.InvincibleFor > 0f,
+                    Boosted = phase == Phase.Playing && player.BoostFor > 0f,
                 }, dt);
                 if (net.Role == NetRole.Host && phase == Phase.Playing && waves != null)
                     SendEnemies(dt);
@@ -311,15 +315,21 @@ namespace Repulsor
             Log("Left the room");
         }
 
-        void ShowCoop()
+        GameMode roomMode = GameMode.PveCoop;
+
+        void ShowCoop() => ShowRooms(GameMode.PveCoop);
+
+        void ShowRooms(GameMode wanted)
         {
+            roomMode = wanted;
             phase = Phase.Modes;
-            RectTransform s = OpenScreen(new Vector2(380f, 280f), "CO-OP");
+            RectTransform s = OpenScreen(new Vector2(380f, 280f), wanted == GameMode.Pvp ? "PVP" : "CO-OP");
             Ui.Label(s, "Both headsets on the same Wi-Fi, in the same room.", new Vector2(0f, 82f), new Vector2(360f, 20f), 13).color = Ui.Muted;
             Ui.Button(s, "CREATE ROOM", new Vector2(0f, 35f), new Vector2(260f, 48f), () =>
             {
-                mode = GameMode.PveCoop;
+                mode = roomMode;
                 bool ok = net.Host();
+                net.Mode = (byte)mode;
                 Log($"Hosting: {net.Status}, code {net.RoomCode}");
                 phase = Phase.Lobby;
                 if (!ok)
@@ -354,7 +364,7 @@ namespace Repulsor
                     {
                         if (int.TryParse(joinCode, out int code) && net.Join(code))
                         {
-                            mode = GameMode.PveCoop;
+                            mode = roomMode;
                             phase = Phase.Lobby;
                             Log($"Joining room {joinCode}: {net.Status}");
                             ShowLobby();
@@ -367,7 +377,7 @@ namespace Repulsor
                     ShowJoin();
                 }, key.Length > 1 ? 15 : 24);
             }
-            Ui.Button(s, "BACK", new Vector2(0f, -160f), new Vector2(140f, 36f), ShowCoop, 15);
+            Ui.Button(s, "BACK", new Vector2(0f, -160f), new Vector2(140f, 36f), () => ShowRooms(roomMode), 15);
         }
 
         void ShowLobby()

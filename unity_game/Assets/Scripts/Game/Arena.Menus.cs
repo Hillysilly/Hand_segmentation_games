@@ -100,9 +100,8 @@ namespace Repulsor
                 ShowCharacters();
             }, 20);
             Ui.Button(s, "CO-OP  (2 players)", new Vector2(0f, 30f), new Vector2(300f, 48f), ShowCoop, 20);
-            PokeButton pvp = Ui.Button(s, "PVP  (2 players)", new Vector2(0f, -25f), new Vector2(300f, 48f), null, 20);
-            pvp.Interactable = false;
-            Ui.Label(s, "Co-op is an early test: enemies only on the host. PVP comes after co-op.", new Vector2(0f, -62f),
+            Ui.Button(s, "PVP  (2 players)", new Vector2(0f, -25f), new Vector2(300f, 48f), () => ShowRooms(GameMode.Pvp), 20);
+            Ui.Label(s, "Two-player modes are early tests: both headsets on the same Wi-Fi.", new Vector2(0f, -62f),
                 new Vector2(360f, 20f), 12).color = Ui.Muted;
             Ui.Button(s, "DEBUG", new Vector2(-80f, -115f), new Vector2(140f, 40f), () => ShowDebug(ShowModes), 16);
             Ui.Button(s, "BACK", new Vector2(80f, -115f), new Vector2(140f, 40f), ShowTitle, 16);
@@ -267,7 +266,8 @@ namespace Repulsor
                 TextAnchor.MiddleCenter, FontStyle.Bold);
             title.color = won ? new Color(1f, 0.85f, 0.3f) : new Color(1f, 0.4f, 0.35f);
             int minutes = Mathf.FloorToInt(matchTime / 60f);
-            Ui.Label(s, $"Waves cleared  {(won ? waves.Wave : Mathf.Max(0, waves.Wave - 1))} / {waves.WaveCount}\n"
+            string first = Pvp && rounds != null ? $"Rounds  {rounds.Wins(net.Slot)} - {rounds.Wins(1 - net.Slot)}\n" : "";
+            Ui.Label(s, first + $"Waves cleared  {(won ? waves.Wave : Mathf.Max(0, waves.Wave - 1))} / {waves.WaveCount}\n"
                 + $"Enemies destroyed  {waves.Kills}\n"
                 + $"Damage dealt  {player.DamageDealt:0}     taken  {player.DamageTaken:0}\n"
                 + $"Time  {minutes}:{matchTime - minutes * 60f:00}", new Vector2(0f, 20f), new Vector2(360f, 90f), 15);

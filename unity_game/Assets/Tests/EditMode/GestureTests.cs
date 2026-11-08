@@ -67,6 +67,24 @@ namespace Repulsor.Tests
         }
 
         [Test]
+        public void TuningLinesChangeThresholds()
+        {
+            float before = HandPose.ThumbOutAbove;
+            try
+            {
+                int applied = Tuning.Apply(new[] { "# comment", "HandPose.ThumbOutAbove = 0.42", "Nope.Field = 1", "PunchDetector.MinSpeed=3" });
+                Assert.That(applied, Is.EqualTo(2));
+                Assert.That(HandPose.ThumbOutAbove, Is.EqualTo(0.42f));
+                Assert.That(PunchDetector.MinSpeed, Is.EqualTo(3f));
+            }
+            finally
+            {
+                HandPose.ThumbOutAbove = before;
+                PunchDetector.MinSpeed = 2.5f;
+            }
+        }
+
+        [Test]
         public void ExtensionsMatchTheClassifiersScale()
         {
             HandPose open = Make(0f, 0f, 0f, 0f, ThumbPose.Out);

@@ -70,6 +70,15 @@ namespace Repulsor.Tests
         }
 
         [Test]
+        public void ClientRoundTrackerPicksUpTheHostsScore()
+        {
+            RoundTracker rounds = RoundTracker.At(2, 1, 0, 2);
+            Assert.That(rounds.Round, Is.EqualTo(2));
+            Assert.That(rounds.RoundWon(0), Is.True);
+            Assert.That(rounds.Winner, Is.EqualTo(0));
+        }
+
+        [Test]
         public void ForeignPacketsAreIgnored()
         {
             byte[] junk = { 1, 2, 3, 4, 5, 6 };

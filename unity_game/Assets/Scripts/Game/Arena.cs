@@ -39,6 +39,7 @@ namespace Repulsor
         PlayerHud hud;
         ShieldView shield;
         DeathView death;
+        HurtFlash hurtFlash;
         Phase phase;
         bool paused;
         int announcedWave = -1;
@@ -62,15 +63,22 @@ namespace Repulsor
             hud.Visible = false;
             shield = new ShieldView(transform);
             death = new DeathView(eye);
+            hurtFlash = new HurtFlash(transform, head);
             foes = new GameObject("Enemies").transform;
             foes.SetParent(transform, false);
             CreateMenu();
             CreateGestureLab();
             CreateAbilityViews();
             CreateNet();
+            CreatePvp();
 
             player = new Fighter(settings.Lives, settings.RespawnSeconds);
             player.Died += OnDied;
+            player.Damaged += lost =>
+            {
+                hurtFlash.Hit(lost);
+                game.PlayAt(head.position + head.forward * 0.3f, game.ZapSound);
+            };
             player.Respawned += OnRespawned;
             player.Transformed += OnTransformed;
             player.Shield.Shattered += () => Log("Shield broke");
@@ -78,6 +86,9 @@ namespace Repulsor
             game.Killed += OnKilled;
 
             ShowTitle();
+#if DEVELOPMENT_BUILD
+            Tuning.WriteCurrent();
+#endif
             Log("Ready");
         }
 
@@ -87,6 +98,9 @@ namespace Repulsor
             input.Tick(game.Hands, game.TrackingSpace, dt);
             body = Stance.From(head.position, head.forward, game.Origin.transform.position.y);
 
+#if DEVELOPMENT_BUILD
+            Tuning.Tick();
+#endif
             TickMenu(dt);
             TickNet(dt);
 
@@ -100,12 +114,14 @@ namespace Repulsor
 
             if (phase == Phase.Playing && !paused)
                 TickMatch(Time.deltaTime);
+            UpdateRemoteTarget();
 
             bool playing = phase == Phase.Playing;
             hud.Tick(playing ? player : null, Character, dt);
             shield.Tick(playing && player.Shield.Up, head.position, PlayerColor, PickedShield(character), dt);
             TickVariantLab(dt);
             death.Tick(playing && player.IsDead, dt);
+            hurtFlash.Tick(dt);
             TickGestureLab(dt);
             UpdateArms();
         }
@@ -138,6 +154,12 @@ namespace Repulsor
 
             // In co-op the host runs the waves and enemies; the client mirrors them (Arena.Net).
             bool client = Multiplayer && net.Role == NetRole.Client;
+            if (Pvp)
+            {
+                TickPvp(dt);
+                TickPowerups();
+                return;
+            }
             if (!client)
             {
                 waves.Tick(dt);
@@ -193,6 +215,8 @@ namespace Repulsor
             player.RespawnSeconds = settings.RespawnSeconds;
             player.Reset();
             waves = new WaveDirector(settings.Waves);
+            if (Pvp)
+                StartPvp();
             announcedWave = -1;
             matchTime = 0f;
             nextPowerup = Random.Range(20f, 30f);
@@ -434,7 +458,7 @@ namespace Repulsor
                 return;
             }
             bool fighting = phase == Phase.Playing && !paused && !player.IsDead && !player.Shield.Up && !xArms.Held
-                && waves != null && waves.State != WaveState.Countdown;
+                && waves != null && !CountingDown;
             game.Arm(fighting ? WeaponFor(character, player.Level) : Weapon.None);
             int level = phase == Phase.Playing ? player.Level : 1;
             game.LaserDps = Damage.LaserPerSecond * (1f + 0.4f * (level - 1));
