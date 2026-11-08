@@ -95,7 +95,7 @@ namespace Repulsor
         public float RepulsorAoe { get; set; }
         /// <summary>The look of fist-and-release shots: 0 comet, 1 streak (small, long tail), 2 orb (big, short tail, shell).</summary>
         public int CometStyle { get; set; }
-        public static readonly string[] CometStyleNames = { "A  COMET", "B  STREAK", "C  ORB" };
+        public static readonly string[] CometStyleNames = { "A  COMET", "B  STREAK", "C  ORB", "D  TECH" };
         public static readonly Color DefaultWeaponColor = new Color(0.1f, 0.4f, 1f);
         public Color WeaponColor { get; private set; } = DefaultWeaponColor;
 
@@ -433,6 +433,11 @@ namespace Repulsor
                 Bubble shell = Bubble.Create("Shell", blast.Head);
                 shell.transform.localScale = Vector3.one * 1.4f;
                 shell.Show(WeaponColor, BubbleStyle.Energy, 0.8f);
+            }
+            else if (style == 3)
+            {
+                blast.TailScale = 1.3f;
+                BallLook.ApplyTech(blast.Head, WeaponColor);
             }
             blast.Aoe = Legacy ? 0f : RepulsorAoe;
             blast.Color = WeaponColor;

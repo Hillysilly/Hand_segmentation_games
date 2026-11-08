@@ -21,18 +21,28 @@ public static class GamePreview
         RenderTinted();
     }
 
-    /// <summary>The three comet looks flying left, top to bottom: comet, streak, orb.</summary>
+    /// <summary>The energy balls, comets and fire pillars. Batch: -executeMethod GamePreview.RenderEffects</summary>
+    public static void RenderEffects()
+    {
+        RenderBalls();
+        RenderComets();
+        RenderPillars();
+    }
+
+    /// <summary>The comet looks flying left, top to bottom: comet, streak, orb, tech (in blue).</summary>
     public static void RenderComets()
     {
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
         var prefab = AssetDatabase.LoadAssetAtPath<Blast>("Assets/Prefabs/Blast.prefab");
         var yellow = new Color(1f, 0.75f, 0.1f);
-        float[] sizes = { 1f, 0.75f, 1.35f };
-        float[] tails = { 1f, 1.9f, 0.45f };
-        for (int i = 0; i < 3; i++)
+        float[] sizes = { 1f, 0.75f, 1.35f, 1f };
+        float[] tails = { 1f, 1.9f, 0.45f, 1.3f };
+        UseEye();
+        var blue = new Color(0.25f, 0.6f, 1f);
+        for (int i = 0; i < 4; i++)
         {
             Blast blast = Object.Instantiate(prefab);
-            blast.Launch(null, new Vector3(-0.3f, 1.9f - i * 0.45f, 2.2f), Vector3.left, 1f, sizes[i], 1f);
+            blast.Launch(null, new Vector3(-0.3f, 2.0f - i * 0.4f, 2.2f), Vector3.left, 1f, sizes[i], 1f);
             blast.TailScale = tails[i];
             blast.ShowTail(3f);
             Tint.Apply(blast.gameObject, yellow);
@@ -42,9 +52,13 @@ public static class GamePreview
                 shell.transform.localScale = Vector3.one * 1.4f;
                 shell.Show(yellow, BubbleStyle.Energy, 0.8f);
             }
+            if (i == 3)
+            {
+                Tint.Apply(blast.gameObject, blue);
+                BallLook.ApplyTech(blast.Head, blue);
+            }
         }
-        foreach (ElectricBall crackle in Object.FindObjectsByType<ElectricBall>())
-            crackle.Crackle(0.1f);
+        CrackleAndPose();
         Save(new Vector3(0f, 1.5f, 0f), Quaternion.identity, 60f, "Logs/preview_comets.png");
     }
 
@@ -53,35 +67,49 @@ public static class GamePreview
     {
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
         var orange = new Color(1f, 0.42f, 0.12f);
+        UseEye();
         for (int i = 0; i < 3; i++)
         {
             FirePillar pillar = FirePillar.Spawn(new Vector3(-1.6f + i * 1.6f, 0f, 4f), orange, i, null);
             pillar.ShowAt(0.5f);
         }
+        CrackleAndPose();
         Save(new Vector3(0f, 1.5f, 0f), Quaternion.LookRotation(new Vector3(0f, -0.05f, 1f)), 70f, "Logs/preview_fire_pillars.png");
     }
 
-    /// <summary>The three energy ball looks side by side: crackle, glow shell, fire shell (left to right).</summary>
+    /// <summary>
+    /// The energy ball looks side by side (A crackle, B plasma, C fireball, D star), each flown a little to the right
+    /// so the flames and sparkles they shed show as a trail. Top row in the Ki fighter's yellow, bottom row in blue.
+    /// </summary>
     public static void RenderBalls()
     {
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
         var prefab = AssetDatabase.LoadAssetAtPath<Blast>("Assets/Prefabs/Blast.prefab");
-        var yellow = new Color(1f, 0.75f, 0.1f);
-        for (int i = 0; i < 3; i++)
+        UseEye();
+        Color[] colors = { new Color(1f, 0.75f, 0.1f), new Color(0.25f, 0.55f, 1f) };
+        var balls = new System.Collections.Generic.List<Blast>();
+        for (int row = 0; row < 2; row++)
         {
-            Blast ball = Object.Instantiate(prefab);
-            ball.Launch(null, new Vector3(-0.9f + i * 0.9f, 1.5f, 2.2f), Vector3.back, 1f, 3f, 0.6f);
-            ball.ShowTail(0.01f);
-            Tint.Apply(ball.gameObject, yellow);
-            if (i > 0)
+            for (int i = 0; i < BallLook.Names.Length; i++)
             {
-                Bubble shell = Bubble.Create("Ball Shell", ball.Head);
-                shell.transform.localScale = Vector3.one * 1.35f;
-                shell.Show(yellow, i == 1 ? BubbleStyle.Energy : BubbleStyle.Flame, 0.9f);
+                Blast ball = Object.Instantiate(prefab);
+                ball.Launch(null, new Vector3(-1.35f + i * 0.9f, 1.85f - row * 0.75f, 2.6f), Vector3.back, 1f, 2.2f, 0.6f);
+                ball.ShowTail(0.01f);
+                Tint.Apply(ball.gameObject, colors[row]);
+                BallLook.Apply(ball.Head, i, colors[row]);
+                balls.Add(ball);
             }
         }
-        foreach (ElectricBall crackle in Object.FindObjectsByType<ElectricBall>())
-            crackle.Crackle(0.1f);
+        // Fly each ball 25 cm to the right while its particles run, so trails form.
+        for (int step = 0; step < 20; step++)
+        {
+            foreach (Blast ball in balls)
+                ball.transform.position += Vector3.right * 0.0125f;
+            foreach (ParticleSystem particles in Object.FindObjectsByType<ParticleSystem>())
+                if (particles.main.simulationSpace == ParticleSystemSimulationSpace.World)
+                    particles.Simulate(0.025f, false, step == 0, false);
+        }
+        CrackleAndPose();
         Save(new Vector3(0f, 1.5f, 0f), Quaternion.identity, 60f, "Logs/preview_energy_balls.png");
     }
 
@@ -184,6 +212,24 @@ public static class GamePreview
                 $"Logs/preview_shield_{i}_{styles[i]}_inside.png");
             Object.DestroyImmediate(bubble.gameObject);
         }
+    }
+
+    /// <summary>Effect sprites face a viewer at the preview camera's spot.</summary>
+    static void UseEye()
+    {
+        var eye = new GameObject("Eye").transform;
+        eye.position = new Vector3(0f, 1.5f, 0f);
+        FxSpin.Eye = eye;
+    }
+
+    /// <summary>Strikes the lightning on crackling balls that are still on, and turns effect sprites to the viewer.</summary>
+    static void CrackleAndPose()
+    {
+        foreach (ElectricBall crackle in Object.FindObjectsByType<ElectricBall>())
+            if (crackle.enabled)
+                crackle.Crackle(0.1f);
+        foreach (FxSpin spin in Object.FindObjectsByType<FxSpin>())
+            spin.Tick(0f);
     }
 
     static void Save(Vector3 position, Quaternion rotation, float fov, string outputPath)

@@ -60,6 +60,7 @@ namespace Repulsor
         public void Init(RepulsorGame owner, HandRepulsor left, HandRepulsor right, RoomDim roomDim)
         {
             GameLog.Start();
+            FxSpin.Eye = owner.Head;
             game = owner;
             leftHand = left;
             rightHand = right;
@@ -615,7 +616,8 @@ namespace Repulsor
             // Not while posing to transform either: opening the fists afterwards would fire into the floor.
             // The Variant Lab's practice counts as fighting, outside a match.
             bool inPlay = practicing || (phase == Phase.Playing && !paused && waves != null && !CountingDown);
-            bool fighting = inPlay && !player.IsDead && !player.Shield.Up && !xArms.Held && !powerUp.Posing;
+            // Posing only disarms when the meter is full, or holding two fists low (Saber blades) would blink them out.
+            bool fighting = inPlay && !player.IsDead && !player.Shield.Up && !xArms.Held && !(powerUp.Posing && player.CanTransform);
             game.Arm(fighting && handsBusyFor <= 0f ? WeaponFor(character, player.Level) : Weapon.None);
             int level = phase == Phase.Playing || practicing ? player.Level : 1;
             game.LaserDps = Damage.LaserPerSecond * (1f + 0.4f * (level - 1));

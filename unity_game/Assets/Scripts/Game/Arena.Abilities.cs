@@ -43,19 +43,12 @@ namespace Repulsor
         GameObject chargeBall;
         /// <summary>Seconds the hand weapons stay off: during a two-hand ability and just after, so its fists don't fire.</summary>
         float handsBusyFor;
-        public static readonly string[] BallStyleNames = { "A  CRACKLE", "B  GLOW", "C  FIRE" };
+        public static string[] BallStyleNames => BallLook.Names;
         const string BallPickKey = "variant.ball";
         int PickedBall => PlayerPrefs.GetInt(BallPickKey, 0);
 
-        /// <summary>Adds the chosen energy ball look on top of the crackling ball: a glowing or fiery shell.</summary>
-        void DecorateBall(Transform ball, int style, Color color)
-        {
-            if (style == 0)
-                return;
-            Bubble shell = Bubble.Create("Ball Shell", ball);
-            shell.transform.localScale = Vector3.one * 1.35f;
-            shell.Show(color, style == 1 ? BubbleStyle.Energy : BubbleStyle.Flame, 0.9f);
-        }
+        /// <summary>Gives a ball the chosen energy ball look (see <see cref="BallLook"/>).</summary>
+        static void DecorateBall(Transform ball, int style, Color color) => BallLook.Apply(ball, style, color);
         LineRenderer[] playAim;
         LineRenderer playRing;
 
