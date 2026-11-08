@@ -10,7 +10,30 @@ Columns:
 - **Checked by you:** you saw it in the headset and approved it.
 - **Pick:** for visual items, the variant letter you chose (A/B/C/D).
 
-## Day plan
+## Status, end of 11/8 session
+
+Most of the Claude-side work planned for 11/7-11/14 is built, with tests passing (132 of 132) and installed on the headset. **None of it has been seen in the headset yet.**
+
+The bottleneck now is your testing:
+- gesture thresholds
+- poke feel
+- HUD readability
+- frame rate
+- the two-headset test
+
+Then picking models and variants.
+
+Suggested re-plan:
+
+| Day | Claude | You |
+|---|---|---|
+| 11/9 | fix whatever your first session finds; fit picked models (enemies, gauntlets) | checklist below; download picked models |
+| 11/10 | two-headset fixes; frame rate pass; remaining looks (wings, knight shield) | co-op test with the second Quest |
+| 11/11 | **pivot checkpoint**: what to cut or polish | PVP test |
+| 11/12-11/15 | polish, balance, bugs, sound | playtests |
+| 11/16 | freeze, clean repo, writeup notes | final check |
+
+## Day plan (original)
 
 The pivot checkpoint is the evening of **11/11**: anything behind schedule gets re-planned or cut.
 
