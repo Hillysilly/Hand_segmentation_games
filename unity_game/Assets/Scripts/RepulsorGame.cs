@@ -78,6 +78,13 @@ namespace Repulsor
         /// <see cref="Arena"/> decides what the hands can do.
         /// </summary>
         public bool Legacy { get; set; }
+        /// <summary>
+        /// The real game's aiming for fist-and-release shots: (left hand?, palm, palm direction) to a direction.
+        /// Unset, or in the old test game, shots follow the palm.
+        /// </summary>
+        public System.Func<bool, Vector3, Vector3, Vector3> HandAim { get; set; }
+        /// <summary>Bends a shot (from, direction) onto a nearby enemy. Unset, or in the old test game, no assist.</summary>
+        public System.Func<Vector3, Vector3, Vector3> AssistAim { get; set; }
         /// <summary>What the hands do: the cycled weapon in the old test game, otherwise what the arena allows.</summary>
         public Weapon ArmedWeapon => Legacy ? CurrentWeapon : arenaWeapon;
         /// <summary>Multiplies damage, for the 1.5x powerup.</summary>
@@ -559,10 +566,44 @@ namespace Repulsor
             }
         }
 
+        AudioSource[] voices;
+        int nextVoice;
+
+        /// <summary>
+        /// Plays a sound from a point in the room. Each sound is placed by moving a source there, so the sources live
+        /// on their own objects at the scene root: the scene's own source sits on this object, which everything in the
+        /// game hangs off, and moving it moved every enemy, menu and shot along with it. Several voices take turns, so
+        /// a new sound doesn't drag one that's still playing across the room.
+        /// </summary>
         public void PlayAt(Vector3 position, AudioClip clip)
         {
-            audioSource.transform.position = position;
-            audioSource.PlayOneShot(clip);
+            if (voices == null)
+                CreateVoices();
+            AudioSource voice = voices[nextVoice];
+            nextVoice = (nextVoice + 1) % voices.Length;
+            voice.transform.position = position;
+            voice.PlayOneShot(clip);
+        }
+
+        void CreateVoices()
+        {
+            const int Count = 8;
+            voices = new AudioSource[Count];
+            for (int i = 0; i < Count; i++)
+            {
+                var voice = new GameObject("Sound " + i).AddComponent<AudioSource>();
+                voice.playOnAwake = false;
+                voice.outputAudioMixerGroup = audioSource.outputAudioMixerGroup;
+                voice.volume = audioSource.volume;
+                voice.spatialBlend = audioSource.spatialBlend;
+                voice.spread = audioSource.spread;
+                voice.dopplerLevel = audioSource.dopplerLevel;
+                voice.rolloffMode = audioSource.rolloffMode;
+                voice.minDistance = audioSource.minDistance;
+                voice.maxDistance = audioSource.maxDistance;
+                voice.priority = audioSource.priority;
+                voices[i] = voice;
+            }
         }
 
         void UpdateHud(float dt)
