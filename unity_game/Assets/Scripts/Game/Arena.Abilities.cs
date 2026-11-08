@@ -41,6 +41,19 @@ namespace Repulsor
         float nextRoomRefresh;
         float noFurnitureHint;
         GameObject chargeBall;
+        public static readonly string[] BallStyleNames = { "A  CRACKLE", "B  GLOW", "C  FIRE" };
+        const string BallPickKey = "variant.ball";
+        int PickedBall => PlayerPrefs.GetInt(BallPickKey, 0);
+
+        /// <summary>Adds the chosen energy ball look on top of the crackling ball: a glowing or fiery shell.</summary>
+        void DecorateBall(Transform ball, int style, Color color)
+        {
+            if (style == 0)
+                return;
+            Bubble shell = Bubble.Create("Ball Shell", ball);
+            shell.transform.localScale = Vector3.one * 1.35f;
+            shell.Show(color, style == 1 ? BubbleStyle.Energy : BubbleStyle.Flame, 0.9f);
+        }
         LineRenderer[] playAim;
         LineRenderer playRing;
 
@@ -109,7 +122,10 @@ namespace Repulsor
             if (charging)
             {
                 if (chargeBall == null)
+                {
                     chargeBall = game.MakeEnergyBall(transform);
+                    DecorateBall(chargeBall.transform, PickedBall, AttackColor);
+                }
                 chargeBall.transform.position = kiCharge.Center;
                 chargeBall.transform.localScale = Vector3.one * Mathf.Lerp(0.05f, 0.28f, kiCharge.Charge);
             }
@@ -129,8 +145,9 @@ namespace Repulsor
                 {
                     Vector3 from = kiCharge.Center + direction * 0.15f;
                     float size = Mathf.Lerp(BallMinSize, BallMaxSize, power);
-                    game.FireBlast(from, direction, 1f, size, Mathf.Lerp(0.8f, 0.55f, power),
+                    Blast ball = game.FireBlast(from, direction, 1f, size, Mathf.Lerp(0.8f, 0.55f, power),
                         player.Outgoing(12f + 18f * power), 0.6f + 0.6f * power);
+                    DecorateBall(ball.Head, PickedBall, AttackColor);
                     Log($"Energy ball, power {power:0.00}");
                 }
                 charging = kiCharge.Charging;

@@ -21,6 +21,30 @@ public static class GamePreview
         RenderTinted();
     }
 
+    /// <summary>The three energy ball looks side by side: crackle, glow shell, fire shell (left to right).</summary>
+    public static void RenderBalls()
+    {
+        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        var prefab = AssetDatabase.LoadAssetAtPath<Blast>("Assets/Prefabs/Blast.prefab");
+        var yellow = new Color(1f, 0.75f, 0.1f);
+        for (int i = 0; i < 3; i++)
+        {
+            Blast ball = Object.Instantiate(prefab);
+            ball.Launch(null, new Vector3(-0.9f + i * 0.9f, 1.5f, 2.2f), Vector3.back, 1f, 3f, 0.6f);
+            ball.ShowTail(0.01f);
+            Tint.Apply(ball.gameObject, yellow);
+            if (i > 0)
+            {
+                Bubble shell = Bubble.Create("Ball Shell", ball.Head);
+                shell.transform.localScale = Vector3.one * 1.35f;
+                shell.Show(yellow, i == 1 ? BubbleStyle.Energy : BubbleStyle.Flame, 0.9f);
+            }
+        }
+        foreach (ElectricBall crackle in Object.FindObjectsByType<ElectricBall>())
+            crackle.Crackle(0.1f);
+        Save(new Vector3(0f, 1.5f, 0f), Quaternion.identity, 60f, "Logs/preview_energy_balls.png");
+    }
+
     /// <summary>The smoke bomb's cloud in front of a stand-in person, as seven overlapping smoke spheres.</summary>
     public static void RenderSmoke()
     {

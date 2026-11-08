@@ -22,19 +22,26 @@ namespace Repulsor
 
         void LabTabs(RectTransform s)
         {
-            PokeButton shields = Ui.Button(s, "SHIELDS", new Vector2(-75f, 105f), new Vector2(140f, 32f), () =>
+            PokeButton shields = Ui.Button(s, "SHIELDS", new Vector2(-155f, 105f), new Vector2(140f, 32f), () =>
             {
                 labItem = 0;
                 ShowVariantLab();
             }, 14);
             shields.Selected = labItem == 0;
-            PokeButton dragon = Ui.Button(s, "DRAGON FIST", new Vector2(75f, 105f), new Vector2(140f, 32f), () =>
+            PokeButton dragon = Ui.Button(s, "DRAGON FIST", new Vector2(0f, 105f), new Vector2(140f, 32f), () =>
             {
                 labItem = 1;
                 HideLabBubble();
                 ShowVariantLab();
             }, 14);
             dragon.Selected = labItem == 1;
+            PokeButton ball = Ui.Button(s, "ENERGY BALL", new Vector2(155f, 105f), new Vector2(140f, 32f), () =>
+            {
+                labItem = 2;
+                HideLabBubble();
+                ShowVariantLab();
+            }, 14);
+            ball.Selected = labItem == 2;
         }
 
         void ShowDragonLab()
@@ -73,11 +80,54 @@ namespace Repulsor
         }
 
         int dragonTried = -1;
+        int ballTried = -1;
 
+        void ShowBallLab()
+        {
+            Time.timeScale = 1f;
+            RectTransform s = OpenScreen(new Vector2(480f, 320f), "VARIANT LAB");
+            LabTabs(s);
+            Ui.Label(s, "The Ki fighter's charged ball. Poke a style to fire one ahead of you.",
+                new Vector2(0f, 72f), new Vector2(450f, 20f), 12).color = Ui.Muted;
+            for (int i = 0; i < BallStyleNames.Length; i++)
+            {
+                int style = i;
+                PokeButton b = Ui.Button(s, BallStyleNames[i], new Vector2(-130f + i * 130f, 25f), new Vector2(120f, 44f), () =>
+                {
+                    Vector3 forward = Vector3.ProjectOnPlane(head.forward, Vector3.up).normalized;
+                    Vector3 from = head.position + Vector3.down * 0.3f + forward * 0.6f;
+                    game.SetWeaponColor(PlayerColor);
+                    Blast shot = game.FireBlast(from, forward, 1f, 3f, 0.6f, 0f, 0f);
+                    DecorateBall(shot.Head, style, PlayerColor);
+                    ballTried = style;
+                    ShowVariantLab();
+                }, 13);
+                b.Selected = i == (ballTried >= 0 ? ballTried : PickedBall);
+            }
+            Ui.Button(s, "SAVE PICK", new Vector2(-90f, -55f), new Vector2(150f, 44f), () =>
+            {
+                if (ballTried < 0)
+                    return;
+                PlayerPrefs.SetInt(BallPickKey, ballTried);
+                PlayerPrefs.Save();
+                Debug.Log($"[Variant] Energy ball: {BallStyleNames[ballTried]}");
+                hud.Message("SAVED", $"Energy ball {BallStyleNames[ballTried]}", 1.5f);
+            }, 16);
+            Ui.Button(s, "BACK", new Vector2(90f, -55f), new Vector2(150f, 44f), () => ShowDebug(debugBack), 16);
+        }
+
+        readonly System.Collections.Generic.Dictionary<CharacterId, BubbleStyle> shieldPicks =
+            new System.Collections.Generic.Dictionary<CharacterId, BubbleStyle>();
+
+        /// <summary>The saved shield look for a character, read from storage once and then remembered.</summary>
         BubbleStyle PickedShield(CharacterId id)
         {
+            if (shieldPicks.TryGetValue(id, out BubbleStyle style))
+                return style;
             int saved = PlayerPrefs.GetInt(ShieldPickKey + id, -1);
-            return saved >= 0 ? (BubbleStyle)saved : ShieldStyle(id);
+            style = saved >= 0 ? (BubbleStyle)saved : ShieldStyle(id);
+            shieldPicks[id] = style;
+            return style;
         }
 
         void ShowVariantLab()
@@ -85,6 +135,11 @@ namespace Repulsor
             if (labItem == 1)
             {
                 ShowDragonLab();
+                return;
+            }
+            if (labItem == 2)
+            {
+                ShowBallLab();
                 return;
             }
             RectTransform s = OpenScreen(new Vector2(480f, 320f), "VARIANT LAB");
@@ -111,6 +166,7 @@ namespace Repulsor
                 if (labStyle < 0)
                     return;
                 PlayerPrefs.SetInt(ShieldPickKey + character, labStyle);
+                shieldPicks[character] = (BubbleStyle)labStyle;
                 PlayerPrefs.Save();
                 Debug.Log($"[Variant] Shield for {character}: {ShieldNames[labStyle]}");
                 hud.Message("SAVED", $"{Character.Name}: shield {ShieldNames[labStyle]}", 1.5f);

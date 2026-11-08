@@ -61,6 +61,7 @@ The new build is installed. Pick it up and move around until it finds its positi
 5. **Variant batches 1-2:** DEBUG > VARIANT LAB.
    - SHIELDS tab: poke A-E, then SAVE PICK for each character you care about.
    - DRAGON FIST tab: A comet, B three twisting comets, C punch wave, D both. Poke to fire one, then SAVE PICK.
+   - ENERGY BALL tab: A crackle, B glowing shell, C fiery shell. PC render: `unity_game/Logs/preview_energy_balls.png`.
    PC renders are in `unity_game/Logs/preview_shield_*.png`.
 6. HUD: is it readable, in a good spot, too big or too small?
 7. **When the second Quest arrives:** install the same build on both (`build_and_run.ps1 -NoBuild` with each plugged
