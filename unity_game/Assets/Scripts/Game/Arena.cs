@@ -613,6 +613,35 @@ namespace Repulsor
 
         public void TestSandbox() => EnterSandbox();
 
+        /// <summary>PlayMode co-op test: host a co-op room on this port.</summary>
+        public bool TestHost(int port)
+        {
+            mode = GameMode.PveCoop;
+            bool ok = net.Host(port);
+            net.Mode = (byte)mode;
+            phase = Phase.Lobby;
+            return net.LocalPort > 0;
+        }
+
+        /// <summary>PlayMode co-op test: start the match as host without the ready handshake.</summary>
+        public void TestStartHosting()
+        {
+            StartMatch();
+            waves.Tick(WaveDirector.CountdownSeconds + 0.1f);
+        }
+
+        public bool TestPartnerVisible => remote.Visible;
+        public bool TestPartnerConnected => net.Connected;
+
+        /// <summary>PlayMode co-op test: the HP of the enemy with this id, or -1.</summary>
+        public float TestEnemyHp(ushort id)
+        {
+            foreach (IHittable foe in enemies)
+                if (foe is Enemy enemy && enemy != null && enemy.Id == id)
+                    return enemy.Hp;
+            return -1f;
+        }
+
         /// <summary>PlayMode smoke test: knock the player out, then run the clock past the respawn.</summary>
         public void TestKnockOutAndRespawn()
         {

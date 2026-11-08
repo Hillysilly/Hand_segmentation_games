@@ -12,7 +12,7 @@ Columns:
 
 ## Status, end of 11/8 session
 
-Most of the Claude-side work planned for 11/7-11/14 is built and installed on the headset. 138 of 138 unit tests pass, plus a PC smoke test that plays every character through a wave. **None of it has been seen in the headset yet.**
+Most of the Claude-side work planned for 11/7-11/14 is built and installed on the headset. 138 of 138 unit tests pass, plus PC tests that play every character through a wave and host a co-op match with a test client. **None of it has been seen in the headset yet.**
 
 The bottleneck now is your testing:
 - gesture thresholds
@@ -199,7 +199,7 @@ Sketchfab needs a login to download. If you grab G1 as glTF into `assets/models/
 | LAN room code + join | ✅ | ✅ | | UDP; the code carries the host's address (same Wi-Fi); loopback test passes |
 | Colocation | ✅ manual | | | both touch the same 2 real points; shared anchors not tried |
 | Player sync (pose, aura, shield, attacks) | ✅ | | | HP bar, level, shield, powerup glow, an aura stand-in (body shell), head and palm markers, blasts |
-| Co-op PVE | ✅ | | | host runs enemies and waves, client sees copies and its hits count; ends when both are out |
+| Co-op PVE | ✅ | ✅ host side | | host runs enemies and waves, client sees copies and its hits count; ends when both are out. PC test: the real game hosts, a test client joins over loopback, gets enemies, its hits land |
 | PVP (best of 3, friendly fire toggle) | ✅ | | | victim's headset applies hits; levels reset each round; co-op friendly fire toggle in pause |
 
 ### Submission
