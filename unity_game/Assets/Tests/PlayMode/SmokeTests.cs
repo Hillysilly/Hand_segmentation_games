@@ -66,6 +66,11 @@ namespace Repulsor.Tests
                 Assert.That(arena.Phase, Is.EqualTo(Phase.Playing), $"{character.Name} match ended early");
             }
 
+            arena.TestKnockOutAndRespawn();
+            yield return Frames(30);
+            arena.TestEveryScreen();
+            yield return Frames(120);
+
             arena.TestSandbox();
             yield return Frames(60);
             Assert.That(crashes, Is.Empty, string.Join("\n\n", crashes));

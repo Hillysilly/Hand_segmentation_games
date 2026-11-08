@@ -539,6 +539,42 @@ namespace Repulsor
 
         public void TestSandbox() => EnterSandbox();
 
+        /// <summary>PlayMode smoke test: knock the player out, then run the clock past the respawn.</summary>
+        public void TestKnockOutAndRespawn()
+        {
+            HurtPlayer(10000f, "test");
+            player.Tick(settings.RespawnSeconds + 0.1f);
+        }
+
+        /// <summary>PlayMode smoke test: open every screen, every Variant Lab page, and fire each variant once.</summary>
+        public void TestEveryScreen()
+        {
+            ShowTitle();
+            ShowModes();
+            ShowCoop();
+            ShowRooms(GameMode.Pvp);
+            ShowJoin();
+            ShowCharacters();
+            debugBack = ShowModes;
+            ShowDebug(ShowModes);
+            for (int item = 0; item < LabItems.Length; item++)
+            {
+                labItem = item;
+                ShowVariantLab();
+            }
+            for (int style = 0; style < DragonFist.StyleNames.Length; style++)
+                DragonFist.Launch(game, style, head.position + head.forward, head.forward, 0f);
+            for (int style = 0; style < FirePillar.StyleNames.Length; style++)
+                FirePillar.Spawn(head.position + head.forward * 2f, PlayerColor, style, transform);
+            labItem = 0;
+            HideLabBubble();
+            StartMatch();
+            paused = true;
+            ShowPause();
+            ShowResults(true);
+            ShowTitle();
+        }
+
         /// <summary>Editor preview: just the menus and HUD around a fixed head, with no XR or weapons.</summary>
         public void InitPreview(Transform previewHead)
         {
