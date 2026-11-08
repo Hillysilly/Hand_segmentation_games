@@ -41,6 +41,8 @@ namespace Repulsor
         float nextRoomRefresh;
         float noFurnitureHint;
         GameObject chargeBall;
+        /// <summary>Seconds the hand weapons stay off: during a two-hand ability and just after, so its fists don't fire.</summary>
+        float handsBusyFor;
         public static readonly string[] BallStyleNames = { "A  CRACKLE", "B  GLOW", "C  FIRE" };
         const string BallPickKey = "variant.ball";
         int PickedBall => PlayerPrefs.GetInt(BallPickKey, 0);
@@ -118,6 +120,14 @@ namespace Repulsor
                 }
             }
             spiderSense.Tick(canFight && character == CharacterId.Spider, dt);
+
+            handsBusyFor = Mathf.Max(0f, handsBusyFor - dt);
+            // Each detector only updates for its own character, so only that character's counts (a stale one can't lock others out).
+            bool busy = canFight && ((character == CharacterId.Mage && triangle.Aiming)
+                || (character == CharacterId.KiFighter && kiCharge.Charging)
+                || (character == CharacterId.Archer && bow.Formed));
+            if (busy)
+                handsBusyFor = 0.6f;
 
             if (charging)
             {
@@ -249,6 +259,7 @@ namespace Repulsor
                 return;
             if (triangle.Step(input.Left, input.Right, body, dt, out Vector3 target))
             {
+                handsBusyFor = 0.8f;
                 game.Explode(target + Vector3.up * 0.6f, 1.1f, player.Outgoing(25f), AttackColor);
                 FirePillar.Spawn(target, AttackColor, PickedPillar, foes);
                 Log($"Fire pillar {Vector3.Distance(Flat(head.position), Flat(target)):0.0} m away");

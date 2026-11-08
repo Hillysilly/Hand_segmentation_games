@@ -542,7 +542,7 @@ namespace Repulsor
             // Not while posing to transform either: opening the fists afterwards would fire into the floor.
             bool fighting = phase == Phase.Playing && !paused && !player.IsDead && !player.Shield.Up && !xArms.Held
                 && !powerUp.Posing && waves != null && !CountingDown;
-            game.Arm(fighting ? WeaponFor(character, player.Level) : Weapon.None);
+            game.Arm(fighting && handsBusyFor <= 0f ? WeaponFor(character, player.Level) : Weapon.None);
             int level = phase == Phase.Playing ? player.Level : 1;
             game.LaserDps = Damage.LaserPerSecond * (1f + 0.4f * (level - 1));
             game.RepulsorDamage = Damage.Repulsor * (level >= 2 && character == CharacterId.KiFighter ? 1.3f : 1f);
