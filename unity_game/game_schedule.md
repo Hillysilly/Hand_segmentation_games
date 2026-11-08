@@ -154,7 +154,7 @@ Sketchfab needs a login to download. If you grab G1 as glTF into `assets/models/
 | HP, damage, passive healing | ✅ | ✅ | | unit tests |
 | Transformation meter, power-up pose, levels 1-3 | ✅ | ✅ | | unit tests; pose thresholds untested on real hands |
 | Lives, respawn, grey view while dead | ✅ | ✅ | | |
-| Shield (X arms), hold limit + cooldown | ✅ | ✅ | | 5 bubble styles; flame style needs another pass |
+| Shield (X arms), hold limit + cooldown | ✅ | ✅ | | 5 bubble styles; flame reworked to wispy layered noise |
 | Gesture library | ✅ | ✅ | | 13 detectors with made-up-hand tests; **needs tuning with your hands** |
 | Debug menu (old controls, Variant Lab) | ✅ | | | also the gesture readout, FPS, spawn/hurt/meter/powerup buttons |
 
@@ -185,7 +185,7 @@ Sketchfab needs a login to download. If you grab G1 as glTF into `assets/models/
 | Character | Name | L1 | L2 | L3 | Shield | Visuals | Checked by you |
 |---|---|---|---|---|---|---|---|
 | Technoman | | ✅ laser | ✅ +repulsor | ✅ AOE repulsor | ✅ hex | no gauntlets / tight aura yet | |
-| Ki fighter | | ✅ comet (yellow) | ✅ energy ball | ✅ dragon fist (4 looks in Variant Lab) | flame (needs work) | aura 2 at L2, blue at L3 | |
+| Ki fighter | | ✅ comet (yellow) | ✅ energy ball | ✅ dragon fist (4 looks in Variant Lab) | flame | aura 2 at L2, blue at L3 | |
 | Mage | | ✅ fireball | force: needs room objects | ✅ fire pillar (3 looks in Variant Lab) | thin | rune aura L2-3 | |
 | Saber | | ✅ finger-gun blaster + aim line | ✅ laser sword | force: needs room objects | glass | light aura | |
 | Archer | | ✅ crossbow (reloads) | ✅ bow + aim line | ✅ smoke bomb (blinds enemies), piercing arrows | flat glass shield (knight shield needs a model) | wings: needs model; white ring shockwave | |

@@ -123,13 +123,16 @@ Shader "Repulsor/Bubble"
                 }
                 else if (style == 1)
                 {
-                    // Tongues of flame running upward: noise stretched tall and scrolling up, stronger near the top.
-                    float3 q = float3(p.x * 3.0, p.y * 1.1 - t * 1.6, p.z * 3.0);
-                    float n = Noise(q * 2.0) * 0.6 + Noise(q * 4.5 + 7.0) * 0.4;
+                    // Tongues of flame licking upward: four octaves of noise, squeezed sideways and stretched tall,
+                    // scrolling up and bent by a slower noise so the tongues sway. Thin wisps at the edge, a hot core.
+                    float3 q = float3(p.x * 4.0, p.y * 1.4 - t * 1.9, p.z * 4.0);
+                    q.xz += (Noise(q * 0.7 + 3.1) - 0.5) * 1.2;
+                    float n = Noise(q) * 0.5 + Noise(q * 2.03 + 1.7) * 0.25 + Noise(q * 4.01 + 4.3) * 0.15 + Noise(q * 8.02 + 9.1) * 0.1;
                     float height = p.y * 0.5 + 0.5;
-                    float lick = smoothstep(0.58, 0.9, n + height * 0.3);
-                    glow = rim * 0.9 + lick * (0.35 + 0.5 * height) + 0.02;
-                    color = lerp(_Color.rgb, float3(1.0, 0.92, 0.65), lick * 0.6);
+                    float lick = smoothstep(0.5, 0.78, n + height * 0.22 - 0.06);
+                    float core = smoothstep(0.7, 0.95, n + height * 0.22 - 0.06);
+                    glow = rim * 0.55 + lick * (0.3 + 0.45 * height) + core * 0.5 + 0.01;
+                    color = lerp(_Color.rgb, float3(1.0, 0.95, 0.75), core * 0.8);
                 }
                 else if (style == 2)
                 {
