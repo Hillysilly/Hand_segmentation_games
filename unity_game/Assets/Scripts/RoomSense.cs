@@ -23,6 +23,9 @@ namespace Repulsor
 
         readonly List<ARRaycastHit> hits = new List<ARRaycastHit>();
 
+        /// <summary>Furniture boxes from the headset's Space Setup, once the room permission is granted.</summary>
+        public ARBoundingBoxManager Boxes { get; private set; }
+
         void Start()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -44,6 +47,7 @@ namespace Repulsor
             raycaster.enabled = true;
             occlusion.enabled = true;
             shaderOcclusion.enabled = true;
+            Boxes = raycaster.gameObject.AddComponent<ARBoundingBoxManager>();
             Debug.Log("[Repulsor] Room sensing on");
         }
 

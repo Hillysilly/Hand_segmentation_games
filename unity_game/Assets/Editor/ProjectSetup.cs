@@ -237,6 +237,7 @@ public static class ProjectSetup
             typeof(ARCameraFeature),
             typeof(ARRaycastFeature),
             typeof(AROcclusionFeature),
+            typeof(ARBoundingBoxFeature),     // Space Setup furniture, for picking up and throwing
             typeof(DisplayUtilitiesFeature),
             typeof(HandTracking),
             typeof(OculusTouchControllerProfile),

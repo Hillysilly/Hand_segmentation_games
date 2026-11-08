@@ -30,6 +30,12 @@ namespace Repulsor
         readonly float[] reload = new float[2];
         readonly SpiderSignDetector[] web = { new SpiderSignDetector(), new SpiderSignDetector() };
         SpiderSense spiderSense;
+        readonly ForceGrabDetector[] force = { new ForceGrabDetector(), new ForceGrabDetector() };
+        RoomObjects room;
+        ThrownObject held;
+        int heldHand = -1;
+        float heldFor;
+        float nextRoomRefresh;
         GameObject chargeBall;
         LineRenderer[] playAim;
         LineRenderer playRing;
@@ -46,6 +52,7 @@ namespace Repulsor
             playRing = CreateLine("Pillar Ring", line, 0.015f, 33);
             playRing.loop = true;
             spiderSense = new SpiderSense(transform, head);
+            room = new RoomObjects(transform);
         }
 
         void TickAbilities(bool canFight, float dt)
@@ -53,6 +60,17 @@ namespace Repulsor
             foreach (LineRenderer aim in playAim)
                 aim.enabled = false;
             playRing.enabled = false;
+            room.Highlight(null, Color.white);
+            if (Time.unscaledTime >= nextRoomRefresh)
+            {
+                nextRoomRefresh = Time.unscaledTime + 2f;
+                int before = room.Count;
+                room.Refresh(game.Room.Boxes);
+                if (room.Count != before)
+                    Log($"Room objects: {room.Count}");
+            }
+            if (!canFight && held != null)
+                DropHeld();
 
             bool charging = false;
             if (canFight)
@@ -70,6 +88,8 @@ namespace Repulsor
                         break;
                     case CharacterId.Mage:
                         TickMage(dt);
+                        if (player.Level >= 2)
+                            TickForce(dt);
                         break;
                     case CharacterId.Spider:
                         TickSpider(dt);
@@ -125,6 +145,8 @@ namespace Repulsor
 
         void TickSaber(float dt)
         {
+            if (player.Level >= 3)
+                TickForce(dt);
             for (int i = 0; i < 2; i++)
             {
                 HandPose hand = i == 0 ? input.Left : input.Right;
@@ -204,16 +226,103 @@ namespace Repulsor
             }
         }
 
+        /// <summary>Force powers: a cupped hand at a piece of furniture lifts a copy of it; a fast swing throws it.</summary>
+        void TickForce(float dt)
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                HandPose hand = i == 0 ? input.Left : input.Right;
+                GrabEvent grab = force[i].Step(hand, body, dt, out Vector3 throwVelocity);
+                if (held != null && heldHand == i)
+                {
+                    held.Hold(hand.Palm, force[i].AimDirection, dt);
+                    if (grab == GrabEvent.Throw)
+                        ThrowHeld(throwVelocity, force[i].AimDirection);
+                    else if (grab == GrabEvent.Drop)
+                        DropHeld();
+                    continue;
+                }
+                if (held != null || !(force[i].Forming || force[i].Holding))
+                    continue;
+                bool aimed = room.TryAim(force[i].AimOrigin, force[i].AimDirection, out var box);
+                ShowAim(i, force[i].AimOrigin, force[i].AimOrigin + force[i].AimDirection * (aimed ? 1.5f : 3f));
+                if (!aimed)
+                    continue;
+                room.Highlight(box, AttackColor);
+                if (grab == GrabEvent.Grab)
+                    LiftBox(box, i, AttackColor);
+            }
+        }
+
+        void LiftBox(UnityEngine.XR.ARFoundation.ARBoundingBox box, int hand, Color color)
+        {
+            held = room.Lift(box, color, this);
+            heldHand = hand;
+            heldFor = 0f;
+            game.PlayAt(box.transform.position, game.WhooshSound);
+            Log($"Lifted {held.Label}");
+        }
+
+        void ThrowHeld(Vector3 handVelocity, Vector3 aim)
+        {
+            float wall = game.Room.TryDistance(held.transform.position, aim, out float d) ? d : float.MaxValue;
+            held.Throw(handVelocity, aim, wall);
+            game.PlayAt(held.transform.position, game.WhooshSound);
+            Log($"Threw {held.Label} at {handVelocity.magnitude:0.0} m/s");
+            held = null;
+        }
+
+        void DropHeld()
+        {
+            if (held != null)
+                held.Drop();
+            held = null;
+        }
+
+        /// <summary>A thrown object's path touches an enemy.</summary>
+        public bool ThrownHits(Vector3 from, Vector3 to, float radius)
+        {
+            foreach (IHittable foe in Hittables.All)
+                if (foe.Alive && foe.Team == Team.Enemies && GameMath.SegmentHitsSphere(from, to, foe.Center, foe.Radius + radius))
+                    return true;
+            return false;
+        }
+
+        public void ThrownBreaks(Vector3 at, float radius, float damage, Color color) =>
+            game.Explode(at, radius, player.Outgoing(damage), color);
+
         void TickSpider(float dt)
         {
+            // Level 2 web pull: a web sign aimed at furniture pulls a copy of it to you; swing your arm to fling it.
+            if (held != null)
+            {
+                HandPose holding = heldHand == 0 ? input.Left : input.Right;
+                heldFor += dt;
+                Vector3 aim = Vector3.Slerp(holding.Forward, body.ArmDirection(holding.IsLeft, holding.Palm), 0.5f).normalized;
+                held.Hold(holding.Palm, aim, dt);
+                ShowAim(heldHand, holding.Wrist, held.transform.position);
+                if (holding.Tracked && holding.Velocity.magnitude > ForceGrabDetector.ThrowSpeed
+                    && Vector3.Dot(holding.Velocity.normalized, body.ArmDirection(holding.IsLeft, holding.Palm)) > 0.3f)
+                    ThrowHeld(holding.Velocity, holding.Velocity.normalized);
+                else if (heldFor > 5f)
+                    DropHeld();
+                return;
+            }
+
             // Placeholder look: webs are pale comets, darker and stronger at level 3. Web pull waits for room objects.
             bool black = player.Level >= 3;
             Color color = black ? new Color(0.35f, 0.1f, 0.45f) : new Color(0.9f, 0.92f, 1f);
             for (int i = 0; i < 2; i++)
             {
                 HandPose hand = i == 0 ? input.Left : input.Right;
-                if (web[i].Step(hand, body, dt, out Vector3 origin, out Vector3 direction))
-                    game.FireBlast(origin, direction, 0.3f, 0.5f, 1.6f, player.Outgoing(black ? 7f : 5f), 0f, color);
+                if (!web[i].Step(hand, body, dt, out Vector3 origin, out Vector3 direction))
+                    continue;
+                if (player.Level >= 2 && room.TryAim(origin, direction, out var box))
+                {
+                    LiftBox(box, i, color);
+                    continue;
+                }
+                game.FireBlast(origin, direction, 0.3f, 0.5f, 1.6f, player.Outgoing(black ? 7f : 5f), 0f, color);
             }
         }
 

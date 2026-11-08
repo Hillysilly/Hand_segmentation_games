@@ -22,6 +22,8 @@ public static class GameAssets
         });
         SaveMesh("SphereMesh", PrimitiveType.Sphere);
         SaveMesh("QuadMesh", PrimitiveType.Quad);
+        SaveMesh("CubeMesh", PrimitiveType.Cube);
+        EnableBoundingBoxes();
         Save("EnemyPlaceholder", "Repulsor/Orb", m => m.SetColor("_BaseColor", new Color(0.85f, 0.2f, 0.15f)));
         Save("EnemyBolt", "Repulsor/Orb", m => m.SetColor("_BaseColor", new Color(1f, 0.25f, 0.2f)));
         Save("AimLine", "Universal Render Pipeline/Unlit", m => m.SetColor("_BaseColor", new Color(0.35f, 0.75f, 1f)));
@@ -41,6 +43,19 @@ public static class GameAssets
         string path = $"{Folder}/{name}.asset";
         AssetDatabase.DeleteAsset(path);
         AssetDatabase.CreateAsset(mesh, path);
+    }
+
+    /// <summary>Turns on Space Setup furniture boxes for Android, without regenerating the scene.</summary>
+    static void EnableBoundingBoxes()
+    {
+        var settings = UnityEngine.XR.OpenXR.OpenXRSettings.GetSettingsForBuildTargetGroup(BuildTargetGroup.Android);
+        var feature = settings.GetFeature<UnityEngine.XR.OpenXR.Features.Meta.ARBoundingBoxFeature>();
+        if (feature == null)
+            throw new System.Exception("Meta bounding box feature not found");
+        feature.enabled = true;
+        EditorUtility.SetDirty(feature);
+        EditorUtility.SetDirty(settings);
+        Debug.Log("[Setup] Bounding boxes on");
     }
 
     static void Save(string name, string shaderName, System.Action<Material> configure)
