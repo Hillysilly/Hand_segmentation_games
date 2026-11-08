@@ -45,9 +45,18 @@ namespace Repulsor.Tests
         }
 
         [Test]
-        public void FingerGunNeedsTheThumbUp()
+        public void PointingAndLooseGunsCountAsAFingerGun()
         {
-            Assert.That(Make(0f, 0f, 1f, 1f, ThumbPose.Tucked).Gun, Is.False);
+            Assert.That(Make(0f, 0f, 1f, 1f, ThumbPose.Tucked).Gun, Is.True, "thumb down");
+            Assert.That(Make(0f, 1f, 1f, 1f, ThumbPose.Tucked).Gun, Is.True, "index only");
+            Assert.That(Make(0f, 0.5f, 0.7f, 0.7f, ThumbPose.Out).Gun, Is.True, "middle half in, ring and little loose");
+        }
+
+        [Test]
+        public void ARelaxedHandIsNotAFingerGun()
+        {
+            Assert.That(Make(0f, 0f, 0f, 0f, ThumbPose.Out).Gun, Is.False);
+            Assert.That(Make(0.6f, 0.6f, 0.6f, 0.6f, ThumbPose.Tucked).Gun, Is.False);
         }
 
         [Test]
@@ -352,6 +361,33 @@ namespace Repulsor.Tests
                 saber.Step(hand, Frame);
             Assert.That(saber.On, Is.True);
             Assert.That(Vector3.Dot(saber.BladeDirection, hand.ThumbSide), Is.GreaterThan(0.8f));
+        }
+
+        [Test]
+        public void SaberTakesALooseFistAndStaysLitThroughDropouts()
+        {
+            var hand = new HandPose(false);
+            var saber = new SaberGripDetector();
+            // Fingers only partly closed, index a little out: still a grip.
+            hand.Pose(new Vector3(0.2f, 1.3f, 0.3f), Quaternion.identity, 0.6f, 0.75f, 0.75f, 0.75f, ThumbPose.Tucked);
+            hand.Analyze();
+            for (int i = 0; i < 12; i++)
+                saber.Step(hand, Frame);
+            Assert.That(saber.On, Is.True, $"index {hand.Index:0.00}, middle {hand.Middle:0.00}");
+
+            // Tracking drops out for a third of a second mid-swing: the blade stays.
+            hand.Tracked = false;
+            hand.Analyze();
+            for (int i = 0; i < 24; i++)
+                saber.Step(hand, Frame);
+            Assert.That(saber.On, Is.True);
+
+            // An open hand puts it away soon after.
+            hand.Pose(new Vector3(0.2f, 1.3f, 0.3f), Quaternion.identity, 0f, 0f, 0f, 0f, ThumbPose.Out);
+            hand.Analyze();
+            for (int i = 0; i < 72; i++)
+                saber.Step(hand, Frame);
+            Assert.That(saber.On, Is.False);
         }
 
         [Test]

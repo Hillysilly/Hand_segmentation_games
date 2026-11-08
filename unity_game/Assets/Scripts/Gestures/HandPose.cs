@@ -31,6 +31,9 @@ namespace Repulsor
         public static float PinchRelease = 0.04f;
         // Thumb tip's distance from the index knuckle, over the hand's length. Tucked about 0.4, out about 0.8.
         public static float ThumbOutAbove = 0.6f;
+        /// <summary>Finger gun: the index is out past this, and the ring and little fingers are in below <see cref="GunOthersBelow"/>.</summary>
+        public static float GunIndexAbove = 1.35f;
+        public static float GunOthersBelow = 1.42f;
         public static float CupLow = 1.2f;
         public static float CupHigh = 1.65f;
 
@@ -106,13 +109,13 @@ namespace Repulsor
 
             // A little give once on, because tracking wobbles around the thresholds.
             float slack = 0.08f;
-            float open = OpenAbove - (Gun ? slack : 0f);
-            float curled = CurledBelow + (Gun ? slack : 0f);
-            Gun = Index > open && Middle > open && Ring < curled && Little < curled
-                && ThumbOut > ThumbOutAbove - (Gun ? slack : 0f);
+            // Finger gun, kept loose on purpose (a stray shot beats a shot that won't come): the index out and
+            // the ring and little fingers in. The middle finger and thumb can be anywhere, so pointing counts.
+            float gunGive = Gun ? 0.1f : 0f;
+            Gun = Index > GunIndexAbove - gunGive && Ring < GunOthersBelow + gunGive && Little < GunOthersBelow + gunGive;
 
-            open = OpenAbove - (SpiderSign ? slack : 0f);
-            curled = CurledBelow + (SpiderSign ? slack : 0f);
+            float open = OpenAbove - (SpiderSign ? slack : 0f);
+            float curled = CurledBelow + (SpiderSign ? slack : 0f);
             SpiderSign = Index > open && Little > open && Middle < curled && Ring < curled;
 
             float average = (Index + Middle + Ring + Little) * 0.25f;

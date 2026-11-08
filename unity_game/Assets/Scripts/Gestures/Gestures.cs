@@ -349,9 +349,9 @@ namespace Repulsor
     /// </summary>
     public sealed class FingerGunDetector
     {
-        public static float FlickDegrees = 22f;
-        public static float FlickWindow = 0.15f;
-        public static float Cooldown = 0.35f;
+        public static float FlickDegrees = 12f;
+        public static float FlickWindow = 0.25f;
+        public static float Cooldown = 0.25f;
         public static float ArmBlend = 0.5f;
         const int HistorySize = 24;
 
@@ -516,7 +516,12 @@ namespace Repulsor
     public sealed class SaberGripDetector
     {
         public static float ForwardTilt = 0.35f;
-        readonly HoldTimer hold = new HoldTimer(0.15f, 0.25f);
+        /// <summary>A loose fist is enough: the middle, ring and little fingers average below this, the index below <see cref="IndexBelow"/>.</summary>
+        public static float FingersBelow = 1.35f;
+        public static float IndexBelow = 1.3f;
+        /// <summary>The blade stays lit this long through a tracking dropout or a loosened grip, so fast swings don't blink it out.</summary>
+        public static float KeepLitSeconds = 0.6f;
+        readonly HoldTimer hold = new HoldTimer(0.1f, 0.6f);
 
         public bool On => hold.On;
         public Vector3 Hilt { get; private set; }
@@ -524,7 +529,11 @@ namespace Repulsor
 
         public bool Step(HandPose hand, float dt)
         {
-            hold.Step(hand.Fist, dt);
+            float give = On ? 0.15f : 0f;
+            bool grip = hand.Tracked && (hand.Middle + hand.Ring + hand.Little) / 3f < FingersBelow + give
+                && hand.Index < IndexBelow + give;
+            hold.Dropout = KeepLitSeconds;
+            hold.Step(grip, dt);
             if (hand.Tracked)
             {
                 Hilt = (hand[Joint.IndexProximal] + hand[Joint.LittleProximal]) * 0.5f + hand.PalmNormal * 0.02f;
