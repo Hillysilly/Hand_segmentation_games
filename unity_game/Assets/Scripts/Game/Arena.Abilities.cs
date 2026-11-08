@@ -142,8 +142,7 @@ namespace Repulsor
                     HandPose hand = i == 0 ? input.Left : input.Right;
                     if (kiPunch[i].Step(hand, body, dt, out Vector3 origin, out Vector3 punch))
                     {
-                        // Placeholder look: a big fast comet. The dragon fist gets its own look in variant batch 2.
-                        game.FireBlast(origin + punch * 0.1f, punch, 1f, 2.2f, 1.4f, player.Outgoing(10f), 0f);
+                        DragonFist.Launch(game, PickedDragon, origin + punch * 0.1f, punch, player.Outgoing(10f));
                         Log($"Dragon fist at {hand.Velocity.magnitude:0.0} m/s");
                     }
                 }

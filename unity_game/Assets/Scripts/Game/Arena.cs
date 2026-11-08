@@ -189,7 +189,8 @@ namespace Repulsor
             switch (waves.State)
             {
                 case WaveState.Countdown:
-                    hud.Message(Mathf.CeilToInt(waves.Timer).ToString(), "Get ready", 0.2f);
+                    // The countdown doubles as a reminder of how to attack.
+                    hud.Message(Mathf.CeilToInt(waves.Timer).ToString(), Character.Controls[0][0], 0.2f);
                     break;
                 case WaveState.Fighting:
                     if (announcedWave != waves.Wave)
@@ -429,7 +430,8 @@ namespace Repulsor
             TransformWave.Spawn(head.position + Vector3.down * TransformShake, PlayerColor, transform);
             game.PlayAt(head.position, game.WhooshSound);
             game.PlayAt(head.position, game.BoomSound);
-            hud.Message($"LEVEL {level}", Character.Name.ToUpperInvariant(), 1.6f);
+            // Tell the player what the new level unlocked.
+            hud.Message($"LEVEL {level}", Character.Controls[Mathf.Clamp(level - 1, 0, Character.Controls.Length - 1)][0], 2.5f);
             UpdateAura();
             Log($"Transformed to level {level}, HP {player.Hp:0}/{player.MaxHp:0}");
         }

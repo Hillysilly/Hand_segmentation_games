@@ -58,7 +58,9 @@ The new build is installed. Pick it up and move around until it finds its positi
    In the pause menu, DEBUG has HIT ME, KNOCK ME OUT, FILL METER and SPAWN POWERUP.
 4. **Ki fighter (Ryuu):** fist and snap open for yellow comets. Use FILL METER and the pose to reach level 2:
    hold your hands together to charge a ball, then push both forward. Level 3: punch fast for a dragon fist.
-5. **Variant batch 1, shields:** DEBUG > VARIANT LAB. Poke A-E, then SAVE PICK for each character you care about.
+5. **Variant batches 1-2:** DEBUG > VARIANT LAB.
+   - SHIELDS tab: poke A-E, then SAVE PICK for each character you care about.
+   - DRAGON FIST tab: A comet, B three twisting comets, C punch wave, D both. Poke to fire one, then SAVE PICK.
    PC renders are in `unity_game/Logs/preview_shield_*.png`.
 6. HUD: is it readable, in a good spot, too big or too small?
 7. **When the second Quest arrives:** install the same build on both (`build_and_run.ps1 -NoBuild` with each plugged
@@ -129,7 +131,7 @@ All of these say CC0 on their pages. I'll check each licence file when downloadi
 | Character | Name | L1 | L2 | L3 | Shield | Visuals | Checked by you |
 |---|---|---|---|---|---|---|---|
 | Technoman | | ✅ laser | ✅ +repulsor | ✅ AOE repulsor | ✅ hex | no gauntlets / tight aura yet | |
-| Ki fighter | | ✅ comet (yellow) | ✅ energy ball | ✅ dragon fist (placeholder look) | flame (needs work) | aura 2 at L2, blue at L3 | |
+| Ki fighter | | ✅ comet (yellow) | ✅ energy ball | ✅ dragon fist (4 looks in Variant Lab) | flame (needs work) | aura 2 at L2, blue at L3 | |
 | Mage | | ✅ fireball | force: needs room objects | ✅ fire pillar (placeholder look) | thin | rune aura L2-3 | |
 | Saber | | ✅ finger-gun blaster + aim line | ✅ laser sword | force: needs room objects | glass | light aura | |
 | Archer | | ✅ crossbow (reloads) | ✅ bow + aim line | ✅ smoke bomb (blinds enemies), piercing arrows | (knight shield: needs model) | wings: needs model | |

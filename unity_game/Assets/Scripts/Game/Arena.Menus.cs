@@ -180,6 +180,8 @@ namespace Repulsor
 
         void ShowPause()
         {
+            if (paused && (mode == GameMode.PveSolo || phase == Phase.Sandbox))
+                Time.timeScale = 0f;
             RectTransform s = OpenScreen(new Vector2(480f, 330f), "PAUSED");
             bool sandbox = phase == Phase.Sandbox;
             Ui.Button(s, "RESUME", new Vector2(-115f, 95f), new Vector2(210f, 44f), Resume, 18);
