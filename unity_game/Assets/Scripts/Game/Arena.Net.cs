@@ -215,6 +215,7 @@ namespace Repulsor
                 Vector3 aim = frame.DirectionToWorld(direction);
                 float range = game.Room.TryDistance(from, aim, out float wall) ? wall : 12f;
                 EnemyBolt.Launch(from, aim, range, this, head, foes);
+                game.PlayAt(from, enemyShotSound);
             };
             net.EndReceived += won =>
             {

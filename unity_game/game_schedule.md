@@ -27,6 +27,12 @@ The pivot checkpoint is the evening of **11/11**: anything behind schedule gets 
 | 11/15 Sun | balance, 72 FPS performance pass, bugs, follow-up variant rounds | playtest |
 | 11/16 Mon | feature freeze, clean public repo (no suit models in history), writeup notes, video shot list | final check |
 
+## Live tuning (no rebuild)
+
+If a gesture misfires or menus are hard to reach, tell me what happens. I push a small file to the headset and it
+takes effect within 2 seconds. For example, `MenuLayout.Distance = 0.38` or `HandPose.ThumbOutAbove = 0.5`. All
+current values are written to `files/tuning_current.txt` on the headset when the game starts.
+
 ## Names (pick one per character, or write your own)
 
 The first option is used as the placeholder for now.

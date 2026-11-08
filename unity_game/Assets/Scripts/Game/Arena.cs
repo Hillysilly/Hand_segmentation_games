@@ -319,9 +319,10 @@ namespace Repulsor
             // Somewhere ahead-ish, 2.5-4 m away, kept on this side of walls and furniture.
             Vector3 forward = Vector3.ProjectOnPlane(head.forward, Vector3.up).normalized;
             Vector3 direction = Quaternion.AngleAxis(Random.Range(-70f, 70f), Vector3.up) * forward;
+            // Out of the wall in that direction if there's one within reach, so they seem to step out of your room.
             float distance = Random.Range(2.5f, 4f);
-            if (game.Room.TryDistance(head.position, direction, out float wall))
-                distance = Mathf.Clamp(wall - 0.5f, 1.2f, distance);
+            if (game.Room.TryDistance(head.position, direction, out float wall) && wall < 6f)
+                distance = Mathf.Clamp(wall - 0.5f, 1.5f, 5f);
             Vector3 point = head.position + direction * distance;
             point.y = kind == EnemyKind.Robot ? 0.65f : head.position.y + 0.2f;
             Enemy enemy = Enemy.Spawn(kind, point, this, head, foes, ++nextEnemyId);

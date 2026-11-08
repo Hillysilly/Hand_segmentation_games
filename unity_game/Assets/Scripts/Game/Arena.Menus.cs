@@ -7,8 +7,6 @@ namespace Repulsor
     public sealed partial class Arena
     {
         public const string GameTitle = "POWER UP";
-        const float MenuDistance = 0.42f;
-        const float MenuDrop = 0.2f;
         const float ReplaceAfterTurn = 50f;
 
         static readonly string[] Swatches =
@@ -44,7 +42,7 @@ namespace Repulsor
             if (forward.sqrMagnitude < 1e-4f)
                 forward = Vector3.forward;
             forward.Normalize();
-            menu.position = head.position + forward * MenuDistance + Vector3.down * MenuDrop;
+            menu.position = head.position + forward * MenuLayout.Distance + Vector3.down * MenuLayout.Drop;
             menu.rotation = Quaternion.LookRotation(menu.position - head.position, Vector3.up);
             menuPlaced = head.localPosition != Vector3.zero;
         }

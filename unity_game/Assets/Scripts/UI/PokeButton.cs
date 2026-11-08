@@ -13,7 +13,6 @@ namespace Repulsor
     public sealed class PokeButton : MonoBehaviour
     {
         public const float Travel = 14f;         // mm the key can sink
-        public const float ClickDepth = 9f;
         public const float HoverRange = 60f;     // mm in front where the ring starts to show
         public const float EdgeMargin = 6f;
         const float SpringSpeed = 140f;          // mm per second back up
@@ -107,7 +106,7 @@ namespace Repulsor
             {
                 armed = true;
             }
-            else if (armed && interactable && depth >= ClickDepth)
+            else if (armed && interactable && depth >= MenuLayout.ClickDepth)
             {
                 armed = false;
                 clicked = true;
