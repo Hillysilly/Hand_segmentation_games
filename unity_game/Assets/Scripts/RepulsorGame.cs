@@ -122,6 +122,7 @@ namespace Repulsor
             if (room.TryDistance(position, direction.normalized, out float wall))
                 blast.WallDistance = wall;
             PlayAt(position, size > 1.5f ? boom : zap);
+            BlastFired?.Invoke(position, direction, size, speed, color);
         }
 
         /// <summary>Damages everything within the radius, with an explosion.</summary>
@@ -153,6 +154,9 @@ namespace Repulsor
         public AudioClip BoomSound => boom;
         public AudioClip WhooshSound => whoosh;
         public AudioClip ZapSound => zap;
+
+        /// <summary>A comet-style shot left: origin, direction, size, speed, colour. For the other headset to draw.</summary>
+        public event System.Action<Vector3, Vector3, float, float, Color> BlastFired;
 
         /// <summary>A hit landed: what was hit and the HP it lost.</summary>
         public event System.Action<IHittable, float> Dealt;
@@ -396,6 +400,7 @@ namespace Repulsor
             if (room.TryDistance(position, direction.normalized, out float wall))
                 blast.WallDistance = wall;
             PlayAt(position, zap);
+            BlastFired?.Invoke(position, direction, 1f, 1f, WeaponColor);
             shots++;
             Debug.Log($"[Repulsor] Fired shot {shots}, charge {charge:0.00}");
         }

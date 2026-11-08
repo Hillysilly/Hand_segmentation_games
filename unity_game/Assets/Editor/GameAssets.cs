@@ -24,6 +24,7 @@ public static class GameAssets
         SaveMesh("QuadMesh", PrimitiveType.Quad);
         SaveMesh("CubeMesh", PrimitiveType.Cube);
         EnableBoundingBoxes();
+        PlayerSettings.Android.forceInternetPermission = true;   // LAN multiplayer
         Save("EnemyPlaceholder", "Repulsor/Orb", m => m.SetColor("_BaseColor", new Color(0.85f, 0.2f, 0.15f)));
         Save("EnemyBolt", "Repulsor/Orb", m => m.SetColor("_BaseColor", new Color(1f, 0.25f, 0.2f)));
         Save("AimLine", "Universal Render Pipeline/Unlit", m => m.SetColor("_BaseColor", new Color(0.35f, 0.75f, 1f)));
@@ -41,7 +42,8 @@ public static class GameAssets
         Mesh mesh = Object.Instantiate(primitive.GetComponent<MeshFilter>().sharedMesh);
         Object.DestroyImmediate(primitive);
         string path = $"{Folder}/{name}.asset";
-        AssetDatabase.DeleteAsset(path);
+        if (AssetDatabase.LoadAssetAtPath<Mesh>(path) != null)
+            return;   // Keep the existing asset and its GUID.
         AssetDatabase.CreateAsset(mesh, path);
     }
 

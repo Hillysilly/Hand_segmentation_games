@@ -78,6 +78,8 @@ namespace Repulsor
 
         void ShowTitle()
         {
+            if (Multiplayer)
+                LeaveRoom();
             phase = Phase.Title;
             hud.Visible = false;
             RectTransform s = OpenScreen(new Vector2(360f, 230f), null);
@@ -97,11 +99,10 @@ namespace Repulsor
                 mode = GameMode.PveSolo;
                 ShowCharacters();
             }, 20);
-            PokeButton coop = Ui.Button(s, "CO-OP  (2 players)", new Vector2(0f, 30f), new Vector2(300f, 48f), null, 20);
-            coop.Interactable = false;
+            Ui.Button(s, "CO-OP  (2 players)", new Vector2(0f, 30f), new Vector2(300f, 48f), ShowCoop, 20);
             PokeButton pvp = Ui.Button(s, "PVP  (2 players)", new Vector2(0f, -25f), new Vector2(300f, 48f), null, 20);
             pvp.Interactable = false;
-            Ui.Label(s, "Two-player modes need the second headset: coming soon", new Vector2(0f, -62f),
+            Ui.Label(s, "Co-op is an early test: enemies only on the host. PVP comes after co-op.", new Vector2(0f, -62f),
                 new Vector2(360f, 20f), 12).color = Ui.Muted;
             Ui.Button(s, "DEBUG", new Vector2(-80f, -115f), new Vector2(140f, 40f), () => ShowDebug(ShowModes), 16);
             Ui.Button(s, "BACK", new Vector2(80f, -115f), new Vector2(140f, 40f), ShowTitle, 16);
@@ -156,8 +157,26 @@ namespace Repulsor
             }
             Ui.Label(s, "COLOUR", new Vector2(-75f, -108f), new Vector2(100f, 20f), 13, TextAnchor.MiddleRight).color = Ui.Muted;
 
-            Ui.Button(s, "BACK", new Vector2(-215f, -160f), new Vector2(110f, 34f), ShowModes, 14);
-            Ui.Button(s, "READY", new Vector2(215f, -152f), new Vector2(130f, 44f), StartMatch, 22);
+            Ui.Button(s, "BACK", new Vector2(-215f, -160f), new Vector2(110f, 34f), Multiplayer ? ShowLobby : (System.Action)ShowModes, 14);
+            if (!Multiplayer)
+            {
+                Ui.Button(s, "READY", new Vector2(215f, -152f), new Vector2(130f, 44f), StartMatch, 22);
+                return;
+            }
+            PokeButton ready = Ui.Button(s, localReady ? "WAITING" : "READY", new Vector2(215f, -152f), new Vector2(130f, 44f), () =>
+            {
+                localReady = !localReady;
+                SendLobby();
+                TryStartTogether();
+                if (phase == Phase.Characters)
+                    ShowCharacters();
+            }, 20);
+            ready.Selected = localReady;
+            string partner = !net.Connected ? "Player 2: not connected"
+                : $"Player 2: {CharacterDef.Get((CharacterId)Mathf.Clamp(remoteLobby.Character, 0, CharacterDef.All.Length - 1)).Name}"
+                  + (remoteReady ? "  <color=#80FF80>READY</color>" : "  choosing...");
+            Ui.Label(s, partner + (frame.Calibrated ? "" : "   (not lined up)"), new Vector2(60f, -150f), new Vector2(200f, 40f), 12,
+                TextAnchor.MiddleLeft);
         }
 
         void ShowPause()
@@ -252,7 +271,18 @@ namespace Repulsor
                 + $"Enemies destroyed  {waves.Kills}\n"
                 + $"Damage dealt  {player.DamageDealt:0}     taken  {player.DamageTaken:0}\n"
                 + $"Time  {minutes}:{matchTime - minutes * 60f:00}", new Vector2(0f, 20f), new Vector2(360f, 90f), 15);
-            Ui.Button(s, "PLAY AGAIN", new Vector2(0f, -60f), new Vector2(200f, 46f), StartMatch, 18);
+            Ui.Button(s, "PLAY AGAIN", new Vector2(0f, -60f), new Vector2(200f, 46f), () =>
+            {
+                if (Multiplayer)
+                {
+                    localReady = false;
+                    ShowCharacters();
+                }
+                else
+                {
+                    StartMatch();
+                }
+            }, 18);
             Ui.Button(s, "CHARACTERS", new Vector2(-95f, -112f), new Vector2(170f, 38f), ShowCharacters, 14);
             Ui.Button(s, "TITLE", new Vector2(95f, -112f), new Vector2(170f, 38f), ShowTitle, 14);
         }

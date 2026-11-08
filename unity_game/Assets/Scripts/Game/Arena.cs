@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Repulsor
 {
-    public enum Phase { Title, Modes, Characters, Playing, Results, Sandbox }
+    public enum Phase { Title, Modes, Lobby, Characters, Playing, Results, Sandbox }
 
     /// <summary>
     /// The real game, on top of the old test game's weapons: menus, the match (waves, HP, meter, levels,
@@ -67,6 +67,7 @@ namespace Repulsor
             CreateMenu();
             CreateGestureLab();
             CreateAbilityViews();
+            CreateNet();
 
             player = new Fighter(settings.Lives, settings.RespawnSeconds);
             player.Died += OnDied;
@@ -87,6 +88,7 @@ namespace Repulsor
             body = Stance.From(head.position, head.forward, game.Origin.transform.position.y);
 
             TickMenu(dt);
+            TickNet(dt);
 
             if (pauseGesture.Step(input.Left, input.Right, dt) && (phase == Phase.Playing || phase == Phase.Sandbox))
             {
@@ -108,6 +110,14 @@ namespace Repulsor
             UpdateArms();
         }
 
+        void OnDestroy() => net?.Close();
+
+        void OnApplicationPause(bool paused)
+        {
+            if (paused)
+                Log("App paused");
+        }
+
         void LateUpdate()
         {
             // Your own aura stays around you.
@@ -127,7 +137,8 @@ namespace Repulsor
                 player.TryTransform();
 
             waves.Tick(dt);
-            if (settings.EnemiesEnabled)
+            // In co-op only the host runs enemies, until enemy sync is built.
+            if (settings.EnemiesEnabled && !(Multiplayer && net.Role == NetRole.Client))
             {
                 while (waves.TakeSpawn())
                     SpawnEnemy();
