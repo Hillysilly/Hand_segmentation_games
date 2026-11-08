@@ -10,7 +10,9 @@ namespace Repulsor
         const float ReplaceAfterTurn = 50f;
         const float LostMenuDegrees = 75f;
         const float LostMenuSeconds = 1.5f;
+        const float OutOfReachSeconds = 0.5f;
         float menuAwayFor;
+        float menuOutOfReachFor;
 
         static readonly string[] Swatches =
         {
@@ -39,9 +41,12 @@ namespace Repulsor
             Vector3 toMenu = Vector3.ProjectOnPlane(menu.position - head.position, Vector3.up);
             Vector3 facing = Vector3.ProjectOnPlane(head.forward, Vector3.up);
             menuAwayFor = Vector3.Angle(toMenu, facing) > LostMenuDegrees ? menuAwayFor + dt : 0f;
-            if (menuAwayFor > LostMenuSeconds)
+            // Too far to reach (you walked off, or the headset re-found its position after the menu was placed).
+            menuOutOfReachFor = MenuOutOfReach(0.35f) ? menuOutOfReachFor + dt : 0f;
+            if (menuAwayFor > LostMenuSeconds || menuOutOfReachFor > OutOfReachSeconds)
             {
                 menuAwayFor = 0f;
+                menuOutOfReachFor = 0f;
                 PlaceMenu();
             }
             if (PokeInput.Tick(input.Left, input.Right, dt, out Vector3 clickedAt))
@@ -58,6 +63,18 @@ namespace Repulsor
             menu.position = head.position + forward * MenuLayout.Distance + Vector3.down * MenuLayout.Drop;
             menu.rotation = Quaternion.LookRotation(menu.position - head.position, Vector3.up);
             menuPlaced = head.localPosition != Vector3.zero;
+            Debug.Log($"[Menu] Placed {MenuLayout.Distance:0.00} m ahead, head at {head.position}");
+        }
+
+        /// <summary>
+        /// True when the menu is further away than where it's normally placed by more than <paramref name="slack"/>
+        /// metres, sideways or in height. Being closer never counts: you lean in to poke.
+        /// </summary>
+        bool MenuOutOfReach(float slack)
+        {
+            Vector3 offset = menu.position - head.position;
+            float across = Vector3.ProjectOnPlane(offset, Vector3.up).magnitude;
+            return across > MenuLayout.Distance + slack || Mathf.Abs(offset.y + MenuLayout.Drop) > slack + 0.1f;
         }
 
         RectTransform OpenScreen(Vector2 size, string title)
@@ -66,7 +83,7 @@ namespace Repulsor
             // Re-place if you've turned away since the last screen.
             Vector3 toMenu = Vector3.ProjectOnPlane(menu.position - head.position, Vector3.up);
             Vector3 facing = Vector3.ProjectOnPlane(head.forward, Vector3.up);
-            if (!menuPlaced || Vector3.Angle(toMenu, facing) > ReplaceAfterTurn)
+            if (!menuPlaced || Vector3.Angle(toMenu, facing) > ReplaceAfterTurn || MenuOutOfReach(0.15f))
                 PlaceMenu();
 
             Ui.Clear(menu);
