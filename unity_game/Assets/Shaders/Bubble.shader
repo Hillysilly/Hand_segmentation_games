@@ -174,7 +174,8 @@ Shader "Repulsor/Bubble"
                 float radius = length(UNITY_MATRIX_M._m00_m10_m20) * 0.5;
                 if (distance(GetCameraPositionWS(), centre) < radius && style != 5 && style != 6)
                     glow *= 0.35 + 0.65 * _Hit;
-                float shown = _Alpha * Visibility(input.positionWS);
+                // The quick depth test: bubbles can cover the whole view, so the 4-sample one costs too much.
+                float shown = _Alpha * VisibilityQuick(input.positionWS);
                 return float4(color * glow * shown, saturate(glow) * shown * 0.85);
             }
             ENDHLSL

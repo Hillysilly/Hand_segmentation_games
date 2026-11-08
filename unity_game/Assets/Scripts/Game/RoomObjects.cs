@@ -36,6 +36,21 @@ namespace Repulsor
                 boxes.Add(box);
         }
 
+        /// <summary>True if a point on the floor plan is inside a furniture box, grown by a margin.</summary>
+        public bool Blocks(Vector3 point, float margin)
+        {
+            foreach (ARBoundingBox box in boxes)
+            {
+                if (box == null)
+                    continue;
+                Vector3 local = box.transform.InverseTransformPoint(point);
+                Vector3 half = box.size * 0.5f;
+                if (Mathf.Abs(local.x) < half.x + margin && Mathf.Abs(local.z) < half.z + margin)
+                    return true;
+            }
+            return false;
+        }
+
         /// <summary>The nearest box a ray points at, within reach and not recently thrown.</summary>
         public bool TryAim(Vector3 origin, Vector3 direction, out ARBoundingBox hit)
         {

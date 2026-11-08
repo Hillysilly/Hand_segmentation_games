@@ -147,7 +147,7 @@ namespace Repulsor
             if (Kind == EnemyKind.Robot)
             {
                 if (distance > RobotRange)
-                    transform.position += direction * (RobotSpeed * dt);
+                    transform.position += arena.Steer(transform.position, direction, RobotSpeed * dt);
                 transform.position = new Vector3(transform.position.x, 0.65f + Mathf.Abs(Mathf.Sin(age * 6f)) * 0.03f, transform.position.z);
             }
             else

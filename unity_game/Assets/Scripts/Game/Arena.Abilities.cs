@@ -322,6 +322,26 @@ namespace Repulsor
             held = null;
         }
 
+        /// <summary>
+        /// A robot's step toward its target, slid round Space Setup furniture: straight if clear, otherwise the
+        /// nearest clear direction up to 90 degrees off, otherwise no move.
+        /// </summary>
+        public Vector3 Steer(Vector3 from, Vector3 direction, float step)
+        {
+            const float margin = 0.3f;
+            // Already inside a box (spawned there, or the box is wrong): walk out rather than freeze.
+            if (room.Blocks(from, 0f))
+                return direction * step;
+            for (int i = 0; i <= 12; i++)
+            {
+                float angle = (i + 1) / 2 * 15f * (i % 2 == 0 ? 1f : -1f);
+                Vector3 tryDirection = Quaternion.AngleAxis(angle, Vector3.up) * direction;
+                if (!room.Blocks(from + tryDirection * (step + margin), margin * 0.5f))
+                    return tryDirection * step;
+            }
+            return Vector3.zero;
+        }
+
         /// <summary>A thrown object's path touches an enemy.</summary>
         public bool ThrownHits(Vector3 from, Vector3 to, float radius)
         {
