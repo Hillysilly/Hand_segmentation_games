@@ -90,6 +90,8 @@ namespace Repulsor
         /// <summary>Multiplies damage, for the 1.5x powerup.</summary>
         public float DamageScale { get; set; } = 1f;
         public float LaserDps { get; set; } = Damage.LaserPerSecond;
+        /// <summary>The palm laser pours fire instead (the Mage's level 2 flamethrower).</summary>
+        public bool FlameLaser { get; set; }
         public float RepulsorDamage { get; set; } = Damage.Repulsor;
         /// <summary>Repulsor shots explode over this radius where they land (Technoman level 3). 0 for none.</summary>
         public float RepulsorAoe { get; set; }

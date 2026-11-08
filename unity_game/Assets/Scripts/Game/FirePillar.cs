@@ -13,6 +13,8 @@ namespace Repulsor
     public sealed class FirePillar : MonoBehaviour
     {
         public static readonly string[] StyleNames = { "A  INFERNO", "B  ENERGY", "C  BOTH" };
+        /// <summary>The one in the game: the inferno with rising rings.</summary>
+        public const int Default = 2;
         const float Height = 3f;
         const float Width = 0.9f;
         const float RiseSeconds = 0.25f;

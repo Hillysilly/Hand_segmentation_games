@@ -32,6 +32,10 @@ namespace Repulsor
         }
 
         public static void Remove(IHittable hittable) => All.Remove(hittable);
+
+        /// <summary>Still there and alive: false for one whose object has been destroyed (say, a cleared wave).</summary>
+        public static bool IsLive(IHittable hittable) =>
+            hittable != null && !(hittable is UnityEngine.Object gone && gone == null) && hittable.Alive;
     }
 }
 

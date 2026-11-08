@@ -90,7 +90,7 @@ says how much furniture the game found, which the force powers need.
 4. **Ki fighter (Ryuu):** fist and snap open for yellow comets. Use FILL METER and the pose to reach level 2:
    hold your hands together to charge a ball, then push both forward. Level 3: punch fast for a dragon fist.
    Then try the others the same way (FILL METER, power-up pose); the countdown and each level-up show what's new:
-   - Mage: triangle, then fists for the fire pillar.
+   - Mage: level 2, hold a palm out for the flamethrower; level 3, triangle, then fists for the fire pillar.
    - Saber: finger gun, then a fist for the sword.
    - Archer: fists together, then pull one back for the bow.
    - Spider: index and little finger out to shoot webs.
@@ -98,8 +98,10 @@ says how much furniture the game found, which the force powers need.
    - HUD: A low right, B low centre, C top centre. Saved as soon as you poke one.
    - SHIELDS: poke A-E, then SAVE PICK for each character you care about.
    - DRAGON FIST: A comet, B three twisting comets, C punch wave, D both. Poke to fire one, then SAVE PICK.
-   - ENERGY BALL: A crackle, B glowing shell, C fiery shell. PC render: `unity_game/Logs/preview_energy_balls.png`.
-   - FIRE PILLAR: A flame column, B energy column, C both with a floor ring. PC render: `unity_game/Logs/preview_fire_pillars.png`.
+   - ENERGY BALL: A crackle, B plasma, C fireball, D star (the default, your pick). PC render: `unity_game/Logs/preview_energy_balls.png`.
+   - FIRE PILLAR: settled on C BOTH (11/8), no longer in the lab.
+   - ENEMIES: robot A George, B Leela, C Mike, D Stan (default), E Classic, F Shell, G the old pill; drone A eye drone
+     (default), B the old disc. All have glowing red eyes. PC render: `unity_game/Logs/preview_enemies.png`.
    - COMET (Ki fighter's blast): A comet, B streak, C orb. PC render: `unity_game/Logs/preview_comets.png`.
    PC renders are in `unity_game/Logs/preview_shield_*.png`.
 6. HUD: is it readable, in a good spot, too big or too small?
@@ -108,20 +110,19 @@ says how much furniture the game found, which the force powers need.
    table corner with the right index finger and hold still, then a second point. The coloured dots should sit on the
    other person's head and hands. Then both pick characters and READY.
 
-## Model candidates for enemies (pick one per enemy)
+## Enemy models (in the game since 11/8, pick in VARIANT LAB > ENEMIES)
 
-All of these say CC0 on their pages. I'll check each licence file when downloading.
+All CC0 from OpenGameArt; licence files are next to the models in `Assets/Enemies/`.
 
-| # | Model | For | Link |
-|---|---|---|---|
-| R1 | Quaternius Animated LowPoly Robot (14 animations, including walk and shoot) | robot | [itch.io](https://quaternius.itch.io/lowpoly-robot), [OpenGameArt](https://opengameart.org/content/animated-lowpoly-robot) |
-| R2 | Quaternius Animated Mech Pack | robot | OpenGameArt, CC0 |
-| R3 | Quaternius Sci-Fi Essentials Kit robot enemies | robot or drone | [quaternius.com](https://quaternius.com/packs/scifiessentialskit.html) |
-| D1 | Quaternius Ultimate Space Kit enemies (check for a flyer) | drone | [quaternius.com](https://quaternius.com/packs/ultimatespacekit.html) |
+| Pick | Model | Source |
+|---|---|---|
+| Robots A-D | Quaternius Animated Mech Pack: George, Leela, Mike, Stan (walk, idle, shoot) | [OpenGameArt](https://opengameart.org/content/animated-mech-pack) |
+| Robot E | Quaternius Animated Robot (walk, idle, punch) | [OpenGameArt](https://opengameart.org/content/animated-lowpoly-robot) |
+| Robot F, drone A | Quaternius Sci-Fi Essentials Kit: QuadShell, EyeDrone | [OpenGameArt](https://opengameart.org/content/sci-fi-essentials-kit) |
 
 ## Known gaps
 
-- **Assets still needed:** the enemy models, the gauntlets, the Archer's wings and the knight shield.
+- **Assets still needed:** the gauntlets, the Archer's wings and the knight shield.
 - **Other player's aura:** in multiplayer it's a body-shaped shell, not the real aura.
 - **Effect sounds** are synthesized. The Kenney CC0 pack needs a browser download.
 
@@ -174,8 +175,8 @@ Sketchfab needs a login to download. If you grab G1 as glTF into `assets/models/
 
 | Feature | Done | Good enough | Checked by you | Pick |
 |---|---|---|---|---|
-| Robot enemy (walk, bad-aim lasers) | ✅ | | | slow dodgeable bolts; steers round furniture; placeholder body until you pick a model |
-| Drone enemy | ✅ | | | weaves at head height, smaller; placeholder body |
+| Robot enemy (walk, bad-aim lasers) | ✅ | | | slow dodgeable bolts; steers round furniture; CC0 mech models with red eyes, walk and shoot animations |
+| Drone enemy | ✅ | | | weaves at head height, smaller; CC0 eye drone with a red eye |
 | Spawn bubble + waves (5) | ✅ | | | spawn out of the nearest wall; purple bubble; score and best score per character |
 | Powerups (charge, invincibility, 1.5x damage) | ✅ | | | touch to take; your attacks turn red or gold, and others see a glow |
 | Walls block attacks | ✅ | | | laser, blasts, shockwave and enemy bolts stop at live-depth surfaces |
@@ -187,7 +188,7 @@ Sketchfab needs a login to download. If you grab G1 as glTF into `assets/models/
 |---|---|---|---|---|---|---|---|
 | Technoman | | ✅ laser | ✅ +repulsor | ✅ AOE repulsor | ✅ hex | L3 glow: your hands glow, others see a body glow; no gauntlets yet | |
 | Ki fighter | | ✅ comet (yellow) | ✅ energy ball | ✅ dragon fist (4 looks in Variant Lab) | flame | aura 2 at L2, blue at L3 | |
-| Mage | | ✅ fireball | force: needs room objects | ✅ fire pillar (3 looks in Variant Lab) | thin | rune aura L2-3 | |
+| Mage | | ✅ fireball | ✅ flamethrower (palm out and hold) | ✅ fire pillar (inferno with rings) | thin | rune aura L2-3 | |
 | Saber | | ✅ finger-gun blaster + aim line | ✅ laser sword | force: needs room objects | glass | light aura | |
 | Archer | | ✅ crossbow (reloads) | ✅ bow + aim line | ✅ smoke bomb (blinds enemies), piercing arrows | flat glass shield (knight shield needs a model) | wings: needs model; white ring shockwave | |
 | Spider | | ✅ web shots with strands, spider sense | ✅ web pull (furniture) | ✅ dark webs, more damage | web cocoon | no gloves yet | |

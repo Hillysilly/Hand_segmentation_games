@@ -107,6 +107,7 @@ namespace Repulsor
         {
             StopPractice();
             HideLabBubble();
+            HideLabEnemies();
             Ui.Clear(menu);
             menu.gameObject.SetActive(false);
         }

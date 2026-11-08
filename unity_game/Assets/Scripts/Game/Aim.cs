@@ -27,27 +27,41 @@ namespace Repulsor
             return arm.normalized;
         }
 
+        /// <summary>The dragon fist locks on this far off the punch, and then homes in.</summary>
+        public static float LockDegrees = 40f;
+        /// <summary>How fast a locked-on dragon fist turns toward its target, in degrees per second.</summary>
+        public static float HomingDegrees = 360f;
+
         /// <summary>Bends a shot onto the enemy closest to its line, if one is within <see cref="AssistDegrees"/>.</summary>
         public static Vector3 Assist(Vector3 from, Vector3 direction)
         {
-            if (AssistDegrees <= 0f)
-                return direction;
-            float best = AssistDegrees;
-            Vector3 result = direction;
+            IHittable target = Target(from, direction, AssistDegrees, AssistRange);
+            return target != null ? (target.Center - from).normalized : direction;
+        }
+
+        /// <summary>
+        /// The enemy closest to a shot's line, if one is within <paramref name="degrees"/> of it (measured to its edge,
+        /// so bigger and nearer ones are easier to catch) and <paramref name="range"/> away. Null if none.
+        /// </summary>
+        public static IHittable Target(Vector3 from, Vector3 direction, float degrees, float range)
+        {
+            if (degrees <= 0f)
+                return null;
+            float best = degrees;
+            IHittable result = null;
             foreach (IHittable target in Hittables.All)
             {
                 if (!target.Alive || target.Team != Team.Enemies)
                     continue;
                 Vector3 to = target.Center - from;
                 float distance = to.magnitude;
-                if (distance < 0.3f || distance > AssistRange)
+                if (distance < 0.3f || distance > range)
                     continue;
-                // Bigger and nearer enemies are easier to catch: the angle is measured to their edge.
                 float angle = Vector3.Angle(direction, to) - Mathf.Atan2(target.Radius, distance) * Mathf.Rad2Deg;
                 if (angle < best)
                 {
                     best = angle;
-                    result = to / distance;
+                    result = target;
                 }
             }
             return result;

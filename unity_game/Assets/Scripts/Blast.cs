@@ -34,6 +34,8 @@ namespace Repulsor
         public float Damage { get => damage; set => damage = value; }
         /// <summary>Flies through enemies, hitting each once, instead of stopping at the first.</summary>
         public bool Pierce { get; set; }
+        /// <summary>An enemy this shot steers toward while it lives (the dragon fist's lock-on).</summary>
+        public IHittable Homing { get; set; }
         readonly System.Collections.Generic.HashSet<IHittable> pierced = new System.Collections.Generic.HashSet<IHittable>();
 
         RepulsorGame game;
@@ -71,6 +73,17 @@ namespace Repulsor
         void Update()
         {
             age += Time.deltaTime;
+            bool homing = Hittables.IsLive(Homing);
+            if (homing)
+            {
+                Vector3 toTarget = Homing.Center - transform.position;
+                if (toTarget.sqrMagnitude > 1e-4f)
+                {
+                    velocity = Vector3.RotateTowards(velocity, toTarget.normalized * velocity.magnitude,
+                        Aim.HomingDegrees * Mathf.Deg2Rad * Time.deltaTime, 0f);
+                    transform.rotation = Quaternion.LookRotation(-velocity);
+                }
+            }
             Vector3 from = transform.position;
             Vector3 to = from + velocity * Time.deltaTime;
             transform.position = to;
@@ -88,9 +101,11 @@ namespace Repulsor
             {
                 hit = game.TryHit(from, to, radius, damage);
             }
-            if (hit || age > LifeSeconds || flown >= wallAt)
+            // The wall was measured along the first heading, so a shot that has turned toward its target ignores it.
+            bool wall = flown >= wallAt && !homing;
+            if (hit || age > LifeSeconds || wall)
             {
-                if (Aoe > 0f && (hit || flown >= wallAt))
+                if (Aoe > 0f && (hit || wall))
                     game.Explode(to, Aoe, damage * 0.6f, Color);
                 Destroy(gameObject);
             }

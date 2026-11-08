@@ -7,7 +7,8 @@ namespace Repulsor
     /// <summary>
     /// A PVE enemy. Robots walk on the floor toward the player, stop at shooting range and fire slow bolts with
     /// poor aim. Drones fly at head height, weave sideways and fire less often; they're smaller and harder to hit.
-    /// Both appear inside a spawn bubble. The look is a placeholder until a licensed model is picked.
+    /// Both appear inside a spawn bubble. Their bodies are CC0 models picked in the Variant Lab (<see cref="EnemyLook"/>),
+    /// or the old placeholder shapes.
     /// </summary>
     public sealed class Enemy : MonoBehaviour, IHittable
     {
@@ -30,6 +31,8 @@ namespace Repulsor
         Transform head;
         Bubble spawnBubble;
         Renderer body;
+        EnemyLook look;
+        bool walking;
         MaterialPropertyBlock properties;
         Color color;
         float age;
@@ -100,7 +103,18 @@ namespace Repulsor
             enemy.spawnBubble = Bubble.Create("Spawn Bubble", parent);
             enemy.lastPosition = position;
             enemy.floorY = position.y - (kind == EnemyKind.Robot ? 0.65f : 0f);
-            enemy.Shape();
+            enemy.look = EnemyLook.Create(EnemyLook.KeyFor(kind, EnemyLook.Picked(kind)), go.transform);
+            if (enemy.look != null)
+            {
+                // The root sits at the robot's middle; the model stands on its feet.
+                enemy.look.transform.localPosition = kind == EnemyKind.Robot ? Vector3.down * 0.65f : Vector3.zero;
+                enemy.body.enabled = false;
+                enemy.look.gameObject.SetActive(false);
+            }
+            else
+            {
+                enemy.Shape();
+            }
             return enemy;
         }
 
@@ -130,8 +144,15 @@ namespace Repulsor
             age += dt;
             TickSpawnBubble();
             flash = Mathf.Max(0f, flash - dt);
-            properties.SetColor(BaseColor, flash > 0f ? Color.white : color);
-            body.SetPropertyBlock(properties);
+            if (look != null)
+            {
+                look.Tick(dt, walking, flash);
+            }
+            else
+            {
+                properties.SetColor(BaseColor, flash > 0f ? Color.white : color);
+                body.SetPropertyBlock(properties);
+            }
             if (!Alive)
                 return;
             // Diagnostic: enemies only ever move a few centimetres a frame, so a big step is worth a log line.
@@ -166,9 +187,12 @@ namespace Repulsor
 
             if (Kind == EnemyKind.Robot)
             {
-                if (distance > RobotRange)
+                walking = distance > RobotRange;
+                if (walking)
                     transform.position += arena.Steer(transform.position, direction, RobotSpeed * dt);
-                transform.position = new Vector3(transform.position.x, floorY + 0.65f + Mathf.Abs(Mathf.Sin(age * 3f)) * 0.03f, transform.position.z);
+                // The placeholder bobs; a model walks.
+                float bob = look == null ? Mathf.Abs(Mathf.Sin(age * 3f)) * 0.03f : 0f;
+                transform.position = new Vector3(transform.position.x, floorY + 0.65f + bob, transform.position.z);
             }
             else
             {
@@ -198,6 +222,8 @@ namespace Repulsor
             float error = Kind == EnemyKind.Robot ? RobotAimError : DroneAimError;
             aim = Quaternion.Euler(Random.Range(-error, error), Random.Range(-error, error), 0f) * aim;
             arena.FireEnemyBolt(muzzle, aim, this);
+            if (look != null)
+                look.Shoot();
         }
 
         void TickSpawnBubble()
@@ -207,6 +233,9 @@ namespace Repulsor
             float t = age / SpawnSeconds;
             if (t >= 1.2f)
             {
+                if (look != null)
+                    look.gameObject.SetActive(true);
+                body.enabled = look == null;
                 Destroy(spawnBubble.gameObject);
                 return;
             }
@@ -215,7 +244,10 @@ namespace Repulsor
             spawnBubble.transform.position = transform.position;
             spawnBubble.transform.localScale = Vector3.one * (size * Mathf.Clamp01(t * 2.5f) * (1f + Mathf.Max(0f, t - 1f) * 2f));
             spawnBubble.Show(new Color(0.8f, 0.3f, 1f), BubbleStyle.Energy, t < 1f ? 0.9f : Mathf.Clamp01((1.2f - t) * 5f));
-            body.enabled = t > 0.4f;
+            if (look != null)
+                look.gameObject.SetActive(t > 0.4f);
+            else
+                body.enabled = t > 0.4f;
         }
 
         void OnDestroy()

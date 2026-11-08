@@ -31,6 +31,38 @@ namespace Repulsor.Tests
         public void TearDown() => Hittables.All.Clear();
 
         [Test]
+        public void DragonFistLocksOnFurtherOffThanAssist()
+        {
+            Vector3 from = new Vector3(0f, 1.3f, 0f);
+            // About 30 degrees off: too far for shot assist, inside the dragon fist's lock-on.
+            Vector3 punch = Quaternion.Euler(0f, -30f, 0f) * (dummy.Center - from).normalized;
+            Assert.That(Aim.Target(from, punch, Aim.AssistDegrees, Aim.AssistRange), Is.Null);
+            Assert.That(Aim.Target(from, punch, Aim.LockDegrees, Aim.AssistRange), Is.SameAs(dummy));
+        }
+
+        [Test]
+        public void LockOnPicksTheEnemyNearestTheLine()
+        {
+            var other = new Dummy { Center = new Vector3(-1.5f, 1.4f, 4f) };
+            Hittables.Add(other);
+            Vector3 from = new Vector3(0f, 1.3f, 0f);
+            Vector3 punch = (other.Center - from).normalized;
+            Assert.That(Aim.Target(from, punch, Aim.LockDegrees, Aim.AssistRange), Is.SameAs(other));
+        }
+
+        [Test]
+        public void FlamesBurnOnlyInsideTheirShortCone()
+        {
+            Vector3 from = new Vector3(0f, 1.4f, 0f);
+            Vector3 toward = (dummy.Center - from).normalized;
+            dummy.Center = from + toward * (Flamethrower.Reach * 0.8f);
+            Assert.That(Flamethrower.InCone(from, toward, Flamethrower.Reach, dummy), Is.True);
+            Assert.That(Flamethrower.InCone(from, Quaternion.Euler(0f, 40f, 0f) * toward, Flamethrower.Reach, dummy), Is.False, "off to the side");
+            dummy.Center = from + toward * (Flamethrower.Reach + 1f);
+            Assert.That(Flamethrower.InCone(from, toward, Flamethrower.Reach, dummy), Is.False, "out of reach");
+        }
+
+        [Test]
         public void ShotsNearAnEnemyBendOntoIt()
         {
             Vector3 from = new Vector3(0f, 1.3f, 0f);

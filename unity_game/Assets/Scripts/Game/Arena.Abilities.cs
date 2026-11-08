@@ -7,7 +7,7 @@ namespace Repulsor
     /// - Ki fighter: energy ball (level 2) and dragon fist (level 3)
     /// - Saber: finger-gun blaster (level 1) and laser sword (level 2)
     /// - Archer: finger-gun crossbow that reloads (level 1) and bow (level 2)
-    /// - Mage: triangle fire pillar (level 3)
+    /// - Mage: flamethrower (level 2, the palm laser drawn as fire in HandRepulsor) and triangle fire pillar (level 3)
     /// Each runs only while the player can fight. Looks marked placeholder get their own variants later.
     /// </summary>
     public sealed partial class Arena
@@ -43,9 +43,11 @@ namespace Repulsor
         GameObject chargeBall;
         /// <summary>Seconds the hand weapons stay off: during a two-hand ability and just after, so its fists don't fire.</summary>
         float handsBusyFor;
+        float busyFor;
         public static string[] BallStyleNames => BallLook.Names;
-        const string BallPickKey = "variant.ball";
-        int PickedBall => PlayerPrefs.GetInt(BallPickKey, 0);
+        // A new key, so the Star (the user's favourite) replaces picks saved before it existed.
+        const string BallPickKey = "variant.ball.v2";
+        int PickedBall => PlayerPrefs.GetInt(BallPickKey, BallLook.Star);
 
         /// <summary>Gives a ball the chosen energy ball look (see <see cref="BallLook"/>).</summary>
         static void DecorateBall(Transform ball, int style, Color color) => BallLook.Apply(ball, style, color);
@@ -104,8 +106,6 @@ namespace Repulsor
                         break;
                     case CharacterId.Mage:
                         TickMage(dt);
-                        if (player.Level >= 2)
-                            TickForce(dt);
                         break;
                     case CharacterId.Spider:
                         TickSpider(dt);
@@ -121,6 +121,15 @@ namespace Repulsor
                 || (character == CharacterId.Archer && bow.Formed));
             if (busy)
                 handsBusyFor = 0.6f;
+            // Diagnostic: a two-hand gesture that keeps the hand weapons off for long may be a false detection.
+            if (busy)
+                busyFor += dt;
+            else if (busyFor > 0f)
+            {
+                if (busyFor > 1f)
+                    Log($"Hand weapons were held off {busyFor:0.0} s by the {(character == CharacterId.Mage ? "triangle" : character == CharacterId.KiFighter ? "two-hand charge" : "bow")}");
+                busyFor = 0f;
+            }
 
             if (charging)
             {
@@ -163,8 +172,8 @@ namespace Repulsor
                     HandPose hand = i == 0 ? input.Left : input.Right;
                     if (kiPunch[i].Step(hand, body, dt, out Vector3 origin, out Vector3 punch))
                     {
-                        DragonFist.Launch(game, PickedDragon, origin + punch * 0.1f, punch, player.Outgoing(10f));
-                        Log($"Dragon fist at {hand.Velocity.magnitude:0.0} m/s");
+                        IHittable locked = DragonFist.Launch(game, PickedDragon, origin + punch * 0.1f, punch, player.Outgoing(10f));
+                        Log($"Dragon fist at {hand.Velocity.magnitude:0.0} m/s, {(locked != null ? $"locked on {Vector3.Angle(punch, locked.Center - origin):0} deg off" : "nothing to lock on")}");
                     }
                 }
             }

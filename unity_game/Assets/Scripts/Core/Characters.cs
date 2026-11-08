@@ -63,7 +63,7 @@ namespace Repulsor
                 Controls = new[]
                 {
                     new[] { "Fist, then snap open: fireball" },
-                    new[] { "Cupped hand at an object: lift it, then throw", "Rune circle aura" },
+                    new[] { "Palm out and hold: flamethrower", "Rune circle aura" },
                     new[] { "Triangle with both hands: aim a fire circle, close both fists: fire pillar" },
                 },
             },

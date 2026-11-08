@@ -9,6 +9,7 @@ Shader "Repulsor/Bubble"
         _Style ("Style", Float) = 0
         _Alpha ("Alpha", Range(0, 1)) = 1
         _Hit ("Hit Flash", Range(0, 1)) = 0
+        _Occlude ("Hide behind real things", Range(0, 1)) = 1
     }
 
     SubShader
@@ -34,6 +35,7 @@ Shader "Repulsor/Bubble"
                 float _Style;
                 float _Alpha;
                 float _Hit;
+                float _Occlude;
             CBUFFER_END
 
             struct Attributes
@@ -176,9 +178,9 @@ Shader "Repulsor/Bubble"
                 float3 centre = UNITY_MATRIX_M._m03_m13_m23;
                 float radius = length(UNITY_MATRIX_M._m00_m10_m20) * 0.5;
                 if (distance(GetCameraPositionWS(), centre) < radius && style != 5 && style != 6)
-                    glow *= 0.35 + 0.65 * _Hit;
+                    glow *= 0.6 + 0.4 * _Hit;
                 // The quick depth test: bubbles can cover the whole view, so the 4-sample one costs too much.
-                float shown = _Alpha * VisibilityQuick(input.positionWS);
+                float shown = _Alpha * lerp(1.0, VisibilityQuick(input.positionWS), _Occlude);
                 return float4(color * glow * shown, saturate(glow) * shown * 0.85);
             }
             ENDHLSL

@@ -434,10 +434,12 @@ namespace Repulsor
             if (speed < MinSpeed)
                 return false;
             Vector3 moving = hand.Velocity / speed;
-            if (Vector3.Dot(moving, body.ArmDirection(hand.IsLeft, hand.Palm)) < 0.6f)
+            Vector3 arm = body.ArmDirection(hand.IsLeft, hand.Palm);
+            if (Vector3.Dot(moving, arm) < 0.6f)
                 return false;
             origin = hand.Palm;
-            direction = moving;
+            // The hand's path wobbles; half the arm's line steadies it (lock-on does the rest).
+            direction = Vector3.Slerp(moving, arm, 0.5f).normalized;
             cooldown = Cooldown;
             return true;
         }

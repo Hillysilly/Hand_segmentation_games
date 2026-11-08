@@ -83,13 +83,17 @@ namespace Repulsor.Tests
             yield return Frames(30);
             var arena = Object.FindAnyObjectByType<Arena>();
 
-            arena.TestOpenLab(3);   // fire pillar: the Mage at level 3
+            arena.TestOpenLab(2);   // energy ball: the Ki fighter at level 2
             yield return new WaitForSecondsRealtime(Enemy.SpawnSeconds + 0.3f);
-            Assert.That(arena.TestPracticeState(), Is.EqualTo("True Mage 3 Repulsor dummy"));
+            Assert.That(arena.TestPracticeState(), Is.EqualTo("True KiFighter 2 Repulsor dummy"));
 
             arena.TestOpenLab(1);   // dragon fist: the Ki fighter at level 3
             yield return Frames(5);
             Assert.That(arena.TestPracticeState(), Does.StartWith("True KiFighter 3 Repulsor"));
+
+            arena.TestOpenLab(5);   // enemies: a robot and a drone in the picked models
+            yield return new WaitForSecondsRealtime(Enemy.SpawnSeconds + 0.5f);
+            Assert.That(arena.TestLabEnemyLooks(), Does.Match(@"^Look \w+, Look \w+$"));
 
             arena.TestLeaveLab();
             yield return Frames(5);

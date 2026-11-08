@@ -11,6 +11,7 @@ namespace Repulsor
         static readonly int StyleId = Shader.PropertyToID("_Style");
         static readonly int AlphaId = Shader.PropertyToID("_Alpha");
         static readonly int HitId = Shader.PropertyToID("_Hit");
+        static readonly int OccludeId = Shader.PropertyToID("_Occlude");
         static Material material;
 
         MeshRenderer sphere;
@@ -32,8 +33,10 @@ namespace Repulsor
             return bubble;
         }
 
-        public void Show(Color color, BubbleStyle style, float alpha, float hit = 0f)
+        /// <param name="occlude">Hide it behind real things the headset can see.</param>
+        public void Show(Color color, BubbleStyle style, float alpha, float hit = 0f, bool occlude = true)
         {
+            properties.SetFloat(OccludeId, occlude ? 1f : 0f);
             sphere.enabled = alpha > 0.001f;
             properties.SetColor(ColorId, color);
             properties.SetFloat(StyleId, (float)style);
@@ -56,6 +59,9 @@ namespace Repulsor
 
         public ShieldView(Transform parent) => bubble = Bubble.Create("Shield", parent);
 
+        /// <summary>Whether real things hide it (true for other players' shields, false for your own).</summary>
+        public bool Occlude { get; set; } = true;
+
         public void Flash() => hit = 1f;
 
         public void Tick(bool up, Vector3 head, Color color, BubbleStyle style, float dt) =>
@@ -71,7 +77,7 @@ namespace Repulsor
             hit = Mathf.Max(0f, hit - HitFade * dt);
             float eased = 1f - (1f - shown) * (1f - shown);
             Place(bubble.transform, head, facing, Mathf.Lerp(0.6f, 1f, eased));
-            bubble.Show(color, style, eased, hit);
+            bubble.Show(color, style, eased, hit, Occlude);
         }
 
         /// <summary>Where a shield goes for a player whose head is here.</summary>

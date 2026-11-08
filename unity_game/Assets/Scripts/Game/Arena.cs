@@ -69,7 +69,8 @@ namespace Repulsor
 
             hud = new PlayerHud(transform, head);
             hud.Visible = false;
-            shield = new ShieldView(transform);
+            // Your own shield isn't hidden by live depth: your crossed arms are always in front of it.
+            shield = new ShieldView(transform) { Occlude = false };
             death = new DeathView(eye);
             hurtFlash = new HurtFlash(transform, head);
             damageNumbers = new DamageNumbers(transform, head);
@@ -96,6 +97,7 @@ namespace Repulsor
             player.Respawned += OnRespawned;
             player.Transformed += OnTransformed;
             player.Shield.Shattered += () => Log("Shield broke");
+            player.Shield.Raised += () => Log($"Shield up, {PickedShield(character)}");
             game.Dealt += OnDealt;
             game.Killed += OnKilled;
             game.HandAim = (left, palm, palmDirection) => Aim.Arm(body, left ? input.Left : input.Right, palm, palmDirection);
@@ -140,7 +142,7 @@ namespace Repulsor
 
             bool playing = phase == Phase.Playing;
             // The HUD lab shows the real panel outside a match too.
-            hud.Tick(playing || labItem == 4 ? player : null, Character, dt);
+            hud.Tick(playing || HudLabOpen ? player : null, Character, dt);
             Vector3 shieldFacing = character == CharacterId.Archer ? head.forward : Vector3.zero;
             shield.Tick((playing || practicing) && player.Shield.Up, head.position, shieldFacing, PlayerColor, PickedShield(character), dt);
             TickVariantLab(dt);
@@ -328,7 +330,7 @@ namespace Repulsor
             HideMenu();
             hud.Visible = true;
             UpdateAura();
-            Log($"Match starts: {mode}, {Character.Name}, colour #{ColorUtility.ToHtmlStringRGB(PlayerColor)}, lives {settings.Lives}");
+            Log($"Match starts: {mode}, {Character.Name}, colour #{ColorUtility.ToHtmlStringRGB(PlayerColor)}, lives {settings.Lives}, {room.Count} furniture boxes from Space Setup");
         }
 
         void EndMatch(bool won)
@@ -625,6 +627,7 @@ namespace Repulsor
             game.RepulsorAoe = character == CharacterId.Technoman && level >= 3 ? 0.8f : 0f;
             game.SetWeaponColor(phase == Phase.Playing || practicing ? AttackColor : RepulsorGame.DefaultWeaponColor);
             game.CometStyle = character == CharacterId.KiFighter ? PickedComet : 0;
+            game.FlameLaser = character == CharacterId.Mage;
             TickAbilities(fighting, paused ? 0f : Time.deltaTime);
         }
 
@@ -634,6 +637,9 @@ namespace Repulsor
             {
                 case CharacterId.Technoman:
                     return level >= 2 ? Weapon.LaserRepulsor : Weapon.Laser;
+                case CharacterId.Mage:
+                    // Fireballs from level 1; the flamethrower (palm out and hold) joins them at level 2.
+                    return level >= 2 ? Weapon.LaserRepulsor : Weapon.Repulsor;
                 case CharacterId.Saber:
                 case CharacterId.Archer:
                 case CharacterId.Spider:
@@ -752,6 +758,10 @@ namespace Repulsor
             labItem = item;
             ShowVariantLab();
         }
+
+        /// <summary>PlayMode test: the bodies of the enemies standing in the lab's ENEMIES page, as "Look X, Look Y".</summary>
+        public string TestLabEnemyLooks() => string.Join(", ", System.Linq.Enumerable.Select(labEnemies,
+            e => e == null ? "none" : e.GetComponentInChildren<EnemyLook>(true) is EnemyLook look ? look.name : "placeholder"));
 
         /// <summary>PlayMode test: leave the lab the way its BACK button does.</summary>
         public void TestLeaveLab() => ShowDebug(debugBack);

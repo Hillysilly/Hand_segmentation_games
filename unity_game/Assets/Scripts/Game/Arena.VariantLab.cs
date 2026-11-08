@@ -13,14 +13,15 @@ namespace Repulsor
         static readonly string[] ShieldNames = { "A  HEX", "B  FLAME", "C  GLASS", "D  THIN", "E  WEB" };
         const string ShieldPickKey = "variant.shield.";
         const string DragonPickKey = "variant.dragon";
-        const string PillarPickKey = "variant.pillar";
         const string CometPickKey = "variant.comet";
-        static readonly string[] LabItems = { "SHIELDS", "DRAGON FIST", "ENERGY BALL", "FIRE PILLAR", "HUD", "COMET" };
+        static readonly string[] LabItems = { "SHIELDS", "DRAGON FIST", "ENERGY BALL", "HUD", "COMET", "ENEMIES" };
+        /// <summary>The fire pillar look is settled (C BOTH), so it's no longer in the lab.</summary>
+        static int PickedPillar => FirePillar.Default;
+        bool HudLabOpen => LabItems[labItem] == "HUD";
         /// <summary>The lab sits this far to your left while you practise, so your shots go past it.</summary>
         const float PracticeMenuYaw = -40f;
 
         int PickedDragon => PlayerPrefs.GetInt(DragonPickKey, 0);
-        int PickedPillar => PlayerPrefs.GetInt(PillarPickKey, 0);
         int PickedComet => PlayerPrefs.GetInt(CometPickKey, 0);
 
         Bubble labBubble;
@@ -35,16 +36,16 @@ namespace Repulsor
 
         void ShowVariantLab()
         {
-            switch (labItem)
+            switch (LabItems[labItem])
             {
-                case 1:
+                case "DRAGON FIST":
                     ShowPickLab("DRAGON FIST", DragonFist.StyleNames, PickedDragon, DragonPickKey, CharacterId.KiFighter, 3, style =>
                     {
                         Vector3 forward = Ahead(head.forward);
                         DragonFist.Launch(game, style, head.position + Vector3.down * 0.3f + forward * 0.5f + head.right * 0.35f, forward, 0f);
                     });
                     return;
-                case 2:
+                case "ENERGY BALL":
                     ShowPickLab("ENERGY BALL", BallStyleNames, PickedBall, BallPickKey, CharacterId.KiFighter, 2, style =>
                     {
                         Vector3 forward = Ahead(head.forward);
@@ -52,19 +53,13 @@ namespace Repulsor
                         DecorateBall(shot.Head, style, AttackColor);
                     });
                     return;
-                case 3:
-                    ShowPickLab("FIRE PILLAR", FirePillar.StyleNames, PickedPillar, PillarPickKey, CharacterId.Mage, 3, style =>
-                    {
-                        Vector3 point = head.position + Ahead(head.forward) * 2f;
-                        point.y = FloorY;
-                        FirePillar.Spawn(point, AttackColor, style, transform);
-                        game.PlayAt(point, game.BoomSound);
-                    });
-                    return;
-                case 4:
+                case "HUD":
                     ShowHudLab();
                     return;
-                case 5:
+                case "ENEMIES":
+                    ShowEnemyLab();
+                    return;
+                case "COMET":
                     ShowPickLab("COMET", RepulsorGame.CometStyleNames, PickedComet, CometPickKey, CharacterId.KiFighter, 1, style =>
                     {
                         Vector3 forward = Ahead(head.forward);
@@ -166,6 +161,7 @@ namespace Repulsor
             {
                 labItem = (labItem + LabItems.Length - 1) % LabItems.Length;
                 HideLabBubble();
+                HideLabEnemies();
                 ShowVariantLab();
             }, 18);
             Ui.Label(s, $"{LabItems[labItem]}  ({labItem + 1}/{LabItems.Length})", new Vector2(0f, 105f), new Vector2(260f, 30f), 16,
@@ -174,8 +170,76 @@ namespace Repulsor
             {
                 labItem = (labItem + 1) % LabItems.Length;
                 HideLabBubble();
+                HideLabEnemies();
                 ShowVariantLab();
             }, 18);
+        }
+
+        readonly Enemy[] labEnemies = new Enemy[2];
+
+        /// <summary>Enemy bodies: a row of robot models and a row of drone models, with one of each standing ahead.</summary>
+        void ShowEnemyLab()
+        {
+            StopPractice();
+            RectTransform s = OpenScreen(new Vector2(580f, 330f), "VARIANT LAB");
+            LabTabs(s);
+            Ui.Label(s, "Poke a model; it's saved straight away and the one ahead of you changes.",
+                new Vector2(0f, 72f), new Vector2(540f, 20f), 12).color = Ui.Muted;
+            EnemyRow(s, "ROBOT", EnemyKind.Robot, EnemyLook.RobotNames, EnemyLook.RobotPickKey, 30f);
+            EnemyRow(s, "DRONE", EnemyKind.Drone, EnemyLook.DroneNames, EnemyLook.DronePickKey, -25f);
+            Ui.Button(s, "BACK", new Vector2(0f, -85f), new Vector2(150f, 44f), () =>
+            {
+                HideLabEnemies();
+                ShowDebug(debugBack);
+            }, 16);
+            ShowLabEnemies();
+        }
+
+        void EnemyRow(RectTransform s, string label, EnemyKind kind, string[] names, string key, float y)
+        {
+            Ui.Label(s, label, new Vector2(-250f, y), new Vector2(70f, 20f), 12, TextAnchor.MiddleLeft, FontStyle.Bold).color = Ui.Ink;
+            int picked = EnemyLook.Picked(kind);
+            for (int i = 0; i < names.Length; i++)
+            {
+                int style = i;
+                PokeButton b = Ui.Button(s, names[i], new Vector2(-170f + i * 68f, y), new Vector2(64f, 40f), () =>
+                {
+                    PlayerPrefs.SetInt(key, style);
+                    PlayerPrefs.Save();
+                    Debug.Log($"[Variant] {label}: {names[style]}");
+                    ShowVariantLab();
+                }, 10);
+                b.Selected = i == picked;
+            }
+        }
+
+        /// <summary>A robot and a drone standing still ahead, in the picked looks.</summary>
+        void ShowLabEnemies()
+        {
+            HideLabEnemies();
+            Vector3 forward = Ahead(head.forward);
+            Vector3 right = Vector3.Cross(Vector3.up, forward);
+            float distance = 2.2f;
+            if (game.Room.TryDistance(head.position + forward * 0.5f, forward, out float wall))
+                distance = Mathf.Clamp(wall + 0.1f, 1.3f, 2.2f);
+            Vector3 robot = head.position + forward * distance - right * 0.5f;
+            robot.y = FloorY + 0.65f;
+            Vector3 drone = head.position + forward * distance + right * 0.6f;
+            drone.y = head.position.y;
+            labEnemies[0] = Enemy.Spawn(EnemyKind.Robot, robot, this, head, foes);
+            labEnemies[1] = Enemy.Spawn(EnemyKind.Drone, drone, this, head, foes);
+            foreach (Enemy enemy in labEnemies)
+                enemy.Practice = true;
+        }
+
+        void HideLabEnemies()
+        {
+            for (int i = 0; i < labEnemies.Length; i++)
+            {
+                if (labEnemies[i] != null)
+                    Destroy(labEnemies[i].gameObject);
+                labEnemies[i] = null;
+            }
         }
 
         void ShowHudLab()
@@ -296,7 +360,12 @@ namespace Repulsor
         {
             if (labBubble == null)
                 labBubble = Bubble.Create("Variant Bubble", transform);
-            labBubble.transform.position = head.position + Ahead(head.forward) * 1.6f + Vector3.down * 0.35f;
+            // In front of any wall, or the room's depth hides it.
+            Vector3 forward = Ahead(head.forward);
+            float distance = 1.6f;
+            if (game.Room.TryDistance(head.position + forward * 0.3f, forward, out float wall))
+                distance = Mathf.Clamp(wall + 0.3f - 0.7f, 0.9f, 1.6f);
+            labBubble.transform.position = head.position + forward * distance + Vector3.down * 0.35f;
             labBubble.transform.localScale = Vector3.one * 1.24f;
         }
 

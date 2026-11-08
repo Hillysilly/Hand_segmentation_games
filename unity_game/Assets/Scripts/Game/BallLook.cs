@@ -9,6 +9,8 @@ namespace Repulsor
     /// </summary>
     public static class BallLook
     {
+        /// <summary>The default look.</summary>
+        public const int Star = 3;
         public static readonly string[] Names = { "A  CRACKLE", "B  PLASMA", "C  FIREBALL", "D  STAR" };
 
         /// <summary>Restyles a ball head (a fired one, or the one held while charging). Sizes are in ball diameters.</summary>

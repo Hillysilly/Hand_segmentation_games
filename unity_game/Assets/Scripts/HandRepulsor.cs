@@ -38,7 +38,10 @@ namespace Repulsor
         int laserFrames;
         int surfaceFrames;
         bool pinched;
-        bool laserBlocked;
+        /// <summary>Seconds the laser stays off after a blast, so the snap open that fired it doesn't also start the beam.</summary>
+        float laserBlockedFor;
+        const float LaserBlockSeconds = 0.4f;
+        Flamethrower flames;
 
         public bool IsTracked { get; private set; }
         public bool IsOpen => IsTracked && gesture == HandGesture.Open;
@@ -101,9 +104,9 @@ namespace Repulsor
                 StopWeapons();
             }
 
-            // A repulsor shot leaves the hand open, which would start the laser. Wait for a fresh open palm.
-            if (gesture != HandGesture.Open)
-                laserBlocked = false;
+            // A repulsor shot leaves the hand open, which would start the laser. Wait a moment, or for a fresh open palm.
+            // (Waiting for a fresh palm alone let fist flickers block the laser all the time once blasts unlocked.)
+            laserBlockedFor = gesture != HandGesture.Open ? 0f : Mathf.Max(0f, laserBlockedFor - dt);
 
             if (weapon == Weapon.None)
                 return;
@@ -148,7 +151,7 @@ namespace Repulsor
                 else
                     game.Fire(aim.Position, direction, fired);
                 aim.Clear();
-                laserBlocked = true;
+                laserBlockedFor = LaserBlockSeconds;
             }
 
             UpdateChargeVisuals(shownPosition, shownDirection);
@@ -196,7 +199,7 @@ namespace Repulsor
         void TickLaser(Vector3 palm, Vector3 palmNormal, float dt)
         {
             // Not during an OK sign, which also has the fingers up: that's the pause gesture.
-            laser.Step(gesture == HandGesture.Open && !pinched && !laserBlocked
+            laser.Step(gesture == HandGesture.Open && !pinched && laserBlockedFor <= 0f
                 && game.PointsAwayFromHead(palm, palmNormal), dt);
             if (!laser.Firing)
             {
@@ -211,9 +214,25 @@ namespace Repulsor
                 beamLength.Reset();
                 laserFrames = 0;
                 surfaceFrames = 0;
-                laserHum.Play();
+                if (!game.FlameLaser)
+                    laserHum.Play();
                 game.PlayLaserIgnite(palm);
-                Debug.Log($"[Repulsor] {handedness} laser on");
+                Debug.Log($"[Repulsor] {handedness} {(game.FlameLaser ? "flames" : "laser")} on");
+            }
+
+            if (game.FlameLaser)
+            {
+                // The Mage: a short cone of fire instead of a beam, aimed half by the palm and half by the arm.
+                Vector3 aimed = game.HandAim != null ? game.HandAim(handedness == Handedness.Left, palm, palmNormal) : palmNormal;
+                laserDirection = Vector3.Slerp(laserDirection, Vector3.Slerp(palmNormal, aimed, 0.5f).normalized,
+                    1f - Mathf.Exp(-LaserFollowSpeed * dt)).normalized;
+                Vector3 mouth = palm + laserDirection * PalmOffset;
+                if (flames == null)
+                    flames = Flamethrower.Create(game.transform);
+                flames.Pour(mouth, laserDirection, game.WeaponColor);
+                Flamethrower.Burn(game, mouth, laserDirection, Flamethrower.Reach, game.LaserDps * Flamethrower.DamageScale, dt);
+                laserFrames++;
+                return;
             }
 
             // Smoothing keeps the end of a long beam from shaking with every tiny tracking wobble.
@@ -311,6 +330,8 @@ namespace Repulsor
                 Debug.Log($"[Repulsor] {handedness} laser off, surface found on {surfaceFrames}/{laserFrames} frames");
             lasing = false;
             laserHum.Stop();
+            if (flames != null)
+                flames.Stop();
         }
 
         void StopWeapons()
