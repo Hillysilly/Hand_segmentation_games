@@ -143,6 +143,23 @@ namespace Repulsor
         }
     }
 
+    /// <summary>A PVE run's score: kills and waves, damage, and a win bonus that's bigger the faster you won.</summary>
+    public static class Scoring
+    {
+        public const int PerKill = 100;
+        public const int PerWave = 250;
+        public const int WinBonus = 1000;
+        public const float ParSeconds = 600f;
+
+        public static int Score(int kills, int wavesCleared, float damageDealt, bool won, float seconds)
+        {
+            float score = kills * PerKill + wavesCleared * PerWave + damageDealt * 2f;
+            if (won)
+                score += WinBonus + Math.Max(0f, ParSeconds - seconds) * 2f;
+            return (int)Math.Round(score);
+        }
+    }
+
     /// <summary>PVP: rounds end when a player hits 0 HP; first to <c>roundsToWin</c> takes the match.</summary>
     public sealed class RoundTracker
     {

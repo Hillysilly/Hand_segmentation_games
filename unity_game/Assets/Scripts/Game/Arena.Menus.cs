@@ -263,16 +263,33 @@ namespace Repulsor
 
         void ShowResults(bool won)
         {
-            RectTransform s = OpenScreen(new Vector2(400f, 280f), null);
-            Text title = Ui.Label(s, won ? "VICTORY" : "DEFEATED", new Vector2(0f, 95f), new Vector2(380f, 54f), 44,
+            RectTransform s = OpenScreen(new Vector2(400f, 300f), null);
+            Text title = Ui.Label(s, won ? "VICTORY" : "DEFEATED", new Vector2(0f, 108f), new Vector2(380f, 54f), 44,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
             title.color = won ? new Color(1f, 0.85f, 0.3f) : new Color(1f, 0.4f, 0.35f);
             int minutes = Mathf.FloorToInt(matchTime / 60f);
             string first = Pvp && rounds != null ? $"Rounds  {rounds.Wins(net.Slot)} - {rounds.Wins(1 - net.Slot)}\n" : "";
+            if (!Pvp)
+            {
+                // Score, and the best for this character on this headset.
+                int cleared = won ? waves.Wave : Mathf.Max(0, waves.Wave - 1);
+                int score = Scoring.Score(waves.Kills, cleared, player.DamageDealt, won, matchTime);
+                string key = "best." + character;
+                int best = PlayerPrefs.GetInt(key, 0);
+                bool record = score > best;
+                if (record)
+                {
+                    PlayerPrefs.SetInt(key, score);
+                    PlayerPrefs.Save();
+                }
+                Ui.Label(s, record ? $"SCORE {score}   <color=#FFE060>NEW BEST!</color>" : $"SCORE {score}   best {best}",
+                    new Vector2(0f, 64f), new Vector2(380f, 24f), 18, TextAnchor.MiddleCenter, FontStyle.Bold).color = Ui.Accent;
+                Log($"Score {score}{(record ? " (new best)" : "")}");
+            }
             Ui.Label(s, first + $"Waves cleared  {(won ? waves.Wave : Mathf.Max(0, waves.Wave - 1))} / {waves.WaveCount}\n"
                 + $"Enemies destroyed  {waves.Kills}\n"
                 + $"Damage dealt  {player.DamageDealt:0}     taken  {player.DamageTaken:0}\n"
-                + $"Time  {minutes}:{matchTime - minutes * 60f:00}", new Vector2(0f, 20f), new Vector2(360f, 90f), 15);
+                + $"Time  {minutes}:{matchTime - minutes * 60f:00}", new Vector2(0f, 8f), new Vector2(360f, 90f), 15);
             Ui.Button(s, "PLAY AGAIN", new Vector2(0f, -60f), new Vector2(200f, 46f), () =>
             {
                 if (Multiplayer)

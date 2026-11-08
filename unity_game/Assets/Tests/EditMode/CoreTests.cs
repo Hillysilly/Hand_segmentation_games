@@ -337,6 +337,24 @@ namespace Repulsor.Tests
         }
     }
 
+    public class ScoringTests
+    {
+        [Test]
+        public void KillsWavesAndDamageAddUp()
+        {
+            Assert.That(Scoring.Score(10, 2, 100f, false, 300f), Is.EqualTo(10 * 100 + 2 * 250 + 200));
+        }
+
+        [Test]
+        public void FasterWinsScoreMore()
+        {
+            int slow = Scoring.Score(20, 5, 300f, true, 500f);
+            int fast = Scoring.Score(20, 5, 300f, true, 200f);
+            Assert.That(fast, Is.GreaterThan(slow));
+            Assert.That(slow, Is.GreaterThan(Scoring.Score(20, 5, 300f, false, 500f)));
+        }
+    }
+
     public class RoundTrackerTests
     {
         [Test]
