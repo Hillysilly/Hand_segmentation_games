@@ -127,7 +127,8 @@ namespace Repulsor
             UpdateRemoteTarget();
 
             bool playing = phase == Phase.Playing;
-            hud.Tick(playing ? player : null, Character, dt);
+            // The HUD lab shows the real panel outside a match too.
+            hud.Tick(playing || labItem == 4 ? player : null, Character, dt);
             shield.Tick(playing && player.Shield.Up, head.position, PlayerColor, PickedShield(character), dt);
             TickVariantLab(dt);
             death.Tick(playing && player.IsDead, dt);

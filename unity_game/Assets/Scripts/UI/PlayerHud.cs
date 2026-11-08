@@ -11,7 +11,16 @@ namespace Repulsor
     /// </summary>
     public sealed class PlayerHud
     {
-        static readonly Vector3 PanelOffset = new Vector3(0.24f, -0.2f, 0.75f);
+        public static readonly string[] LayoutNames = { "A  LOW RIGHT", "B  LOW CENTRE", "C  TOP CENTRE" };
+        static readonly Vector3[] PanelOffsets =
+        {
+            new Vector3(0.24f, -0.2f, 0.75f),
+            new Vector3(0f, -0.26f, 0.75f),
+            new Vector3(0f, 0.2f, 0.8f),
+        };
+
+        /// <summary>Where the panel sits: 0 low right, 1 low centre, 2 top centre (like a fighting game).</summary>
+        public int Layout { get; set; } = Mathf.Clamp(PlayerPrefs.GetInt("variant.hud", 0), 0, 2);
         static readonly Vector3 MessageOffset = new Vector3(0f, 0.06f, 1.3f);
         const float FollowSpeed = 4f;
         const int MaxLifeIcons = 5;
@@ -160,7 +169,7 @@ namespace Repulsor
 
         void Follow(float dt)
         {
-            Place(panel, PanelOffset, dt);
+            Place(panel, PanelOffsets[Mathf.Clamp(Layout, 0, PanelOffsets.Length - 1)], dt);
             Place(message, MessageOffset, dt);
             placed = true;
         }

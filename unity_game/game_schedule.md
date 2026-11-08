@@ -58,11 +58,12 @@ The new build is installed. Pick it up and move around until it finds its positi
    In the pause menu, DEBUG has HIT ME, KNOCK ME OUT, FILL METER and SPAWN POWERUP.
 4. **Ki fighter (Ryuu):** fist and snap open for yellow comets. Use FILL METER and the pose to reach level 2:
    hold your hands together to charge a ball, then push both forward. Level 3: punch fast for a dragon fist.
-5. **Variant batches 1-2:** DEBUG > VARIANT LAB.
-   - SHIELDS tab: poke A-E, then SAVE PICK for each character you care about.
-   - DRAGON FIST tab: A comet, B three twisting comets, C punch wave, D both. Poke to fire one, then SAVE PICK.
-   - ENERGY BALL tab: A crackle, B glowing shell, C fiery shell. PC render: `unity_game/Logs/preview_energy_balls.png`.
-   - FIRE PILLAR tab: A flame column, B energy column, C both with a floor ring. PC render: `unity_game/Logs/preview_fire_pillars.png`.
+5. **Variant batches 1-2:** DEBUG > VARIANT LAB. Use < and > to switch item.
+   - HUD: A low right, B low centre, C top centre. Saved as soon as you poke one.
+   - SHIELDS: poke A-E, then SAVE PICK for each character you care about.
+   - DRAGON FIST: A comet, B three twisting comets, C punch wave, D both. Poke to fire one, then SAVE PICK.
+   - ENERGY BALL: A crackle, B glowing shell, C fiery shell. PC render: `unity_game/Logs/preview_energy_balls.png`.
+   - FIRE PILLAR: A flame column, B energy column, C both with a floor ring. PC render: `unity_game/Logs/preview_fire_pillars.png`.
    PC renders are in `unity_game/Logs/preview_shield_*.png`.
 6. HUD: is it readable, in a good spot, too big or too small?
 7. **When the second Quest arrives:** install the same build on both (`build_and_run.ps1 -NoBuild` with each plugged
@@ -80,6 +81,16 @@ All of these say CC0 on their pages. I'll check each licence file when downloadi
 | R2 | Quaternius Animated Mech Pack | robot | OpenGameArt, CC0 |
 | R3 | Quaternius Sci-Fi Essentials Kit robot enemies | robot or drone | [quaternius.com](https://quaternius.com/packs/scifiessentialskit.html) |
 | D1 | Quaternius Ultimate Space Kit enemies (check for a flyer) | drone | [quaternius.com](https://quaternius.com/packs/ultimatespacekit.html) |
+
+## Gauntlet candidates for Technoman level 2 (pick one, or let me build my own)
+
+| # | Model | Licence | Link |
+|---|---|---|---|
+| G1 | Sci-fi Glove (low poly) | CC-BY: credit needed, allowed | [Sketchfab](https://sketchfab.com/3d-models/sci-fi-glove-aa87260a746142e1bd4266cd363c189c) |
+| G2 | Meshy "shields & armor" gauntlets | marked CC0, but AI-generated, so check each model page | [Meshy](https://www.meshy.ai/subcategory/shields-armor) |
+| G3 | Sci-fi glove on free3d | licence not shown, so check the page | [free3d](https://free3d.com/3d-model/sci-fi-glove-5311.html) |
+
+Sketchfab needs a login to download. If you grab G1 as glTF into `assets/models/`, I'll fit it to the tracked hand joints.
 
 ## Features
 

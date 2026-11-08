@@ -57,35 +57,53 @@ namespace Repulsor
             Ui.Button(s, "BACK", new Vector2(90f, -55f), new Vector2(150f, 44f), () => ShowDebug(debugBack), 16);
         }
 
+        static readonly string[] LabItems = { "SHIELDS", "DRAGON FIST", "ENERGY BALL", "FIRE PILLAR", "HUD" };
+
+        /// <summary>The lab's item switcher: previous, the item's name, next.</summary>
         void LabTabs(RectTransform s)
         {
-            PokeButton shields = Ui.Button(s, "SHIELDS", new Vector2(-174f, 105f), new Vector2(108f, 32f), () =>
+            Ui.Button(s, "<", new Vector2(-170f, 105f), new Vector2(60f, 32f), () =>
             {
-                labItem = 0;
-                ShowVariantLab();
-            }, 12);
-            shields.Selected = labItem == 0;
-            PokeButton dragon = Ui.Button(s, "DRAGON FIST", new Vector2(-58f, 105f), new Vector2(108f, 32f), () =>
-            {
-                labItem = 1;
+                labItem = (labItem + LabItems.Length - 1) % LabItems.Length;
                 HideLabBubble();
                 ShowVariantLab();
-            }, 12);
-            dragon.Selected = labItem == 1;
-            PokeButton ball = Ui.Button(s, "ENERGY BALL", new Vector2(58f, 105f), new Vector2(108f, 32f), () =>
+            }, 18);
+            Ui.Label(s, $"{LabItems[labItem]}  ({labItem + 1}/{LabItems.Length})", new Vector2(0f, 105f), new Vector2(260f, 30f), 16,
+                TextAnchor.MiddleCenter, FontStyle.Bold).color = Ui.Ink;
+            Ui.Button(s, ">", new Vector2(170f, 105f), new Vector2(60f, 32f), () =>
             {
-                labItem = 2;
+                labItem = (labItem + 1) % LabItems.Length;
                 HideLabBubble();
                 ShowVariantLab();
-            }, 12);
-            ball.Selected = labItem == 2;
-            PokeButton pillar = Ui.Button(s, "FIRE PILLAR", new Vector2(174f, 105f), new Vector2(108f, 32f), () =>
+            }, 18);
+        }
+
+        void ShowHudLab()
+        {
+            RectTransform s = OpenScreen(new Vector2(480f, 320f), "VARIANT LAB");
+            LabTabs(s);
+            Ui.Label(s, "Where your health and power bars sit. Poke one to switch now; it's saved straight away.",
+                new Vector2(0f, 72f), new Vector2(450f, 20f), 12).color = Ui.Muted;
+            for (int i = 0; i < PlayerHud.LayoutNames.Length; i++)
             {
-                labItem = 3;
-                HideLabBubble();
-                ShowVariantLab();
-            }, 12);
-            pillar.Selected = labItem == 3;
+                int layout = i;
+                PokeButton b = Ui.Button(s, PlayerHud.LayoutNames[i], new Vector2(-145f + i * 145f, 25f), new Vector2(135f, 44f), () =>
+                {
+                    hud.Layout = layout;
+                    PlayerPrefs.SetInt("variant.hud", layout);
+                    PlayerPrefs.Save();
+                    Debug.Log($"[Variant] HUD: {PlayerHud.LayoutNames[layout]}");
+                    ShowVariantLab();
+                }, 13);
+                b.Selected = hud.Layout == i;
+            }
+            Ui.Button(s, "BACK", new Vector2(0f, -55f), new Vector2(150f, 44f), () =>
+            {
+                hud.Visible = phase == Phase.Playing;
+                ShowDebug(debugBack);
+            }, 16);
+            // Show the HUD while choosing, even outside a match.
+            hud.Visible = true;
         }
 
         void ShowDragonLab()
@@ -189,6 +207,11 @@ namespace Repulsor
             if (labItem == 3)
             {
                 ShowPillarLab();
+                return;
+            }
+            if (labItem == 4)
+            {
+                ShowHudLab();
                 return;
             }
             RectTransform s = OpenScreen(new Vector2(480f, 320f), "VARIANT LAB");
