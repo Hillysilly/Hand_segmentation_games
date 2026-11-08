@@ -54,6 +54,21 @@ namespace Repulsor
 
         public bool ShowFps { get; set; }
 
+        Text partnerText;
+        Bar partnerBar;
+
+        /// <summary>Co-op: the other player's name and health under your own bars. Null hides it.</summary>
+        public void Partner(string name, float fraction)
+        {
+            bool show = name != null;
+            partnerText.gameObject.SetActive(show);
+            partnerBar.gameObject.SetActive(show);
+            if (!show)
+                return;
+            partnerText.text = name;
+            partnerBar.Fraction = fraction;
+        }
+
         public PlayerHud(Transform parent, Transform head)
         {
             this.head = head;
@@ -77,6 +92,9 @@ namespace Repulsor
             shield = Ui.Bar(panel, new Vector2(-93f, -48f), new Vector2(100f, 8f), new Color(0.08f, 0.08f, 0.1f, 0.95f), ShieldColor);
             statusText = Ui.Label(panel, "", new Vector2(50f, -48f), new Vector2(180f, 18f), 12, TextAnchor.MiddleRight);
             fpsText = Ui.Label(panel, "", new Vector2(110f, 76f), new Vector2(80f, 14f), 11, TextAnchor.MiddleRight);
+            partnerText = Ui.Label(panel, "", new Vector2(-80f, -62f), new Vector2(130f, 14f), 11, TextAnchor.MiddleLeft);
+            partnerBar = Ui.Bar(panel, new Vector2(60f, -62f), new Vector2(150f, 7f), new Color(0.08f, 0.08f, 0.1f, 0.95f), new Color(0.3f, 1f, 0.4f));
+            Partner(null, 0f);
 
             message = Ui.Canvas("Message", parent, new Vector2(700f, 260f));
             bigText = Ui.Label(message, "", new Vector2(0f, 30f), new Vector2(700f, 120f), 90, TextAnchor.MiddleCenter, FontStyle.Bold);

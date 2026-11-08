@@ -86,6 +86,8 @@ namespace Repulsor
             Ui.Button(s, "START", new Vector2(0f, -35f), new Vector2(170f, 52f), ShowModes, 22);
             Ui.Label(s, "Poke buttons with your index finger. Put the controllers down.", new Vector2(0f, -90f),
                 new Vector2(340f, 20f), 11).color = Ui.Muted;
+            Text roomStatus = Ui.Label(s, RoomStatus(), new Vector2(0f, -106f), new Vector2(340f, 16f), 10);
+            roomStatus.color = room != null && room.Count > 0 ? Ui.Muted : Ui.Warning;
         }
 
         void ShowModes()

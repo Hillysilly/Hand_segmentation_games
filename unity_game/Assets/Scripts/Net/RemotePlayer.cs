@@ -90,9 +90,9 @@ namespace Repulsor
             bar.Tick(dt);
 
             shieldShown = Mathf.MoveTowards(shieldShown, latest.ShieldUp ? 1f : 0f, 8f * dt);
-            shield.transform.position = shownHead + Vector3.down * 0.35f;
-            shield.transform.localScale = Vector3.one * 1.24f;
-            shield.Show(color, BubbleStyle.Hex, shieldShown);
+            bool archer = character.Id == CharacterId.Archer;
+            ShieldView.Place(shield.transform, shownHead, archer ? latest.HeadRotation * Vector3.forward : Vector3.zero, 1f);
+            shield.Show(color, archer ? BubbleStyle.Glass : BubbleStyle.Hex, shieldShown);
 
             // Powerups others can see: a gold star-like glow when invincible, red when doing 1.5x damage.
             bool powered = latest.Invincible || latest.Boosted;

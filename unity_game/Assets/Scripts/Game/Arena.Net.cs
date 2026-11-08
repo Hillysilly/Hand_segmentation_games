@@ -283,6 +283,16 @@ namespace Repulsor
                 }
             }
             remote.Tick(dt);
+            if (phase == Phase.Playing && Multiplayer && remote.Visible)
+            {
+                PlayerSnapshot partner = remote.Latest;
+                string name = CharacterDef.Get((CharacterId)Mathf.Clamp(partner.Character, 0, CharacterDef.All.Length - 1)).Name;
+                hud.Partner(partner.Dead ? $"P2 {name}: OUT" : $"P2 {name}", partner.MaxHp > 0f ? partner.Hp / partner.MaxHp : 0f);
+            }
+            else
+            {
+                hud.Partner(null, 0f);
+            }
             if (lobbyStatus != null)
                 lobbyStatus.text = net.Status;
             TickCalibration(dt);

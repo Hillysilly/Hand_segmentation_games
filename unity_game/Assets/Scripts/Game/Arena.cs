@@ -129,7 +129,8 @@ namespace Repulsor
             bool playing = phase == Phase.Playing;
             // The HUD lab shows the real panel outside a match too.
             hud.Tick(playing || labItem == 4 ? player : null, Character, dt);
-            shield.Tick(playing && player.Shield.Up, head.position, PlayerColor, PickedShield(character), dt);
+            Vector3 shieldFacing = character == CharacterId.Archer ? head.forward : Vector3.zero;
+            shield.Tick(playing && player.Shield.Up, head.position, shieldFacing, PlayerColor, PickedShield(character), dt);
             TickVariantLab(dt);
             death.Tick(playing && player.IsDead, dt);
             hurtFlash.Tick(dt);
@@ -515,6 +516,7 @@ namespace Repulsor
                 case CharacterId.Saber: return BubbleStyle.Glass;
                 case CharacterId.Mage: return BubbleStyle.Thin;
                 case CharacterId.Spider: return BubbleStyle.Web;
+                case CharacterId.Archer: return BubbleStyle.Glass;   // a clear shield, since it sits right in front of you
                 default: return BubbleStyle.Hex;
             }
         }

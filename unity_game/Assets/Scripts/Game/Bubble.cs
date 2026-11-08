@@ -58,14 +58,37 @@ namespace Repulsor
 
         public void Flash() => hit = 1f;
 
-        public void Tick(bool up, Vector3 head, Color color, BubbleStyle style, float dt)
+        public void Tick(bool up, Vector3 head, Color color, BubbleStyle style, float dt) =>
+            Tick(up, head, Vector3.zero, color, style, dt);
+
+        /// <summary>
+        /// With a facing direction, it's a flat shield held out in front (the Archer's, until a knight's shield
+        /// model is picked); with none, a bubble round the upper body.
+        /// </summary>
+        public void Tick(bool up, Vector3 head, Vector3 facing, Color color, BubbleStyle style, float dt)
         {
             shown = Mathf.MoveTowards(shown, up ? 1f : 0f, GrowSpeed * dt);
             hit = Mathf.Max(0f, hit - HitFade * dt);
             float eased = 1f - (1f - shown) * (1f - shown);
-            bubble.transform.position = head + Vector3.down * 0.35f;
-            bubble.transform.localScale = Vector3.one * (Radius * 2f * Mathf.Lerp(0.6f, 1f, eased));
+            Place(bubble.transform, head, facing, Mathf.Lerp(0.6f, 1f, eased));
             bubble.Show(color, style, eased, hit);
+        }
+
+        /// <summary>Where a shield goes for a player whose head is here.</summary>
+        public static void Place(Transform shield, Vector3 head, Vector3 facing, float grow)
+        {
+            Vector3 flat = Vector3.ProjectOnPlane(facing, Vector3.up);
+            if (flat.sqrMagnitude < 1e-4f)
+            {
+                shield.position = head + Vector3.down * 0.35f;
+                shield.rotation = Quaternion.identity;
+                shield.localScale = Vector3.one * (Radius * 2f * grow);
+                return;
+            }
+            flat.Normalize();
+            shield.position = head + Vector3.down * 0.45f + flat * 0.45f;
+            shield.rotation = Quaternion.LookRotation(flat);
+            shield.localScale = new Vector3(0.75f, 1f, 0.08f) * grow;
         }
     }
 

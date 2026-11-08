@@ -322,6 +322,12 @@ namespace Repulsor
             held = null;
         }
 
+        /// <summary>How much of the room the game knows: furniture for force powers comes from Space Setup.</summary>
+        string RoomStatus() => room == null || game == null || game.Room.Boxes == null
+            ? "Room: waiting for the scene permission"
+            : room.Count > 0 ? $"Room: {room.Count} pieces of furniture found"
+            : "Room: no furniture found. Run Space Setup for force powers.";
+
         /// <summary>
         /// A robot's step toward its target, slid round Space Setup furniture: straight if clear, otherwise the
         /// nearest clear direction up to 90 degrees off, otherwise no move.
