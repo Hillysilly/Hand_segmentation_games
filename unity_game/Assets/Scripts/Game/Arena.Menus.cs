@@ -12,6 +12,8 @@ namespace Repulsor
         const float LostMenuSeconds = 1.5f;
         const float OutOfReachSeconds = 0.5f;
         float menuAwayFor;
+        /// <summary>Degrees the menu sits round from straight ahead (negative is left); the Variant Lab moves it aside.</summary>
+        float menuYaw;
         float menuOutOfReachFor;
 
         static readonly string[] Swatches =
@@ -39,8 +41,7 @@ namespace Repulsor
 
             // Turned well away from the menu for a moment: bring it back in front.
             Vector3 toMenu = Vector3.ProjectOnPlane(menu.position - head.position, Vector3.up);
-            Vector3 facing = Vector3.ProjectOnPlane(head.forward, Vector3.up);
-            menuAwayFor = Vector3.Angle(toMenu, facing) > LostMenuDegrees ? menuAwayFor + dt : 0f;
+            menuAwayFor = Vector3.Angle(toMenu, MenuFacing()) > LostMenuDegrees ? menuAwayFor + dt : 0f;
             // Too far to reach (you walked off, or the headset re-found its position after the menu was placed).
             menuOutOfReachFor = MenuOutOfReach(0.35f) ? menuOutOfReachFor + dt : 0f;
             if (menuAwayFor > LostMenuSeconds || menuOutOfReachFor > OutOfReachSeconds)
@@ -56,10 +57,7 @@ namespace Repulsor
         /// <summary>Puts the menu in front of you, a little low, within reach of your finger.</summary>
         void PlaceMenu()
         {
-            Vector3 forward = Vector3.ProjectOnPlane(head.forward, Vector3.up);
-            if (forward.sqrMagnitude < 1e-4f)
-                forward = Vector3.forward;
-            forward.Normalize();
+            Vector3 forward = MenuFacing();
             menu.position = head.position + forward * MenuLayout.Distance + Vector3.down * MenuLayout.Drop;
             menu.rotation = Quaternion.LookRotation(menu.position - head.position, Vector3.up);
             menuPlaced = head.localPosition != Vector3.zero;
@@ -70,6 +68,15 @@ namespace Repulsor
         /// True when the menu is further away than where it's normally placed by more than <paramref name="slack"/>
         /// metres, sideways or in height. Being closer never counts: you lean in to poke.
         /// </summary>
+        /// <summary>Which way the menu should be from you: where you face, turned by <see cref="menuYaw"/>.</summary>
+        Vector3 MenuFacing()
+        {
+            Vector3 forward = Vector3.ProjectOnPlane(head.forward, Vector3.up);
+            if (forward.sqrMagnitude < 1e-4f)
+                forward = Vector3.forward;
+            return Quaternion.AngleAxis(menuYaw, Vector3.up) * forward.normalized;
+        }
+
         bool MenuOutOfReach(float slack)
         {
             Vector3 offset = menu.position - head.position;
@@ -82,8 +89,7 @@ namespace Repulsor
             menu.gameObject.SetActive(true);
             // Re-place if you've turned away since the last screen.
             Vector3 toMenu = Vector3.ProjectOnPlane(menu.position - head.position, Vector3.up);
-            Vector3 facing = Vector3.ProjectOnPlane(head.forward, Vector3.up);
-            if (!menuPlaced || Vector3.Angle(toMenu, facing) > ReplaceAfterTurn || MenuOutOfReach(0.15f))
+            if (!menuPlaced || Vector3.Angle(toMenu, MenuFacing()) > ReplaceAfterTurn || MenuOutOfReach(0.15f))
                 PlaceMenu();
 
             Ui.Clear(menu);
@@ -99,6 +105,7 @@ namespace Repulsor
 
         void HideMenu()
         {
+            StopPractice();
             HideLabBubble();
             Ui.Clear(menu);
             menu.gameObject.SetActive(false);
@@ -338,6 +345,7 @@ namespace Repulsor
 
         void ShowDebug(System.Action back)
         {
+            StopPractice();
             debugBack = back;
             bool inMatch = phase == Phase.Playing;
             RectTransform s = OpenScreen(new Vector2(500f, 420f), "DEBUG");

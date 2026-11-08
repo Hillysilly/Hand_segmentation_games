@@ -75,5 +75,26 @@ namespace Repulsor.Tests
             yield return Frames(60);
             Assert.That(crashes, Is.Empty, string.Join("\n\n", crashes));
         }
+
+        [UnityTest]
+        public IEnumerator VariantLabLetsYouPractiseTheItem()
+        {
+            SceneManager.LoadScene("Main");
+            yield return Frames(30);
+            var arena = Object.FindAnyObjectByType<Arena>();
+
+            arena.TestOpenLab(3);   // fire pillar: the Mage at level 3
+            yield return new WaitForSecondsRealtime(Enemy.SpawnSeconds + 0.3f);
+            Assert.That(arena.TestPracticeState(), Is.EqualTo("True Mage 3 Repulsor dummy"));
+
+            arena.TestOpenLab(1);   // dragon fist: the Ki fighter at level 3
+            yield return Frames(5);
+            Assert.That(arena.TestPracticeState(), Does.StartWith("True KiFighter 3 Repulsor"));
+
+            arena.TestLeaveLab();
+            yield return Frames(5);
+            Assert.That(arena.TestPracticeState(), Does.StartWith("False Technoman 1 None"));
+            Assert.That(crashes, Is.Empty, string.Join("\n\n", crashes));
+        }
     }
 }

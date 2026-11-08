@@ -59,6 +59,7 @@ namespace Repulsor
 
         public void Init(RepulsorGame owner, HandRepulsor left, HandRepulsor right, RoomDim roomDim)
         {
+            GameLog.Start();
             game = owner;
             leftHand = left;
             rightHand = right;
@@ -96,6 +97,8 @@ namespace Repulsor
             player.Shield.Shattered += () => Log("Shield broke");
             game.Dealt += OnDealt;
             game.Killed += OnKilled;
+            game.HandAim = (left, palm, palmDirection) => Aim.Arm(body, left ? input.Left : input.Right, palm, palmDirection);
+            game.AssistAim = Aim.Assist;
 
             ShowTitle();
 #if DEVELOPMENT_BUILD
@@ -104,11 +107,17 @@ namespace Repulsor
             Log("Ready");
         }
 
+        Vector3 lastHead;
+
         void Update()
         {
             float dt = Time.unscaledDeltaTime;
             input.Tick(game.Hands, game.TrackingSpace, dt);
             body = Stance.From(head.position, head.forward, game.Origin.transform.position.y);
+            // Diagnostic: a head can't move 30 cm in a frame, so a jump means tracking re-found its position.
+            if (lastHead != Vector3.zero && (head.position - lastHead).sqrMagnitude > 0.09f)
+                Log($"Head jumped {(head.position - lastHead).magnitude:0.00} m: tracking re-found its position");
+            lastHead = head.position;
 
 #if DEVELOPMENT_BUILD
             Tuning.Tick();
@@ -132,7 +141,7 @@ namespace Repulsor
             // The HUD lab shows the real panel outside a match too.
             hud.Tick(playing || labItem == 4 ? player : null, Character, dt);
             Vector3 shieldFacing = character == CharacterId.Archer ? head.forward : Vector3.zero;
-            shield.Tick(playing && player.Shield.Up, head.position, shieldFacing, PlayerColor, PickedShield(character), dt);
+            shield.Tick((playing || practicing) && player.Shield.Up, head.position, shieldFacing, PlayerColor, PickedShield(character), dt);
             TickVariantLab(dt);
             death.Tick(playing && player.IsDead, dt);
             hurtFlash.Tick(dt);
@@ -395,22 +404,60 @@ namespace Repulsor
             SpawnEnemy(kind);
         }
 
+        /// <summary>Enemies appear at least this far away, then walk in.</summary>
+        public static float SpawnMinDistance = 2.5f;
+        public static float SpawnMaxDistance = 4.5f;
+
         void SpawnEnemy(EnemyKind kind)
         {
-            // Somewhere ahead-ish, 2.5-4 m away, kept on this side of walls and furniture.
-            Vector3 forward = Vector3.ProjectOnPlane(head.forward, Vector3.up).normalized;
-            Vector3 direction = Quaternion.AngleAxis(Random.Range(-70f, 70f), Vector3.up) * forward;
-            // Out of the wall in that direction if there's one within reach, so they seem to step out of your room.
-            float distance = Random.Range(2.5f, 4f);
-            if (game.Room.TryDistance(head.position, direction, out float wall) && wall < 6f)
-                distance = Mathf.Clamp(wall - 0.5f, 1.5f, 5f);
+            Vector3 direction = SpawnDirection(out float distance, out bool atWall);
             Vector3 point = head.position + direction * distance;
-            point.y = kind == EnemyKind.Robot ? 0.65f : head.position.y + 0.2f;
+            point.y = kind == EnemyKind.Robot ? FloorY + 0.65f : head.position.y + 0.2f;
             Enemy enemy = Enemy.Spawn(kind, point, this, head, foes, ++nextEnemyId);
             enemies.Add(enemy);
             OverheadBar.Attach(enemy, head, foes, false);
             game.PlayAt(point, spawnSound);
-            Log($"{kind} spawned {distance:0.0} m away");
+            Log($"{kind} spawned {distance:0.0} m away{(atWall ? " out of a wall" : "")}, "
+                + $"{Vector3.SignedAngle(Vector3.ProjectOnPlane(head.forward, Vector3.up), direction, Vector3.up):0} deg from where you face");
+        }
+
+        float FloorY => game.Origin.transform.position.y;
+
+        /// <summary>
+        /// Picks where the next enemy comes from: somewhere you can see (within 80 degrees of where you face) with
+        /// the most room, so it can walk in from a distance. Out of the wall when the wall is in range, so it seems
+        /// to step out of your room. Rays start 0.5 m out so your own hands and arms aren't taken for a wall.
+        /// </summary>
+        Vector3 SpawnDirection(out float distance, out bool atWall)
+        {
+            Vector3 forward = Vector3.ProjectOnPlane(head.forward, Vector3.up);
+            if (forward.sqrMagnitude < 1e-4f)
+                forward = Vector3.forward;
+            forward.Normalize();
+            const int Tries = 9;
+            Vector3 bestDirection = forward;
+            float bestScore = -1f;
+            float free = SpawnMaxDistance + 1f;
+            float offset = Random.Range(-10f, 10f);
+            for (int i = 0; i < Tries; i++)
+            {
+                float angle = Mathf.Lerp(-80f, 80f, i / (Tries - 1f)) + offset;
+                Vector3 direction = Quaternion.AngleAxis(angle, Vector3.up) * forward;
+                float room = SpawnMaxDistance + 1f;
+                if (game.Room.TryDistance(head.position + direction * 0.5f, direction, out float wall))
+                    room = wall + 0.5f;
+                // A little randomness so enemies don't all come from the one longest direction.
+                float score = Mathf.Min(room, SpawnMaxDistance + 0.5f) + Random.Range(0f, 1.2f);
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestDirection = direction;
+                    free = room;
+                }
+            }
+            atWall = free <= SpawnMaxDistance + 0.4f;
+            distance = atWall ? Mathf.Max(1.2f, free - 0.4f) : Random.Range(SpawnMinDistance, SpawnMaxDistance);
+            return bestDirection;
         }
 
         void ClearProxies()
@@ -479,7 +526,7 @@ namespace Repulsor
 
         void OnDealt(IHittable target, float amount)
         {
-            if (phase == Phase.Playing && !applyingRemoteHit)
+            if ((phase == Phase.Playing || practicing) && !applyingRemoteHit)
             {
                 player.DealtDamage(amount);
                 damageNumbers.Add(target, amount);
@@ -566,14 +613,15 @@ namespace Repulsor
                 return;
             }
             // Not while posing to transform either: opening the fists afterwards would fire into the floor.
-            bool fighting = phase == Phase.Playing && !paused && !player.IsDead && !player.Shield.Up && !xArms.Held
-                && !powerUp.Posing && waves != null && !CountingDown;
+            // The Variant Lab's practice counts as fighting, outside a match.
+            bool inPlay = practicing || (phase == Phase.Playing && !paused && waves != null && !CountingDown);
+            bool fighting = inPlay && !player.IsDead && !player.Shield.Up && !xArms.Held && !powerUp.Posing;
             game.Arm(fighting && handsBusyFor <= 0f ? WeaponFor(character, player.Level) : Weapon.None);
-            int level = phase == Phase.Playing ? player.Level : 1;
+            int level = phase == Phase.Playing || practicing ? player.Level : 1;
             game.LaserDps = Damage.LaserPerSecond * (1f + 0.4f * (level - 1));
             game.RepulsorDamage = Damage.Repulsor * (level >= 2 && character == CharacterId.KiFighter ? 1.3f : 1f);
             game.RepulsorAoe = character == CharacterId.Technoman && level >= 3 ? 0.8f : 0f;
-            game.SetWeaponColor(phase == Phase.Playing ? AttackColor : RepulsorGame.DefaultWeaponColor);
+            game.SetWeaponColor(phase == Phase.Playing || practicing ? AttackColor : RepulsorGame.DefaultWeaponColor);
             game.CometStyle = character == CharacterId.KiFighter ? PickedComet : 0;
             TickAbilities(fighting, paused ? 0f : Time.deltaTime);
         }
@@ -693,6 +741,22 @@ namespace Repulsor
                     return enemy.Hp;
             return -1f;
         }
+
+        /// <summary>PlayMode test: open the Variant Lab on one item from the title screen's debug menu.</summary>
+        public void TestOpenLab(int item)
+        {
+            ShowTitle();
+            ShowDebug(ShowTitle);
+            labItem = item;
+            ShowVariantLab();
+        }
+
+        /// <summary>PlayMode test: leave the lab the way its BACK button does.</summary>
+        public void TestLeaveLab() => ShowDebug(debugBack);
+
+        /// <summary>PlayMode test: practice state, as "practicing character level weapon dummy".</summary>
+        public string TestPracticeState() =>
+            $"{practicing} {character} {player.Level} {game.ArmedWeapon} {(practiceDummy != null && practiceDummy.Alive ? "dummy" : "none")}";
 
         /// <summary>PlayMode smoke test: knock the player out, then run the clock past the respawn.</summary>
         public void TestKnockOutAndRespawn()
