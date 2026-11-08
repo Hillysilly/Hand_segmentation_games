@@ -185,7 +185,7 @@ Sketchfab needs a login to download. If you grab G1 as glTF into `assets/models/
 
 | Character | Name | L1 | L2 | L3 | Shield | Visuals | Checked by you |
 |---|---|---|---|---|---|---|---|
-| Technoman | | ✅ laser | ✅ +repulsor | ✅ AOE repulsor | ✅ hex | no gauntlets / tight aura yet | |
+| Technoman | | ✅ laser | ✅ +repulsor | ✅ AOE repulsor | ✅ hex | L3 glow: your hands glow, others see a body glow; no gauntlets yet | |
 | Ki fighter | | ✅ comet (yellow) | ✅ energy ball | ✅ dragon fist (4 looks in Variant Lab) | flame | aura 2 at L2, blue at L3 | |
 | Mage | | ✅ fireball | force: needs room objects | ✅ fire pillar (3 looks in Variant Lab) | thin | rune aura L2-3 | |
 | Saber | | ✅ finger-gun blaster + aim line | ✅ laser sword | force: needs room objects | glass | light aura | |

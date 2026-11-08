@@ -140,9 +140,35 @@ namespace Repulsor
             TickGestureLab(dt);
             UpdateArms();
             LogPerformance(dt);
+            ShowHandAura();
         }
 
         readonly GameObject[] fistGlow = new GameObject[2];
+        readonly Bubble[] handAura = new Bubble[2];
+
+        /// <summary>Technoman level 3's glow outline, as you see it: your own hands glow (your body is out of view).</summary>
+        void ShowHandAura()
+        {
+            bool on = phase == Phase.Playing && !player.IsDead && character == CharacterId.Technoman && player.Level >= 3;
+            for (int i = 0; i < 2; i++)
+            {
+                HandPose hand = i == 0 ? input.Left : input.Right;
+                if (handAura[i] == null)
+                {
+                    if (!on)
+                        continue;
+                    handAura[i] = Bubble.Create("Hand Aura", transform);
+                }
+                bool show = on && hand.Tracked;
+                if (show)
+                {
+                    handAura[i].transform.position = (hand.Palm + hand[Joint.MiddleProximal]) * 0.5f;
+                    handAura[i].transform.rotation = Quaternion.LookRotation(hand.Forward, -hand.PalmNormal);
+                    handAura[i].transform.localScale = new Vector3(0.14f, 0.07f, 0.2f);
+                }
+                handAura[i].Show(AttackColor, BubbleStyle.Energy, show ? 0.55f + 0.1f * Mathf.Sin(Time.time * 6f + i) : 0f);
+            }
+        }
 
         /// <summary>While posing to transform: energy gathering in both fists, growing until it goes off.</summary>
         void ShowPowerUpCharge(float progress)
