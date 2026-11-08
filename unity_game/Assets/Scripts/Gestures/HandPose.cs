@@ -34,6 +34,11 @@ namespace Repulsor
         /// <summary>Finger gun: the index is out past this, and the ring and little fingers are in below <see cref="GunOthersBelow"/>.</summary>
         public static float GunIndexAbove = 1.35f;
         public static float GunOthersBelow = 1.42f;
+        /// <summary>Spider sign: index and little above these, middle and ring below, and this much apart.</summary>
+        public static float SpiderIndexAbove = 1.4f;
+        public static float SpiderLittleAbove = 1.3f;
+        public static float SpiderInnerBelow = 1.45f;
+        public static float SpiderGap = 0.1f;
         public static float CupLow = 1.2f;
         public static float CupHigh = 1.65f;
 
@@ -58,7 +63,7 @@ namespace Repulsor
         public bool Ok { get; private set; }
         /// <summary>Index and middle straight, ring and little curled, thumb up.</summary>
         public bool Gun { get; private set; }
-        /// <summary>Index and little straight, middle and ring curled.</summary>
+        /// <summary>Index and little out, middle and ring in (loosely).</summary>
         public bool SpiderSign { get; private set; }
         /// <summary>Every finger half bent, like holding a ball.</summary>
         public bool Cup { get; private set; }
@@ -114,9 +119,13 @@ namespace Repulsor
             float gunGive = Gun ? 0.1f : 0f;
             Gun = Index > GunIndexAbove - gunGive && Ring < GunOthersBelow + gunGive && Little < GunOthersBelow + gunGive;
 
-            float open = OpenAbove - (SpiderSign ? slack : 0f);
-            float curled = CurledBelow + (SpiderSign ? slack : 0f);
-            SpiderSign = Index > open && Little > open && Middle < curled && Ring < curled;
+            // Spider sign, loose like the gun: index and little out, middle and ring clearly more bent than them.
+            // Real little fingers rarely straighten fully and the ring finger follows them part way.
+            float spiderGive = SpiderSign ? 0.1f : 0f;
+            float outer = Mathf.Min(Index, Little);
+            float inner = Mathf.Max(Middle, Ring);
+            SpiderSign = Index > SpiderIndexAbove - spiderGive && Little > SpiderLittleAbove - spiderGive
+                && inner < SpiderInnerBelow + spiderGive && outer - inner > SpiderGap - spiderGive;
 
             float average = (Index + Middle + Ring + Little) * 0.25f;
             Cup = InRange(Index) && InRange(Middle) && InRange(Ring) && InRange(Little)

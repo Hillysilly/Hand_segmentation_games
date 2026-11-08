@@ -77,6 +77,27 @@ namespace Repulsor.Tests
         }
 
         [UnityTest]
+        public IEnumerator SpiderWebsAnEnemyAndFlingsIt()
+        {
+            SceneManager.LoadScene("Main");
+            yield return Frames(30);
+            var arena = Object.FindAnyObjectByType<Arena>();
+            arena.TestStart(CharacterId.Spider);
+            yield return Frames(10);
+            arena.TestSkipTime(WaveDirector.CountdownSeconds + 0.5f);
+            yield return new WaitForSecondsRealtime(Enemy.SpawnSeconds + 0.5f);
+            arena.TestAdvance();   // level 2
+
+            (ushort id, float hp) = arena.TestWebAndFling();
+            Assert.That(id, Is.Not.EqualTo(0), "no enemy was ready to web");
+            yield return new WaitForSecondsRealtime(2f);
+            Assert.That(arena.TestAnyWebbed, Is.False, "the flung enemy never landed");
+            float after = arena.TestEnemyHp(id);
+            Assert.That(after < hp, Is.True, $"landing didn't hurt it ({hp} then {after}; -1 means it died)");
+            Assert.That(crashes, Is.Empty, string.Join("\n\n", crashes));
+        }
+
+        [UnityTest]
         public IEnumerator VariantLabLetsYouPractiseTheItem()
         {
             SceneManager.LoadScene("Main");

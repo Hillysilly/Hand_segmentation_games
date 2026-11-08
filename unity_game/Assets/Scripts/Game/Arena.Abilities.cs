@@ -7,6 +7,8 @@ namespace Repulsor
     /// - Ki fighter: energy ball (level 2) and dragon fist (level 3)
     /// - Saber: finger-gun blaster (level 1) and laser sword (level 2)
     /// - Archer: finger-gun crossbow that reloads (level 1) and bow (level 2)
+    /// - Spider: webs with an aim line (level 1); from level 2 webs grab furniture or enemies to swing and fling
+    ///   (Arena.WebSwing)
     /// - Mage: flamethrower (level 2, the palm laser drawn as fire in HandRepulsor) and triangle fire pillar (level 3)
     /// Each runs only while the player can fight. Looks marked placeholder get their own variants later.
     /// </summary>
@@ -113,6 +115,12 @@ namespace Repulsor
                 }
             }
             spiderSense.Tick(canFight && character == CharacterId.Spider, dt);
+            if (swinging != null && (!canFight || character != CharacterId.Spider))
+            {
+                ReleaseWebbed(swinging);
+                swinging = null;
+            }
+            TickFlung(dt);
 
             handsBusyFor = Mathf.Max(0f, handsBusyFor - dt);
             // Each detector only updates for its own character, so only that character's counts (a stale one can't lock others out).
@@ -392,20 +400,45 @@ namespace Repulsor
                 return;
             }
 
+            if (TickWebSwing(dt))
+                return;
+
             // Webs: a strand to a small pale shot and a splat where it lands; darker and stronger at level 3.
+            // From level 2 a web grabs the enemy or furniture it's aimed at; what it would grab is shown first.
             bool black = player.Level >= 3;
             Color color = black ? new Color(0.35f, 0.1f, 0.45f) : new Color(0.9f, 0.92f, 1f);
             for (int i = 0; i < 2; i++)
             {
                 HandPose hand = i == 0 ? input.Left : input.Right;
-                if (!web[i].Step(hand, body, dt, out Vector3 origin, out Vector3 direction))
+                bool fired = web[i].Step(hand, body, dt, out Vector3 origin, out Vector3 direction);
+                if (!web[i].Aiming)
                     continue;
-                if (player.Level >= 2 && room.TryAim(origin, direction, out var box))
+                Enemy grab = WebGrabTarget(origin, direction);
+                UnityEngine.XR.ARFoundation.ARBoundingBox box = null;
+                bool onBox = grab == null && player.Level >= 2 && room.TryAim(origin, direction, out box);
+                Vector3 aimed = Aim.Assist(origin, direction);
+                if (grab != null)
+                    ShowAim(i, origin, grab.Center);
+                else if (onBox)
+                {
+                    room.Highlight(box, color);
+                    ShowAim(i, origin, origin + direction * Mathf.Max(0.3f, Vector3.Distance(origin, box.transform.position)));
+                }
+                else
+                    ShowAim(i, origin, origin + aimed * 4f);
+                if (!fired)
+                    continue;
+                if (grab != null)
+                {
+                    WebEnemy(grab, i);
+                    return;
+                }
+                if (onBox)
                 {
                     LiftBox(box, i, color);
-                    continue;
+                    return;
                 }
-                Blast shot = game.FireBlast(origin, direction, 0.3f, 0.35f, 1.6f, player.Outgoing(black ? 7f : 5f), 0f, color);
+                Blast shot = game.FireBlast(origin, aimed, 0.3f, 0.35f, 1.6f, player.Outgoing(black ? 7f : 5f), 0f, color);
                 WebStrand.Attach(shot, origin, black ? new Color(0.25f, 0.2f, 0.3f) : Color.white, foes);
             }
         }

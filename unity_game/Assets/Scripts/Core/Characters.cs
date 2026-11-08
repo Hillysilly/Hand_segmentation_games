@@ -95,8 +95,8 @@ namespace Repulsor
                 Color = "#E02030", AuraStyle = new[] { 0, 0, 0 }, Shield = "Web cocoon",
                 Controls = new[]
                 {
-                    new[] { "Spider sign (index and little finger out): web shot", "Spider sense warns of unseen enemies" },
-                    new[] { "Web an object, then swing your arm: fling it", "Webbed gloves" },
+                    new[] { "Spider sign (index and little finger out): webs, hold it to keep firing", "Spider sense warns of unseen enemies" },
+                    new[] { "Web an enemy or an object, then swing your arm to smash and fling it", "Webbed gloves" },
                     new[] { "Black webs, more damage", "Black gloves" },
                 },
             },

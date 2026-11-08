@@ -315,18 +315,39 @@ namespace Repulsor.Tests
         }
 
         [Test]
-        public void SpiderSignShootsOncePerSign()
+        public void SpiderSignShootsAtOnceThenKeepsShootingWhileHeld()
         {
             var hand = new HandPose(false);
             var web = new SpiderSignDetector();
             int shots = 0;
-            for (int i = 0; i < 60; i++)
+            float firstShot = -1f;
+            float time = 0f;
+            for (; time < 1f; time += Frame)
             {
                 hand.Pose(new Vector3(0.2f, 1.3f, 0.3f), Quaternion.identity, 0f, 1f, 1f, 0f, ThumbPose.Out);
                 hand.Analyze();
-                shots += web.Step(hand, Body, Frame, out _, out _) ? 1 : 0;
+                if (web.Step(hand, Body, Frame, out _, out _))
+                {
+                    shots++;
+                    if (firstShot < 0f)
+                        firstShot = time;
+                }
             }
-            Assert.That(shots, Is.EqualTo(1));
+            Assert.That(firstShot, Is.LessThan(0.1f), "the first web goes out straight away");
+            Assert.That(shots, Is.InRange(3, 4), "then one every 0.3 s");
+        }
+
+        [Test]
+        public void ALooseSpiderSignStillCounts()
+        {
+            var hand = new HandPose(false);
+            // Index mostly out, little finger half out, middle and ring only partly curled.
+            hand.Pose(new Vector3(0.2f, 1.3f, 0.3f), Quaternion.identity, 0.15f, 0.6f, 0.55f, 0.3f, ThumbPose.Tucked);
+            hand.Analyze();
+            Assert.That(hand.SpiderSign, Is.True, $"i{hand.Index:0.00} m{hand.Middle:0.00} r{hand.Ring:0.00} l{hand.Little:0.00}");
+            hand.Pose(new Vector3(0.2f, 1.3f, 0.3f), Quaternion.identity, 0.3f, 0.3f, 0.3f, 0.3f, ThumbPose.Out);
+            hand.Analyze();
+            Assert.That(hand.SpiderSign, Is.False, "a relaxed hand");
         }
 
         [Test]

@@ -763,6 +763,30 @@ namespace Repulsor
         public string TestLabEnemyLooks() => string.Join(", ", System.Linq.Enumerable.Select(labEnemies,
             e => e == null ? "none" : e.GetComponentInChildren<EnemyLook>(true) is EnemyLook look ? look.name : "placeholder"));
 
+        /// <summary>
+        /// PlayMode test: webs the first enemy that's ready, as a level 2 Spider's web would, and flings it at the
+        /// floor. Returns its id and HP, or id 0 if no enemy was ready.
+        /// </summary>
+        public (ushort id, float hp) TestWebAndFling()
+        {
+            foreach (IHittable foe in enemies)
+            {
+                if (!(foe is Enemy enemy) || enemy == null || !enemy.Alive || enemy.Spawning)
+                    continue;
+                float hp = enemy.Hp;
+                WebEnemy(enemy, 1);
+                Webbed thrown = swinging;
+                swinging = null;
+                thrown.Velocity = Vector3.down * 3f;
+                flung.Add(thrown);
+                return (enemy.Id, hp);
+            }
+            return (0, 0f);
+        }
+
+        /// <summary>PlayMode test: anything still held or flying in a web.</summary>
+        public bool TestAnyWebbed => swinging != null || flung.Count > 0;
+
         /// <summary>PlayMode test: leave the lab the way its BACK button does.</summary>
         public void TestLeaveLab() => ShowDebug(debugBack);
 

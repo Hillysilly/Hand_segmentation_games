@@ -445,24 +445,42 @@ namespace Repulsor
         }
     }
 
-    /// <summary>Web shot: one shot each time the spider sign is made.</summary>
+    /// <summary>
+    /// Web shots: one as soon as the spider sign is made, then more every <see cref="Repeat"/> seconds while it's
+    /// held. Kept loose (see <see cref="HandPose.SpiderSign"/>), with a short dropout grace.
+    /// </summary>
     public sealed class SpiderSignDetector
     {
-        public static float Cooldown = 0.4f;
-        readonly HoldTimer hold = new HoldTimer(0.08f, 0.06f);
+        public static float Cooldown = 0.15f;
+        public static float Repeat = 0.3f;
+        readonly HoldTimer hold = new HoldTimer(0.04f, 0.12f);
         float cooldown;
+
+        /// <summary>The sign is held: show where webs go.</summary>
+        public bool Aiming => hold.On;
 
         public bool Step(HandPose hand, Stance body, float dt, out Vector3 origin, out Vector3 direction)
         {
-            origin = direction = default;
             cooldown -= dt;
-            hold.Step(hand.SpiderSign, dt);
-            if (!hold.JustOn || cooldown > 0f)
+            hold.Step(hand.SpiderSign && hand.Tracked, dt);
+            Aim(hand, body, out origin, out direction);
+            if (!hold.On)
+            {
+                // A fresh sign can fire soon after letting go; holding one repeats more slowly.
+                cooldown = Mathf.Min(cooldown, Cooldown);
                 return false;
+            }
+            if (cooldown > 0f)
+                return false;
+            cooldown = Repeat;
+            return true;
+        }
+
+        /// <summary>Where a web from this hand goes: from the wrist, half along the hand and half along the arm.</summary>
+        public static void Aim(HandPose hand, Stance body, out Vector3 origin, out Vector3 direction)
+        {
             origin = hand.Wrist + hand.Forward * 0.04f;
             direction = Vector3.Slerp(hand.Forward, body.ArmDirection(hand.IsLeft, hand.Palm), 0.5f).normalized;
-            cooldown = Cooldown;
-            return true;
         }
     }
 

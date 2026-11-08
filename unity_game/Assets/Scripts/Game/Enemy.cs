@@ -50,6 +50,8 @@ namespace Repulsor
         public bool IsProxy { get; private set; }
         /// <summary>The Variant Lab's practice robot: stands still and never shoots.</summary>
         public bool Practice { get; set; }
+        /// <summary>Caught in the Spider's web: it stops thinking and goes where the web puts it.</summary>
+        public bool Webbed { get; set; }
         Vector3 netPosition;
         public float Radius => Kind == EnemyKind.Robot ? 0.28f : 0.16f;
         public Vector3 Center => transform.position;
@@ -155,6 +157,12 @@ namespace Repulsor
             }
             if (!Alive)
                 return;
+            if (Webbed)
+            {
+                walking = false;
+                lastPosition = transform.position;
+                return;
+            }
             // Diagnostic: enemies only ever move a few centimetres a frame, so a big step is worth a log line.
             if ((transform.position - lastPosition).sqrMagnitude > 0.25f)
                 Debug.Log($"[Enemy] {Kind} {Id} jumped {(transform.position - lastPosition).magnitude:0.00} m, {lastPosition} to {transform.position}, age {age:0.00}{(IsProxy ? " (copy)" : "")}");
@@ -192,7 +200,9 @@ namespace Repulsor
                     transform.position += arena.Steer(transform.position, direction, RobotSpeed * dt);
                 // The placeholder bobs; a model walks.
                 float bob = look == null ? Mathf.Abs(Mathf.Sin(age * 3f)) * 0.03f : 0f;
-                transform.position = new Vector3(transform.position.x, floorY + 0.65f + bob, transform.position.z);
+                // Settles back to the floor after being thrown about.
+                float y = Mathf.MoveTowards(transform.position.y, floorY + 0.65f + bob, 4f * dt);
+                transform.position = new Vector3(transform.position.x, y, transform.position.z);
             }
             else
             {

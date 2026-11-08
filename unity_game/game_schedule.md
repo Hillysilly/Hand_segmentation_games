@@ -93,7 +93,8 @@ says how much furniture the game found, which the force powers need.
    - Mage: level 2, hold a palm out for the flamethrower; level 3, triangle, then fists for the fire pillar.
    - Saber: finger gun, then a fist for the sword.
    - Archer: fists together, then pull one back for the bow.
-   - Spider: index and little finger out to shoot webs.
+   - Spider: index and little finger out to shoot webs (hold to keep firing, with an aim line). Level 2: web an
+     enemy and swing your arm to smash it into others, swing fast to fling it; furniture you'd grab lights up.
 5. **Variant batches 1-2:** DEBUG > VARIANT LAB. Use < and > to switch item.
    - HUD: A low right, B low centre, C top centre. Saved as soon as you poke one.
    - SHIELDS: poke A-E, then SAVE PICK for each character you care about.
