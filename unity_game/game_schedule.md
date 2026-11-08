@@ -62,6 +62,7 @@ The new build is installed. Pick it up and move around until it finds its positi
    - SHIELDS tab: poke A-E, then SAVE PICK for each character you care about.
    - DRAGON FIST tab: A comet, B three twisting comets, C punch wave, D both. Poke to fire one, then SAVE PICK.
    - ENERGY BALL tab: A crackle, B glowing shell, C fiery shell. PC render: `unity_game/Logs/preview_energy_balls.png`.
+   - FIRE PILLAR tab: A flame column, B energy column, C both with a floor ring. PC render: `unity_game/Logs/preview_fire_pillars.png`.
    PC renders are in `unity_game/Logs/preview_shield_*.png`.
 6. HUD: is it readable, in a good spot, too big or too small?
 7. **When the second Quest arrives:** install the same build on both (`build_and_run.ps1 -NoBuild` with each plugged
@@ -133,7 +134,7 @@ All of these say CC0 on their pages. I'll check each licence file when downloadi
 |---|---|---|---|---|---|---|---|
 | Technoman | | ✅ laser | ✅ +repulsor | ✅ AOE repulsor | ✅ hex | no gauntlets / tight aura yet | |
 | Ki fighter | | ✅ comet (yellow) | ✅ energy ball | ✅ dragon fist (4 looks in Variant Lab) | flame (needs work) | aura 2 at L2, blue at L3 | |
-| Mage | | ✅ fireball | force: needs room objects | ✅ fire pillar (placeholder look) | thin | rune aura L2-3 | |
+| Mage | | ✅ fireball | force: needs room objects | ✅ fire pillar (3 looks in Variant Lab) | thin | rune aura L2-3 | |
 | Saber | | ✅ finger-gun blaster + aim line | ✅ laser sword | force: needs room objects | glass | light aura | |
 | Archer | | ✅ crossbow (reloads) | ✅ bow + aim line | ✅ smoke bomb (blinds enemies), piercing arrows | (knight shield: needs model) | wings: needs model | |
 | Spider | | | | | | | |

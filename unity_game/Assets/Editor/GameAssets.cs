@@ -23,6 +23,7 @@ public static class GameAssets
         SaveMesh("SphereMesh", PrimitiveType.Sphere);
         SaveMesh("QuadMesh", PrimitiveType.Quad);
         SaveMesh("CubeMesh", PrimitiveType.Cube);
+        SaveMesh("CylinderMesh", PrimitiveType.Cylinder);
         EnableBoundingBoxes();
         PlayerSettings.Android.forceInternetPermission = true;   // LAN multiplayer
         Save("EnemyPlaceholder", "Repulsor/Orb", m => m.SetColor("_BaseColor", new Color(0.85f, 0.2f, 0.15f)));

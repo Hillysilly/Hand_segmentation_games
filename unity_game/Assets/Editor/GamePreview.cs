@@ -21,6 +21,19 @@ public static class GamePreview
         RenderTinted();
     }
 
+    /// <summary>The three fire pillar looks, half a second in, left to right A B C.</summary>
+    public static void RenderPillars()
+    {
+        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        var orange = new Color(1f, 0.42f, 0.12f);
+        for (int i = 0; i < 3; i++)
+        {
+            FirePillar pillar = FirePillar.Spawn(new Vector3(-1.6f + i * 1.6f, 0f, 4f), orange, i, null);
+            pillar.ShowAt(0.5f);
+        }
+        Save(new Vector3(0f, 1.5f, 0f), Quaternion.LookRotation(new Vector3(0f, -0.05f, 1f)), 70f, "Logs/preview_fire_pillars.png");
+    }
+
     /// <summary>The three energy ball looks side by side: crackle, glow shell, fire shell (left to right).</summary>
     public static void RenderBalls()
     {

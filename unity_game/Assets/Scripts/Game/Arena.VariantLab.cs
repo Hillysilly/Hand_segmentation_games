@@ -19,29 +19,73 @@ namespace Repulsor
         int labItem;
 
         int PickedDragon => PlayerPrefs.GetInt(DragonPickKey, 0);
+        const string PillarPickKey = "variant.pillar";
+        int PickedPillar => PlayerPrefs.GetInt(PillarPickKey, 0);
+        int pillarTried = -1;
+
+        void ShowPillarLab()
+        {
+            Time.timeScale = 1f;
+            RectTransform s = OpenScreen(new Vector2(480f, 320f), "VARIANT LAB");
+            LabTabs(s);
+            Ui.Label(s, "The Mage's fire pillar. Poke a style to raise one 2 m ahead of you.",
+                new Vector2(0f, 72f), new Vector2(450f, 20f), 12).color = Ui.Muted;
+            for (int i = 0; i < FirePillar.StyleNames.Length; i++)
+            {
+                int style = i;
+                PokeButton b = Ui.Button(s, FirePillar.StyleNames[i], new Vector2(-130f + i * 130f, 25f), new Vector2(120f, 44f), () =>
+                {
+                    Vector3 forward = Vector3.ProjectOnPlane(head.forward, Vector3.up).normalized;
+                    Vector3 point = head.position + forward * 2f;
+                    point.y = game.Origin.transform.position.y;
+                    FirePillar.Spawn(point, PlayerColor, style, transform);
+                    game.PlayAt(point, game.BoomSound);
+                    pillarTried = style;
+                    ShowVariantLab();
+                }, 13);
+                b.Selected = i == (pillarTried >= 0 ? pillarTried : PickedPillar);
+            }
+            Ui.Button(s, "SAVE PICK", new Vector2(-90f, -55f), new Vector2(150f, 44f), () =>
+            {
+                if (pillarTried < 0)
+                    return;
+                PlayerPrefs.SetInt(PillarPickKey, pillarTried);
+                PlayerPrefs.Save();
+                Debug.Log($"[Variant] Fire pillar: {FirePillar.StyleNames[pillarTried]}");
+                hud.Message("SAVED", $"Fire pillar {FirePillar.StyleNames[pillarTried]}", 1.5f);
+            }, 16);
+            Ui.Button(s, "BACK", new Vector2(90f, -55f), new Vector2(150f, 44f), () => ShowDebug(debugBack), 16);
+        }
 
         void LabTabs(RectTransform s)
         {
-            PokeButton shields = Ui.Button(s, "SHIELDS", new Vector2(-155f, 105f), new Vector2(140f, 32f), () =>
+            PokeButton shields = Ui.Button(s, "SHIELDS", new Vector2(-174f, 105f), new Vector2(108f, 32f), () =>
             {
                 labItem = 0;
                 ShowVariantLab();
-            }, 14);
+            }, 12);
             shields.Selected = labItem == 0;
-            PokeButton dragon = Ui.Button(s, "DRAGON FIST", new Vector2(0f, 105f), new Vector2(140f, 32f), () =>
+            PokeButton dragon = Ui.Button(s, "DRAGON FIST", new Vector2(-58f, 105f), new Vector2(108f, 32f), () =>
             {
                 labItem = 1;
                 HideLabBubble();
                 ShowVariantLab();
-            }, 14);
+            }, 12);
             dragon.Selected = labItem == 1;
-            PokeButton ball = Ui.Button(s, "ENERGY BALL", new Vector2(155f, 105f), new Vector2(140f, 32f), () =>
+            PokeButton ball = Ui.Button(s, "ENERGY BALL", new Vector2(58f, 105f), new Vector2(108f, 32f), () =>
             {
                 labItem = 2;
                 HideLabBubble();
                 ShowVariantLab();
-            }, 14);
+            }, 12);
             ball.Selected = labItem == 2;
+            PokeButton pillar = Ui.Button(s, "FIRE PILLAR", new Vector2(174f, 105f), new Vector2(108f, 32f), () =>
+            {
+                labItem = 3;
+                HideLabBubble();
+                ShowVariantLab();
+            }, 12);
+            pillar.Selected = labItem == 3;
         }
 
         void ShowDragonLab()
@@ -140,6 +184,11 @@ namespace Repulsor
             if (labItem == 2)
             {
                 ShowBallLab();
+                return;
+            }
+            if (labItem == 3)
+            {
+                ShowPillarLab();
                 return;
             }
             RectTransform s = OpenScreen(new Vector2(480f, 320f), "VARIANT LAB");

@@ -249,9 +249,8 @@ namespace Repulsor
                 return;
             if (triangle.Step(input.Left, input.Right, body, dt, out Vector3 target))
             {
-                // Placeholder look: an explosion with a column of fire rising from it.
                 game.Explode(target + Vector3.up * 0.6f, 1.1f, player.Outgoing(25f), AttackColor);
-                game.FireBlast(target, Vector3.up, 1f, 3f, 0.7f, 0f, 0f);
+                FirePillar.Spawn(target, AttackColor, PickedPillar, foes);
                 Log($"Fire pillar {Vector3.Distance(Flat(head.position), Flat(target)):0.0} m away");
             }
             if (triangle.Aiming)
