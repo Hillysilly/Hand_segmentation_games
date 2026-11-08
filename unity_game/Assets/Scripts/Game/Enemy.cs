@@ -14,10 +14,13 @@ namespace Repulsor
         public const float SpawnSeconds = 0.9f;
         const float RobotHp = 30f;
         const float DroneHp = 15f;
-        const float RobotSpeed = 0.55f;
-        const float DroneSpeed = 0.9f;
-        const float RobotRange = 2.2f;
-        const float DroneRange = 1.8f;
+        // They walk in slowly and stop about an arm and a half away.
+        public static float RobotSpeed = 0.35f;
+        public static float DroneSpeed = 0.45f;
+        public static float RobotRange = 1.3f;
+        public static float DroneRange = 1.2f;
+        /// <summary>Sideways weaving of drones, in metres per second at its widest.</summary>
+        public static float DroneWeave = 0.25f;
         const float RobotAimError = 9f;    // degrees: they miss a fair amount
         const float DroneAimError = 12f;
 
@@ -34,12 +37,16 @@ namespace Repulsor
         float flash;
         float weave;
         float weaveSpeed;
+        Vector3 lastPosition;
+        float floorY;
 
         public EnemyKind Kind { get; private set; }
         /// <summary>Shared by both headsets in co-op.</summary>
         public ushort Id { get; private set; }
         /// <summary>A copy of an enemy the host runs: no thinking or shooting of its own, it follows the host.</summary>
         public bool IsProxy { get; private set; }
+        /// <summary>The Variant Lab's practice robot: stands still and never shoots.</summary>
+        public bool Practice { get; set; }
         Vector3 netPosition;
         public float Radius => Kind == EnemyKind.Robot ? 0.28f : 0.16f;
         public Vector3 Center => transform.position;
@@ -91,6 +98,8 @@ namespace Repulsor
             enemy.weave = Random.value * 10f;
             enemy.weaveSpeed = Random.Range(0.8f, 1.4f);
             enemy.spawnBubble = Bubble.Create("Spawn Bubble", parent);
+            enemy.lastPosition = position;
+            enemy.floorY = position.y - (kind == EnemyKind.Robot ? 0.65f : 0f);
             enemy.Shape();
             return enemy;
         }
@@ -125,6 +134,10 @@ namespace Repulsor
             body.SetPropertyBlock(properties);
             if (!Alive)
                 return;
+            // Diagnostic: enemies only ever move a few centimetres a frame, so a big step is worth a log line.
+            if ((transform.position - lastPosition).sqrMagnitude > 0.25f)
+                Debug.Log($"[Enemy] {Kind} {Id} jumped {(transform.position - lastPosition).magnitude:0.00} m, {lastPosition} to {transform.position}, age {age:0.00}{(IsProxy ? " (copy)" : "")}");
+            lastPosition = transform.position;
             if (IsProxy)
             {
                 transform.position = Vector3.Lerp(transform.position, netPosition, 1f - Mathf.Exp(-12f * dt));
@@ -135,6 +148,13 @@ namespace Repulsor
             }
             if (Spawning)
                 return;
+            if (Practice)
+            {
+                Vector3 look = Vector3.ProjectOnPlane(head.position - transform.position, Vector3.up);
+                if (look.sqrMagnitude > 1e-4f)
+                    transform.rotation = Quaternion.LookRotation(look);
+                return;
+            }
 
             // Goes for whichever player is nearest.
             Vector3 target = arena.NearestPlayerHead(transform.position);
@@ -148,14 +168,14 @@ namespace Repulsor
             {
                 if (distance > RobotRange)
                     transform.position += arena.Steer(transform.position, direction, RobotSpeed * dt);
-                transform.position = new Vector3(transform.position.x, 0.65f + Mathf.Abs(Mathf.Sin(age * 6f)) * 0.03f, transform.position.z);
+                transform.position = new Vector3(transform.position.x, floorY + 0.65f + Mathf.Abs(Mathf.Sin(age * 3f)) * 0.03f, transform.position.z);
             }
             else
             {
                 weave += dt * weaveSpeed;
-                Vector3 side = Vector3.Cross(Vector3.up, direction) * (Mathf.Sin(weave * 2f) * 0.6f);
-                Vector3 move = (distance > DroneRange ? direction : Vector3.zero) + side;
-                transform.position += move * (DroneSpeed * dt);
+                Vector3 side = Vector3.Cross(Vector3.up, direction) * (Mathf.Sin(weave * 2f) * DroneWeave);
+                Vector3 move = (distance > DroneRange ? direction * DroneSpeed : Vector3.zero) + side;
+                transform.position += move * dt;
                 float height = target.y + 0.2f + Mathf.Sin(weave * 1.3f) * 0.25f;
                 transform.position = new Vector3(transform.position.x,
                     Mathf.Lerp(transform.position.y, height, 1f - Mathf.Exp(-2f * dt)), transform.position.z);

@@ -19,7 +19,7 @@ namespace Repulsor
             typeof(GestureClassifier), typeof(HandPose), typeof(XArmsDetector), typeof(DoubleOkDetector), typeof(PowerUpDetector),
             typeof(TwoHandChargeDetector), typeof(TriangleDetector), typeof(BowDetector), typeof(FingerGunDetector),
             typeof(PunchDetector), typeof(SpiderSignDetector), typeof(ForceGrabDetector), typeof(SaberGripDetector),
-            typeof(UnderhandThrowDetector), typeof(MenuLayout),
+            typeof(UnderhandThrowDetector), typeof(MenuLayout), typeof(Aim), typeof(Enemy), typeof(Arena),
         };
 
         static float nextCheck;

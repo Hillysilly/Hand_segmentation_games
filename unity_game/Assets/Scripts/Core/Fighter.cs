@@ -167,6 +167,16 @@ namespace Repulsor
         /// <summary>Debug: fills the meter.</summary>
         public void FillMeter() => Meter = Level < MaxLevel ? 1f : 0f;
 
+        /// <summary>Practice (Variant Lab): jumps straight to a level at full HP with an empty meter. No transform event.</summary>
+        public void SetLevel(int level)
+        {
+            Level = Math.Max(1, Math.Min(MaxLevel, level));
+            Hp = MaxHp;
+            Meter = 0f;
+            IsDead = false;
+            RespawnIn = 0f;
+        }
+
         void Die()
         {
             Hp = 0f;

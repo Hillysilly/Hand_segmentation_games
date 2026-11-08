@@ -124,23 +124,29 @@ namespace Repulsor
         {
             // Track the hand live while it's a fist. Once it starts opening the pose can't be trusted,
             // so the aim line, the orb and the shot all stay on the remembered aim.
-            Vector3 muzzle = palm + palmNormal * PalmOffset;
+            // In the real game the aim follows the arm, not the palm (a fist's palm faces down or sideways).
+            bool useArena = !game.Legacy && game.HandAim != null;
+            Vector3 handAim = useArena ? game.HandAim(handedness == Handedness.Left, palm, palmNormal) : palmNormal;
+            Vector3 muzzle = palm + handAim * PalmOffset;
             bool fist = gesture == HandGesture.Fist;
             if (fist)
-                aim.Record(Time.time, muzzle, palmNormal);
+                aim.Record(Time.time, muzzle, handAim);
 
             Vector3 shownPosition = fist ? muzzle : aim.Position;
-            Vector3 shownDirection = fist ? palmNormal : aim.Direction;
+            Vector3 shownDirection = fist ? handAim : aim.Direction;
+            if (useArena && game.AssistAim != null)
+                shownDirection = game.AssistAim(shownPosition, shownDirection);
 
             float fired = repulsor.Step(gesture, dt);
             if (fired > 0f)
             {
-                float offAim = Vector3.Angle(palmNormal, aim.Direction);
-                Debug.Log($"[Repulsor] {handedness} firing: live palm was {offAim:0} degrees from the locked aim");
+                Vector3 direction = useArena && game.AssistAim != null ? game.AssistAim(aim.Position, aim.Direction) : aim.Direction;
+                Debug.Log($"[Repulsor] {handedness} firing: palm {Vector3.Angle(palmNormal, aim.Direction):0} deg off the aim, "
+                    + $"assist bent it {Vector3.Angle(aim.Direction, direction):0} deg");
                 if (weapon == Weapon.Shockwave)
-                    game.FireShockwave(aim.Position, aim.Direction, fired);
+                    game.FireShockwave(aim.Position, direction, fired);
                 else
-                    game.Fire(aim.Position, aim.Direction, fired);
+                    game.Fire(aim.Position, direction, fired);
                 aim.Clear();
                 laserBlocked = true;
             }

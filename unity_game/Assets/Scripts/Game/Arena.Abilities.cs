@@ -153,6 +153,7 @@ namespace Repulsor
             {
                 if (kiCharge.Step(input.Left, input.Right, body, dt, out Vector3 direction, out float power))
                 {
+                    direction = Aim.Assist(kiCharge.Center, direction);
                     Vector3 from = kiCharge.Center + direction * 0.15f;
                     float size = Mathf.Lerp(BallMinSize, BallMaxSize, power);
                     Blast ball = game.FireBlast(from, direction, 1f, size, Mathf.Lerp(0.8f, 0.55f, power),
