@@ -513,6 +513,32 @@ namespace Repulsor
         }
 
 #if UNITY_EDITOR
+        /// <summary>PlayMode smoke test: start a solo match as this character.</summary>
+        public void TestStart(CharacterId id)
+        {
+            CleanUpMatch();
+            character = id;
+            customColor = false;
+            mode = GameMode.PveSolo;
+            StartMatch();
+        }
+
+        /// <summary>PlayMode smoke test: jump the waves forward, e.g. past the countdown.</summary>
+        public void TestSkipTime(float seconds)
+        {
+            waves.Tick(seconds);
+            matchTime += seconds;
+        }
+
+        /// <summary>PlayMode smoke test: fill the meter and transform.</summary>
+        public void TestAdvance()
+        {
+            player.FillMeter();
+            player.TryTransform();
+        }
+
+        public void TestSandbox() => EnterSandbox();
+
         /// <summary>Editor preview: just the menus and HUD around a fixed head, with no XR or weapons.</summary>
         public void InitPreview(Transform previewHead)
         {
