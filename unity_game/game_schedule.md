@@ -12,7 +12,7 @@ Columns:
 
 ## Status, end of 11/8 session
 
-Most of the Claude-side work planned for 11/7-11/14 is built, with tests passing (132 of 132) and installed on the headset. **None of it has been seen in the headset yet.**
+Most of the Claude-side work planned for 11/7-11/14 is built and installed on the headset. 138 of 138 unit tests pass, plus a PC smoke test that plays every character through a wave. **None of it has been seen in the headset yet.**
 
 The bottleneck now is your testing:
 - gesture thresholds
@@ -70,9 +70,11 @@ The first option is used as the placeholder for now.
 | Spider | Webline, Silkstrike, Arachne |
 | Game title | POWER UP (placeholder) |
 
-## Your headset checklist for 11/8
+## Your headset checklist (next session)
 
 The new build is installed. Pick it up and move around until it finds its position, then launch Repulsor Test.
+If Space Setup hasn't been done in this room, do it first (headset Settings > Environment setup). The title screen
+says how much furniture the game found, which the force powers need.
 
 1. **Menus:** poke START, SOLO, a character, a colour, READY. Do the keys feel right? Are they too close, too far or too low?
 2. **Gesture readout:** pause with both hands in an OK sign for 2 s, then DEBUG > GESTURES: ON. Try each one and
@@ -87,6 +89,11 @@ The new build is installed. Pick it up and move around until it finds its positi
    In the pause menu, DEBUG has HIT ME, KNOCK ME OUT, FILL METER and SPAWN POWERUP.
 4. **Ki fighter (Ryuu):** fist and snap open for yellow comets. Use FILL METER and the pose to reach level 2:
    hold your hands together to charge a ball, then push both forward. Level 3: punch fast for a dragon fist.
+   Then try the others the same way (FILL METER, power-up pose); the countdown and each level-up show what's new:
+   - Mage: triangle, then fists for the fire pillar.
+   - Saber: finger gun, then a fist for the sword.
+   - Archer: fists together, then pull one back for the bow.
+   - Spider: index and little finger out to shoot webs.
 5. **Variant batches 1-2:** DEBUG > VARIANT LAB. Use < and > to switch item.
    - HUD: A low right, B low centre, C top centre. Saved as soon as you poke one.
    - SHIELDS: poke A-E, then SAVE PICK for each character you care about.
@@ -135,7 +142,7 @@ Sketchfab needs a login to download. If you grab G1 as glTF into `assets/models/
 |---|---|---|---|---|
 | Hand lasers + stopping at surfaces | ✅ | ✅ | ✅ | |
 | Repulsor blasts | ✅ | ✅ | | |
-| Shockwave | ✅ | | | needs to stop at walls |
+| Shockwave | ✅ | | | stops at walls now |
 | Auras: Fire Shells, Spike Shells, Light Halo, Sun Halo, Rune Circle | ✅ | ✅ | | |
 | Person tracking (BlazePose) + depth hiding | ✅ | ✅ | | suits tested on PC replay only |
 | Colour wheel | ✅ | | | moves to character select |
@@ -155,22 +162,21 @@ Sketchfab needs a login to download. If you grab G1 as glTF into `assets/models/
 
 | Feature | Done | Good enough | Checked by you | Pick |
 |---|---|---|---|---|
-| Start + mode select | ✅ | ✅ | | PC render; co-op and PVP buttons disabled until multiplayer |
+| Start + mode select | ✅ | ✅ | | PC render; title shows the Space Setup status |
 | Character select + controls + colour + ready + countdown | ✅ | ✅ | | PC render |
 | Pause (double OK, 2 s) + settings | ✅ | ✅ | | PC render |
 | Poke buttons (keyboard-style) | ✅ | | | sink into a hollow, click at 9 mm; feel untested |
-| Own HP + meter HUD | ✅ | ✅ | | PC render; one design so far |
-| Overhead health bars | ✅ | | | on stand-in orbs |
+| Own HP + meter HUD | ✅ | ✅ | | PC render; 3 positions in Variant Lab; shows partner HP in co-op |
+| Overhead health bars | ✅ | | | on robots and drones |
 
 ### PVE
 
 | Feature | Done | Good enough | Checked by you | Pick |
 |---|---|---|---|---|
-| Stand-in orb enemies with HP | ✅ | | | until robots exist |
-| Robot enemy (walk, bad-aim lasers) | ✅ | | | placeholder body until you pick a model (see candidates below) |
+| Robot enemy (walk, bad-aim lasers) | ✅ | | | slow dodgeable bolts; steers round furniture; placeholder body until you pick a model |
 | Drone enemy | ✅ | | | weaves at head height, smaller; placeholder body |
-| Spawn bubble + waves (5) | ✅ | | | purple bubble grows, enemy fades in |
-| Powerups (charge, invincibility, 1.5x damage) | ✅ | | | touch to take; no glow on you yet |
+| Spawn bubble + waves (5) | ✅ | | | spawn out of the nearest wall; purple bubble; score and best score per character |
+| Powerups (charge, invincibility, 1.5x damage) | ✅ | | | touch to take; your attacks turn red or gold, and others see a glow |
 | Walls block attacks | ✅ | | | laser, blasts, shockwave and enemy bolts stop at live-depth surfaces |
 | Room objects (proxies, HP, pick up/throw) | ✅ | | | Space Setup furniture boxes; a glowing copy flies and breaks on impact; **needs Space Setup done** |
 
@@ -182,8 +188,8 @@ Sketchfab needs a login to download. If you grab G1 as glTF into `assets/models/
 | Ki fighter | | ✅ comet (yellow) | ✅ energy ball | ✅ dragon fist (4 looks in Variant Lab) | flame (needs work) | aura 2 at L2, blue at L3 | |
 | Mage | | ✅ fireball | force: needs room objects | ✅ fire pillar (3 looks in Variant Lab) | thin | rune aura L2-3 | |
 | Saber | | ✅ finger-gun blaster + aim line | ✅ laser sword | force: needs room objects | glass | light aura | |
-| Archer | | ✅ crossbow (reloads) | ✅ bow + aim line | ✅ smoke bomb (blinds enemies), piercing arrows | (knight shield: needs model) | wings: needs model | |
-| Spider | | | | | | | |
+| Archer | | ✅ crossbow (reloads) | ✅ bow + aim line | ✅ smoke bomb (blinds enemies), piercing arrows | flat glass shield (knight shield needs a model) | wings: needs model; white ring shockwave | |
+| Spider | | ✅ web shots with strands, spider sense | ✅ web pull (furniture) | ✅ dark webs, more damage | web cocoon | no gloves yet | |
 
 ### Multiplayer
 
@@ -191,7 +197,7 @@ Sketchfab needs a login to download. If you grab G1 as glTF into `assets/models/
 |---|---|---|---|---|
 | LAN room code + join | ✅ | ✅ | | UDP; the code carries the host's address (same Wi-Fi); loopback test passes |
 | Colocation | ✅ manual | | | both touch the same 2 real points; shared anchors not tried |
-| Player sync (pose, aura, shield, attacks) | ✅ partial | | | HP bar, level, shield, head and palm markers, blasts; no remote aura yet |
+| Player sync (pose, aura, shield, attacks) | ✅ | | | HP bar, level, shield, powerup glow, an aura stand-in (body shell), head and palm markers, blasts |
 | Co-op PVE | ✅ | | | host runs enemies and waves, client sees copies and its hits count; ends when both are out |
 | PVP (best of 3, friendly fire toggle) | ✅ | | | victim's headset applies hits; levels reset each round; co-op friendly fire toggle in pause |
 
@@ -202,4 +208,4 @@ Sketchfab needs a login to download. If you grab G1 as glTF into `assets/models/
 | Clean public repo | | `suit.glb` / `spiderman.glb` must not be in its history |
 | CREDITS for all downloaded assets + sounds | | |
 | Writeup notes | | |
-| Video shot list | | |
+| Video shot list | draft | `unity_game/video_shot_list.md` |
