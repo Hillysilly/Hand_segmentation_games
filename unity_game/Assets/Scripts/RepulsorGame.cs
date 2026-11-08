@@ -73,6 +73,38 @@ namespace Repulsor
         public Weapon CurrentWeapon { get; private set; } = Weapon.Repulsor;
         public RoomSense Room => room;
 
+        /// <summary>
+        /// The old test game (orbs, OK sign cycles weapons, aura and colour wheel). Off in the real game, where
+        /// <see cref="Arena"/> decides what the hands can do.
+        /// </summary>
+        public bool Legacy { get; set; }
+        /// <summary>What the hands do: the cycled weapon in the old test game, otherwise what the arena allows.</summary>
+        public Weapon ArmedWeapon => Legacy ? CurrentWeapon : arenaWeapon;
+        /// <summary>Multiplies damage, for the 1.5x powerup.</summary>
+        public float DamageScale { get; set; } = 1f;
+        public float LaserDps { get; set; } = Damage.LaserPerSecond;
+        public float RepulsorDamage { get; set; } = Damage.Repulsor;
+        public XRHandSubsystem Hands => hands;
+        public Transform Head => head;
+        public XROrigin Origin => origin;
+        public AuraView Aura => aura;
+        public PersonDetector Person => person;
+        public Transform TrackingSpace => origin.CameraFloorOffsetObject.transform;
+        public AudioClip ClickSound => click;
+        public AudioClip BoomSound => boom;
+        public AudioClip WhooshSound => whoosh;
+        public AudioClip ZapSound => zap;
+
+        /// <summary>A hit landed: what was hit and the HP it lost.</summary>
+        public event System.Action<IHittable, float> Dealt;
+        /// <summary>Something's HP reached 0.</summary>
+        public event System.Action<IHittable> Killed;
+
+        Weapon arenaWeapon = Weapon.None;
+        Arena arena;
+
+        public void Arm(Weapon weapon) => arenaWeapon = weapon;
+
         void Start()
         {
             head = origin.Camera.transform;
@@ -90,6 +122,8 @@ namespace Repulsor
             Transform trackingSpace = origin.CameraFloorOffsetObject.transform;
             leftHand.Init(this, trackingSpace, hum);
             rightHand.Init(this, trackingSpace, hum);
+            arena = gameObject.AddComponent<Arena>();
+            arena.Init(this, leftHand, rightHand, roomDim);
             Debug.Log("[Repulsor] Game started");
         }
 
@@ -109,25 +143,29 @@ namespace Repulsor
             // The head stays at the origin until the first tracked pose arrives. Spawning then would
             // put the target on the floor.
             bool headTracked = head.localPosition != Vector3.zero;
-            if (headTracked && !AuraTestOn && targets.Count < MaxTargets && Time.time >= nextSpawnTime)
+            if (Legacy && headTracked && !AuraTestOn && targets.Count < MaxTargets && Time.time >= nextSpawnTime)
             {
                 SpawnTarget();
                 nextSpawnTime = Time.time + RespawnSeconds;
             }
 
-            if (CurrentWeapon != Weapon.Aura)
+            if (!Legacy || CurrentWeapon != Weapon.Aura)
                 aura.Picker.Hide();
             else if (aura.Picker.Tick(leftHand, rightHand, head.position, dt, out Color picked))
                 aura.SetTint(picked, true);
 
-            person.Running = aura.IsLit;
+            // In the game your aura follows your own head (Arena), so the camera tracker only runs in the old mode.
+            bool tracking = (Legacy || AuraTestOn) && aura.IsLit;
+            person.Running = tracking;
             person.Fast = aura.IsSuit;
-            if (aura.IsLit)
+            if (tracking)
                 aura.MoveTo(auraTracker.Tick(person, dt));
-            if (aura.IsLit && aura.IsSuit)
+            if (tracking && aura.IsSuit)
                 suits.Tick(person, dt);
 
-            UpdateHud(dt);
+            hud.gameObject.SetActive(Legacy);
+            if (Legacy)
+                UpdateHud(dt);
 #if DEVELOPMENT_BUILD
             CheckAuraTestFile();
 #endif
@@ -196,7 +234,23 @@ namespace Repulsor
             }
         }
 
-        void SpawnTarget()
+        /// <summary>Puts an orb with this much HP where the player can see and reach it.</summary>
+        public Target SpawnOrb(float hp)
+        {
+            Target target = SpawnTarget();
+            target.Place(target.transform.position, hp);
+            return target;
+        }
+
+        public void ClearOrbs()
+        {
+            foreach (Target target in targets)
+                if (target != null)
+                    Destroy(target.gameObject);
+            targets.Clear();
+        }
+
+        Target SpawnTarget()
         {
             Vector3 position = GameMath.SpawnPoint(head.position, head.forward, 55f, 1.2f, 2.4f, -0.5f, 0.5f,
                 Random.value, Random.value, Random.value);
@@ -212,11 +266,14 @@ namespace Repulsor
             target.Place(position);
             targets.Add(target);
             Debug.Log($"[Repulsor] Target spawned at {position}, head at {head.position}");
+            return target;
         }
 
         /// <summary>The OK sign: changes the aura's style while it's lit, otherwise changes weapon.</summary>
         public void OkSign()
         {
+            if (!Legacy)
+                return;
             if (CurrentWeapon == Weapon.Aura && aura.IsLit)
             {
                 aura.NextStyle();
@@ -272,6 +329,9 @@ namespace Repulsor
         {
             Blast blast = Instantiate(blastPrefab, transform);
             blast.Launch(this, position, direction, charge);
+            // Walls and furniture stop shots.
+            if (room.TryDistance(position, direction.normalized, out float wall))
+                blast.WallDistance = wall;
             PlayAt(position, zap);
             shots++;
             Debug.Log($"[Repulsor] Fired shot {shots}, charge {charge:0.00}");
@@ -281,79 +341,120 @@ namespace Repulsor
         {
             Shockwave wave = Instantiate(shockwavePrefab, transform);
             wave.Launch(this, position, direction, charge);
+            if (room.TryDistance(position, direction.normalized, out float wall))
+                wave.WallDistance = wall;
             PlayAt(position, whoosh);
             shots++;
             Debug.Log($"[Repulsor] Shockwave {shots}, charge {charge:0.00}");
         }
 
-        /// <summary>Destroys the first target the moving blast touches. Returns whether one was hit.</summary>
-        public bool TryHit(Vector3 from, Vector3 to, float blastRadius)
+        /// <summary>Hits the first thing the moving blast touches. Returns whether something was hit.</summary>
+        public bool TryHit(Vector3 from, Vector3 to, float blastRadius, float damage = Damage.Repulsor)
         {
-            for (int i = 0; i < targets.Count; i++)
+            List<IHittable> all = Hittables.All;
+            for (int i = 0; i < all.Count; i++)
             {
-                Target target = targets[i];
-                if (GameMath.SegmentHitsSphere(from, to, target.transform.position, target.Radius + blastRadius))
+                IHittable target = all[i];
+                if (target.Alive && target.Team == Team.Enemies
+                    && GameMath.SegmentHitsSphere(from, to, target.Center, target.Radius + blastRadius))
                 {
-                    DestroyTarget(i, "Repulsor");
+                    Strike(target, damage, from, "Repulsor");
                     return true;
                 }
             }
             return false;
         }
 
-        /// <summary>Destroys every target the shockwave's front has reached.</summary>
-        public void HitWithShockwave(Vector3 origin, Vector3 direction, float travelled)
+        /// <summary>Hits everything the shockwave's front has reached, once per wave.</summary>
+        public void HitWithShockwave(Vector3 origin, Vector3 direction, float travelled, HashSet<IHittable> alreadyHit)
         {
-            for (int i = targets.Count - 1; i >= 0; i--)
+            List<IHittable> all = Hittables.All;
+            for (int i = all.Count - 1; i >= 0; i--)
             {
-                Target target = targets[i];
-                if (GameMath.ConeReaches(origin, direction, Shockwave.StartRadius, Shockwave.HalfAngleDegrees,
-                        travelled, target.transform.position, target.Radius))
-                    DestroyTarget(i, "Shockwave");
+                if (i >= all.Count)
+                    continue;
+                IHittable target = all[i];
+                if (target.Alive && target.Team == Team.Enemies && !alreadyHit.Contains(target)
+                    && GameMath.ConeReaches(origin, direction, Shockwave.StartRadius, Shockwave.HalfAngleDegrees,
+                        travelled, target.Center, target.Radius))
+                {
+                    alreadyHit.Add(target);
+                    Strike(target, Damage.Shockwave, origin, "Shockwave");
+                }
             }
         }
 
-        /// <summary>Burns the nearest target within reach. Returns whether one was hit and the beam's length.</summary>
-        public bool BurnWithLaser(Vector3 start, Vector3 direction, float reach, float dt, out float length)
+        /// <summary>Burns the nearest thing within reach. Returns whether one was hit and the beam's length.</summary>
+        public bool BurnWithLaser(Vector3 start, Vector3 direction, float reach, float dt, out float length,
+            float damagePerSecond = Damage.LaserPerSecond)
         {
-            int nearest = -1;
+            IHittable nearest = null;
             length = reach;
-            for (int i = 0; i < targets.Count; i++)
+            List<IHittable> all = Hittables.All;
+            for (int i = 0; i < all.Count; i++)
             {
-                Target target = targets[i];
-                if (GameMath.RayHitsSphere(start, direction, target.transform.position,
-                        target.Radius + LaserRadius, out float distance) && distance < length)
+                IHittable target = all[i];
+                if (target.Alive && target.Team == Team.Enemies
+                    && GameMath.RayHitsSphere(start, direction, target.Center, target.Radius + LaserRadius, out float distance)
+                    && distance < length)
                 {
-                    nearest = i;
+                    nearest = target;
                     length = distance;
                 }
             }
 
-            if (nearest < 0)
+            if (nearest == null)
                 return false;
 
-            if (targets[nearest].Burn(dt))
-                DestroyTarget(nearest, "Laser");
+            if (Legacy && nearest is Target orb)
+            {
+                if (orb.Burn(dt))
+                    Strike(nearest, float.MaxValue, start, "Laser");
+            }
+            else
+            {
+                Strike(nearest, damagePerSecond * dt, start, "Laser");
+            }
             return true;
         }
 
-        void DestroyTarget(int index, string weapon)
+        /// <summary>Applies one hit: damage, then the explosion if it finished the target off.</summary>
+        public void Strike(IHittable target, float damage, Vector3 from, string weapon)
         {
-            Target target = targets[index];
-            Vector3 position = target.transform.position;
+            if (Legacy)
+                damage = float.MaxValue;
+            else
+                damage *= DamageScale;
+            float taken = target.TakeHit(damage, from);
+            if (taken > 0f)
+                Dealt?.Invoke(target, taken);
+            if (target.Alive)
+                return;
 
+            Vector3 position = target.Center;
             ParticleSystem explosion = Instantiate(explosionPrefab, position, Quaternion.identity, transform);
             Destroy(explosion.gameObject, explosion.main.duration + explosion.main.startLifetime.constantMax);
             PlayAt(position, boom);
+            Killed?.Invoke(target);
 
-            targets.RemoveAt(index);
-            Destroy(target.gameObject);
-            score++;
-            nextSpawnTime = Time.time + RespawnSeconds;
-            Debug.Log($"[Repulsor] Hit! {weapon}, score {score}");
+            if (target is Target orb)
+            {
+                targets.Remove(orb);
+                Destroy(orb.gameObject);
+                nextSpawnTime = Time.time + RespawnSeconds;
+            }
+            else if (target is Component component)
+            {
+                Destroy(component.gameObject);
+            }
+            if (Legacy)
+            {
+                score++;
+                Debug.Log($"[Repulsor] Hit! {weapon}, score {score}");
+            }
         }
 
-        void PlayAt(Vector3 position, AudioClip clip)
+        public void PlayAt(Vector3 position, AudioClip clip)
         {
             audioSource.transform.position = position;
             audioSource.PlayOneShot(clip);

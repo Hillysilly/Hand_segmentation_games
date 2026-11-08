@@ -27,10 +27,17 @@ namespace Repulsor
         float age;
         float tailLength;
         float travelled;
+        float damage;
+        float wallAt = float.MaxValue;
+        float flown;
+
+        /// <summary>Where a real surface stops this shot, measured from where it was fired.</summary>
+        public float WallDistance { set => wallAt = value; }
 
         public void Launch(RepulsorGame owner, Vector3 position, Vector3 direction, float charge)
         {
             game = owner;
+            damage = (owner != null ? owner.RepulsorDamage : Damage.Repulsor) * Mathf.Lerp(0.6f, 1f, charge);
             radius = Mathf.Lerp(MinRadius, MaxRadius, charge);
             velocity = direction.normalized * Mathf.Lerp(MinSpeed, MaxSpeed, charge);
             tailLength = Mathf.Lerp(MinTail, MaxTail, charge);
@@ -54,7 +61,8 @@ namespace Repulsor
             transform.position = to;
             ShowTail(travelled + velocity.magnitude * Time.deltaTime);
 
-            if (game.TryHit(from, to, radius) || age > LifeSeconds)
+            flown += velocity.magnitude * Time.deltaTime;
+            if (game.TryHit(from, to, radius, damage) || age > LifeSeconds || flown >= wallAt)
                 Destroy(gameObject);
         }
     }

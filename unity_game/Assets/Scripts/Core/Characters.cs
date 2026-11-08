@@ -26,9 +26,8 @@ namespace Repulsor
             var text = new System.Text.StringBuilder();
             for (int i = 0; i < level && i < Controls.Length; i++)
             {
-                text.Append("LEVEL ").Append(i + 1).Append('\n');
-                foreach (string line in Controls[i])
-                    text.Append("  ").Append(line).Append('\n');
+                text.Append("<b>LV ").Append(i + 1).Append("</b>   ");
+                text.Append(string.Join(".  ", Controls[i])).Append(".\n");
             }
             return text.ToString();
         }

@@ -1,10 +1,11 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Repulsor
 {
     /// <summary>
     /// A blast front that travels along the palm's direction and widens, as in the web prototype, drawn on a
-    /// real section of cone. Destroys every target the front reaches. A stronger charge travels further.
+    /// real section of cone. Hits everything the front reaches, once each. A stronger charge travels further.
     /// </summary>
     public sealed class Shockwave : MonoBehaviour
     {
@@ -20,12 +21,19 @@ namespace Repulsor
         [SerializeField] Transform front;
         [SerializeField] Renderer frontRenderer;
 
+        readonly HashSet<IHittable> hit = new HashSet<IHittable>();
         MaterialPropertyBlock properties;
         RepulsorGame game;
         Vector3 origin;
         Vector3 direction;
         float range;
         float travelled;
+
+        /// <summary>A real surface ahead stops the front there, so it can't hit through walls.</summary>
+        public float WallDistance
+        {
+            set => range = Mathf.Min(range, value + 0.15f);
+        }
 
         public void Launch(RepulsorGame owner, Vector3 position, Vector3 aim, float charge)
         {
@@ -47,7 +55,7 @@ namespace Repulsor
             }
 
             ShowAt(distance);
-            game.HitWithShockwave(origin, direction, travelled);
+            game.HitWithShockwave(origin, direction, travelled, hit);
         }
 
         /// <summary>Puts the front this far along. Public so the editor preview can pick a moment.</summary>

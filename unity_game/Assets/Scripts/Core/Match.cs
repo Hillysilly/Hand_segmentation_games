@@ -100,6 +100,9 @@ namespace Repulsor
             return true;
         }
 
+        /// <summary>An enemy added outside the wave plan, such as from the debug menu.</summary>
+        public void AddExtra() => Alive++;
+
         public void EnemyKilled()
         {
             Alive = Math.Max(0, Alive - 1);

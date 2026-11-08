@@ -2,7 +2,8 @@ using UnityEngine;
 
 namespace Repulsor
 {
-    public enum Weapon { Repulsor, Laser, Shockwave, Aura }
+    /// <summary>The first four are the old test game's cycle. None disarms the hands; LaserRepulsor gives both.</summary>
+    public enum Weapon { Repulsor, Laser, Shockwave, Aura, None, LaserRepulsor }
 
     /// <summary>
     /// Thumb and index pinched with the other three fingers up, like an "OK" sign. Making a fist

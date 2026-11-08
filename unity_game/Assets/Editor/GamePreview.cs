@@ -1,0 +1,110 @@
+using System.IO;
+using Repulsor;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+
+/// <summary>
+/// Renders the menus, HUD and shield looks to Logs/preview_*.png, to judge them without the headset. One eye,
+/// no passthrough (a flat room colour instead), no live depth.
+/// Batch: -executeMethod GamePreview.RenderAll (without -nographics)
+/// </summary>
+public static class GamePreview
+{
+    static readonly Color RoomColor = new Color(0.46f, 0.42f, 0.37f);
+
+    [MenuItem("Repulsor/Preview Menus and Shields")]
+    public static void RenderAll()
+    {
+        RenderScreens();
+        RenderShields();
+    }
+
+    public static void RenderScreens()
+    {
+        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        var head = new GameObject("Head").transform;
+        head.position = new Vector3(0f, 1.6f, 0f);
+        var arena = new GameObject("Arena").AddComponent<Arena>();
+        arena.InitPreview(head);
+
+        foreach (string screen in new[] { "title", "modes", "characters", "pause", "debug", "results" })
+        {
+            arena.PreviewScreen(screen);
+            Canvas.ForceUpdateCanvases();
+            Vector3 menuCentre = head.position + Vector3.forward * 0.42f + Vector3.down * 0.2f;
+            Save(head.position, Quaternion.LookRotation(menuCentre - head.position), 75f, $"Logs/preview_menu_{screen}.png");
+        }
+
+        // The HUD mid-fight: hurt, meter part full, shield half used.
+        Object.DestroyImmediate(GameObject.Find("Menu"));
+        Fighter player = arena.PreviewPlayer;
+        player.DealtDamage(Fighter.MeterPerLevel);
+        player.TryTransform();
+        player.TakeDamage(70f);
+        player.DealtDamage(Fighter.MeterPerLevel * 0.65f);
+        player.ApplyPowerup(PowerupKind.DamageBoost);
+        arena.PreviewHud.Visible = true;
+        arena.PreviewHud.ShowFps = true;
+        arena.PreviewHud.Message("WAVE 2", "of 5", 0f);
+        for (int i = 0; i < 3; i++)
+            arena.PreviewHud.Tick(player, CharacterDef.Get(CharacterId.Technoman), 0.016f);
+        Canvas.ForceUpdateCanvases();
+        Save(head.position, Quaternion.identity, 90f, "Logs/preview_hud.png");
+
+        player.FillMeter();
+        arena.PreviewHud.Message("", "", 0f);
+        arena.PreviewHud.Tick(player, CharacterDef.Get(CharacterId.Technoman), 0.016f);
+        Canvas.ForceUpdateCanvases();
+        Save(head.position, Quaternion.identity, 90f, "Logs/preview_hud_ready.png");
+    }
+
+    public static void RenderShields()
+    {
+        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        var person = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        person.transform.position = new Vector3(0f, 0.87f, 2.2f);
+        person.transform.localScale = new Vector3(0.5f, 0.87f, 0.3f);
+
+        var colors = new[] { "#4FC3FF", "#FFD23F", "#3F8CFF", "#FF6A20", "#E02030" };
+        var styles = new[] { BubbleStyle.Hex, BubbleStyle.Flame, BubbleStyle.Glass, BubbleStyle.Thin, BubbleStyle.Web };
+        for (int i = 0; i < styles.Length; i++)
+        {
+            Bubble bubble = Bubble.Create("Shield", null);
+            bubble.transform.position = new Vector3(0f, 1.25f, 2.2f);
+            bubble.transform.localScale = Vector3.one * 1.24f;
+            bubble.Show(Arena.Hex(colors[i]), styles[i], 1f);
+            Save(new Vector3(0f, 1.5f, 0f), Quaternion.LookRotation(new Vector3(0f, 1.2f, 2.2f) - new Vector3(0f, 1.5f, 0f)), 60f,
+                $"Logs/preview_shield_{i}_{styles[i]}.png");
+            // From inside, as the player holding it sees it.
+            bubble.transform.position = new Vector3(0f, 1.25f, 0f);
+            Save(new Vector3(0f, 1.6f, 0f), Quaternion.LookRotation(new Vector3(0f, -0.25f, 1f)), 90f,
+                $"Logs/preview_shield_{i}_{styles[i]}_inside.png");
+            Object.DestroyImmediate(bubble.gameObject);
+        }
+    }
+
+    static void Save(Vector3 position, Quaternion rotation, float fov, string outputPath)
+    {
+        var cameraObject = new GameObject("Preview Camera", typeof(Camera));
+        cameraObject.transform.SetPositionAndRotation(position, rotation);
+        var camera = cameraObject.GetComponent<Camera>();
+        camera.clearFlags = CameraClearFlags.SolidColor;
+        camera.backgroundColor = RoomColor;
+        camera.nearClipPlane = 0.05f;
+        camera.fieldOfView = fov;
+
+        var texture = new RenderTexture(1280, 960, 24) { antiAliasing = 4 };
+        camera.targetTexture = texture;
+        camera.Render();
+        RenderTexture.active = texture;
+        var image = new Texture2D(texture.width, texture.height, TextureFormat.RGB24, false);
+        image.ReadPixels(new Rect(0, 0, texture.width, texture.height), 0, 0);
+        image.Apply();
+        RenderTexture.active = null;
+        camera.targetTexture = null;
+        Object.DestroyImmediate(cameraObject);
+        File.WriteAllBytes(outputPath, image.EncodeToPNG());
+        Debug.Log($"[Preview] Wrote {outputPath}");
+    }
+}

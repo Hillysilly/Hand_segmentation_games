@@ -37,19 +37,22 @@ namespace Repulsor
         bool auraPlaced;
         int laserFrames;
         int surfaceFrames;
+        bool pinched;
+        bool laserBlocked;
 
         public bool IsTracked { get; private set; }
         public bool IsOpen => IsTracked && gesture == HandGesture.Open;
         public Vector3 PalmPosition { get; private set; }
         public Vector3 PalmNormal { get; private set; }
         public Vector3 IndexTip { get; private set; }
+        public HandGesture Gesture => gesture;
 
         public void Init(RepulsorGame owner, Transform handTrackingSpace, AudioClip hum)
         {
             game = owner;
             trackingSpace = handTrackingSpace;
             laserHum.clip = hum;
-            weapon = game.CurrentWeapon;
+            weapon = game.ArmedWeapon;
             StopWeapons();
         }
 
@@ -74,13 +77,24 @@ namespace Repulsor
                 Debug.Log($"[Repulsor] {handedness} gesture {gesture}");
             }
 
-            if (weapon != game.CurrentWeapon)
+            if (weapon != game.ArmedWeapon)
             {
-                weapon = game.CurrentWeapon;
+                weapon = game.ArmedWeapon;
                 StopWeapons();
             }
 
-            if (weapon == Weapon.Laser)
+            // A repulsor shot leaves the hand open, which would start the laser. Wait for a fresh open palm.
+            if (gesture != HandGesture.Open)
+                laserBlocked = false;
+
+            if (weapon == Weapon.None)
+                return;
+            if (weapon == Weapon.LaserRepulsor)
+            {
+                TickCharged(palm, palmNormal, dt);
+                TickLaser(palm, palmNormal, dt);
+            }
+            else if (weapon == Weapon.Laser)
                 TickLaser(palm, palmNormal, dt);
             else if (weapon == Weapon.Aura)
                 TickAura(palm, palmNormal, dt);
@@ -110,6 +124,7 @@ namespace Repulsor
                 else
                     game.Fire(aim.Position, aim.Direction, fired);
                 aim.Clear();
+                laserBlocked = true;
             }
 
             UpdateChargeVisuals(shownPosition, shownDirection);
@@ -156,7 +171,9 @@ namespace Repulsor
 
         void TickLaser(Vector3 palm, Vector3 palmNormal, float dt)
         {
-            laser.Step(gesture == HandGesture.Open && game.PointsAwayFromHead(palm, palmNormal), dt);
+            // Not during an OK sign, which also has the fingers up: that's the pause gesture.
+            laser.Step(gesture == HandGesture.Open && !pinched && !laserBlocked
+                && game.PointsAwayFromHead(palm, palmNormal), dt);
             if (!laser.Firing)
             {
                 StopLaser();
@@ -185,7 +202,7 @@ namespace Repulsor
                 surfaceNormal = normal;
 
             float reach = beamLength.Step(surface, distance, dt);
-            bool onTarget = game.BurnWithLaser(start, laserDirection, reach, dt, out float length);
+            bool onTarget = game.BurnWithLaser(start, laserDirection, reach, dt, out float length, game.LaserDps);
             laserBeam.Aim(start, start + laserDirection * length, onTarget || beamLength.Hitting,
                 onTarget ? -laserDirection : surfaceNormal);
             game.DimRoom();
@@ -214,6 +231,7 @@ namespace Repulsor
                 return false;
 
             float thumbToIndex = Vector3.Distance(thumbTip.position, indexTip.position);
+            pinched = thumbToIndex < PinchDetector.ReleaseDistance;
             if (pinch.Step(thumbToIndex, middle, ring, little, dt))
                 game.OkSign();
 
