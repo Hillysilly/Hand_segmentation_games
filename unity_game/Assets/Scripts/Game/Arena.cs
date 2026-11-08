@@ -136,6 +136,32 @@ namespace Repulsor
             hurtFlash.Tick(dt);
             TickGestureLab(dt);
             UpdateArms();
+            LogPerformance(dt);
+        }
+
+        float perfTimer;
+        int perfFrames;
+        float slowestFrame;
+
+        /// <summary>Every 10 s in a match: frame rate, the slowest frame, and how much is going on. For reading after a test.</summary>
+        void LogPerformance(float dt)
+        {
+            if (phase != Phase.Playing || paused)
+            {
+                perfTimer = perfFrames = 0;
+                slowestFrame = 0f;
+                return;
+            }
+            perfTimer += dt;
+            perfFrames++;
+            slowestFrame = Mathf.Max(slowestFrame, dt);
+            if (perfTimer < 10f)
+                return;
+            Debug.Log($"[Perf] {perfFrames / perfTimer:0.0} FPS, slowest {slowestFrame * 1000f:0} ms, {enemies.Count} enemies, "
+                + $"{Hittables.All.Count} hittable, {foes.childCount} effects, aura {(game.Aura.IsLit ? "on" : "off")}, {character} L{player.Level}");
+            perfTimer = 0f;
+            perfFrames = 0;
+            slowestFrame = 0f;
         }
 
         void OnDestroy() => net?.Close();
