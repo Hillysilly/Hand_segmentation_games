@@ -630,6 +630,29 @@ namespace Repulsor
             waves.Tick(WaveDirector.CountdownSeconds + 0.1f);
         }
 
+        /// <summary>PlayMode co-op test: join a host on this machine at this port.</summary>
+        public bool TestJoin(int port)
+        {
+            mode = GameMode.PveCoop;
+            phase = Phase.Characters;
+            return net.Join(0, port, System.Net.IPAddress.Loopback);
+        }
+
+        public int TestEnemyCount => enemies.Count;
+
+        /// <summary>PlayMode co-op test: hit the first enemy as an attack would.</summary>
+        public void TestHitFirstEnemy(float damage)
+        {
+            foreach (IHittable foe in enemies)
+            {
+                if (foe is Object alive && alive != null && foe.Alive)
+                {
+                    game.Strike(foe, damage, foe.Center, "test");
+                    return;
+                }
+            }
+        }
+
         public bool TestPartnerVisible => remote.Visible;
         public bool TestPartnerConnected => net.Connected;
 

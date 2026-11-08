@@ -74,5 +74,76 @@ namespace Repulsor.Tests
             float after = arena.TestEnemyHp(id);
             Assert.That(after, Is.LessThan(before), $"hit didn't land: {before} -> {after}");
         }
+
+        [UnityTest]
+        public IEnumerator ClientCopiesTheHostsEnemiesAndSendsHits()
+        {
+            LogAssert.ignoreFailingMessages = true;
+            SceneManager.LoadScene("Main");
+            yield return null;
+            yield return null;
+            var arena = Object.FindAnyObjectByType<Arena>();
+            Assert.That(arena, Is.Not.Null);
+
+            using var host = new NetSession();
+            host.Host(Port + 1);
+            ushort hitId = 0;
+            float hitDamage = 0f;
+            host.EnemyHitReceived += (id, damage) =>
+            {
+                hitId = id;
+                hitDamage += damage;
+            };
+            Assert.That(arena.TestJoin(Port + 1), Is.True);
+
+            for (int i = 0; i < 300 && !host.Connected; i++)
+            {
+                host.Poll(Time.unscaledDeltaTime);
+                yield return null;
+            }
+            Assert.That(host.Connected, Is.True, "the game's hello never reached the host");
+
+            host.SendStart(1, 0);
+            var list = new List<EnemyNet>
+            {
+                new EnemyNet { Id = 42, Kind = 0, Position = new Vector3(0f, 0.65f, 3f), Hp = 30f, MaxHp = 30f },
+            };
+            float until = Time.realtimeSinceStartup + 3f;
+            while (Time.realtimeSinceStartup < until && (arena.Phase != Phase.Playing || arena.TestEnemyCount == 0))
+            {
+                host.SendEnemies(new WaveNet { Wave = 1, WaveCount = 5, State = (byte)WaveState.Fighting }, list);
+                host.Poll(Time.unscaledDeltaTime);
+                yield return null;
+            }
+            Assert.That(arena.Phase, Is.EqualTo(Phase.Playing), "the host's start didn't start the match");
+            Assert.That(arena.TestEnemyCount, Is.EqualTo(1), "the host's enemy wasn't copied");
+
+            // Past the copy's spawn bubble, then hit it.
+            until = Time.realtimeSinceStartup + 4f;
+            float nextHit = 0f;
+            while (Time.realtimeSinceStartup < until && hitDamage <= 0f)
+            {
+                if (Time.realtimeSinceStartup >= nextHit)
+                {
+                    nextHit = Time.realtimeSinceStartup + 0.25f;
+                    arena.TestHitFirstEnemy(5f);
+                }
+                host.SendEnemies(new WaveNet { Wave = 1, WaveCount = 5, State = (byte)WaveState.Fighting }, list);
+                host.Poll(Time.unscaledDeltaTime);
+                yield return null;
+            }
+            Assert.That(hitId, Is.EqualTo(42));
+            Assert.That(hitDamage, Is.GreaterThan(0f), "the hit never reached the host");
+
+            // The host drops it from its list: the copy goes too.
+            list.Clear();
+            for (int i = 0; i < 30; i++)
+            {
+                host.SendEnemies(new WaveNet { Wave = 1, WaveCount = 5, State = (byte)WaveState.Fighting }, list);
+                host.Poll(Time.unscaledDeltaTime);
+                yield return null;
+            }
+            Assert.That(arena.TestEnemyCount, Is.EqualTo(0));
+        }
     }
 }

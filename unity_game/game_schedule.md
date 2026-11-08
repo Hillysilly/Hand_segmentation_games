@@ -199,7 +199,7 @@ Sketchfab needs a login to download. If you grab G1 as glTF into `assets/models/
 | LAN room code + join | ✅ | ✅ | | UDP; the code carries the host's address (same Wi-Fi); loopback test passes |
 | Colocation | ✅ manual | | | both touch the same 2 real points; shared anchors not tried |
 | Player sync (pose, aura, shield, attacks) | ✅ | | | HP bar, level, shield, powerup glow, an aura stand-in (body shell), head and palm markers, blasts |
-| Co-op PVE | ✅ | ✅ host side | | host runs enemies and waves, client sees copies and its hits count; ends when both are out. PC test: the real game hosts, a test client joins over loopback, gets enemies, its hits land |
+| Co-op PVE | ✅ | ✅ both sides on PC | | host runs enemies and waves, client sees copies and its hits count; ends when both are out. PC tests: the game as host with a test client, and as client with a test host; enemies, hits and start all go through |
 | PVP (best of 3, friendly fire toggle) | ✅ | | | victim's headset applies hits; levels reset each round; co-op friendly fire toggle in pause |
 
 ### Submission
