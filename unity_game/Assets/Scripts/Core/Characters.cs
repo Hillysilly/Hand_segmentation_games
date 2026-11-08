@@ -1,0 +1,108 @@
+namespace Repulsor
+{
+    public enum CharacterId { Technoman, KiFighter, Mage, Saber, Archer, Spider }
+
+    /// <summary>
+    /// What a character is: name, colour, and how each level plays. Names are placeholders until the
+    /// user picks from the shortlist in game_schedule.md. Controls are written per character, because
+    /// the same gesture does different things for different characters.
+    /// </summary>
+    public sealed class CharacterDef
+    {
+        public CharacterId Id;
+        public string Name;
+        public string Tagline;
+        /// <summary>Default colour as #RRGGBB; players can change it on the select screen.</summary>
+        public string Color;
+        /// <summary>Aura style number (1-based, as in AuraView) at levels 1, 2, 3; 0 = none.</summary>
+        public int[] AuraStyle;
+        public string Shield;
+        /// <summary>One line per control, for each level. Each level adds to the ones before it.</summary>
+        public string[][] Controls;
+        public bool Ready;
+
+        public string ControlsUpTo(int level)
+        {
+            var text = new System.Text.StringBuilder();
+            for (int i = 0; i < level && i < Controls.Length; i++)
+            {
+                text.Append("LEVEL ").Append(i + 1).Append('\n');
+                foreach (string line in Controls[i])
+                    text.Append("  ").Append(line).Append('\n');
+            }
+            return text.ToString();
+        }
+
+        public static readonly CharacterDef[] All =
+        {
+            new CharacterDef
+            {
+                Id = CharacterId.Technoman, Name = "Technoman", Tagline = "Armoured inventor",
+                Color = "#4FC3FF", AuraStyle = new[] { 0, 0, 0 }, Shield = "Blue hex bubble", Ready = true,
+                Controls = new[]
+                {
+                    new[] { "Palm out and hold: hand laser" },
+                    new[] { "Fist, then snap open: repulsor blast", "Lasers get stronger", "Gauntlets form on your hands" },
+                    new[] { "Repulsor blasts explode in an area", "Lasers get stronger", "Blue glow outline" },
+                },
+            },
+            new CharacterDef
+            {
+                Id = CharacterId.KiFighter, Name = "Ryuu", Tagline = "Martial artist",
+                Color = "#FFD23F", AuraStyle = new[] { 0, 2, 2 }, Shield = "Flaming bubble",
+                Controls = new[]
+                {
+                    new[] { "Fist, then snap open: comet blast" },
+                    new[] { "Hands together to charge, push forward: giant energy ball", "Comet blasts get stronger", "Golden flame aura" },
+                    new[] { "Punch fast: dragon fist", "Aura turns blue" },
+                },
+            },
+            new CharacterDef
+            {
+                Id = CharacterId.Mage, Name = "Emberwitch", Tagline = "Fire mage",
+                Color = "#FF6A20", AuraStyle = new[] { 0, 5, 5 }, Shield = "Thin magic bubble",
+                Controls = new[]
+                {
+                    new[] { "Fist, then snap open: fireball" },
+                    new[] { "Cupped hand at an object: lift it, then throw", "Rune circle aura" },
+                    new[] { "Triangle with both hands: aim a fire circle, close both fists: fire pillar" },
+                },
+            },
+            new CharacterDef
+            {
+                Id = CharacterId.Saber, Name = "Lumen", Tagline = "Laser swordfighter",
+                Color = "#3F8CFF", AuraStyle = new[] { 0, 3, 3 }, Shield = "Glassy bubble",
+                Controls = new[]
+                {
+                    new[] { "Finger gun, flick up: blaster bolt" },
+                    new[] { "Make a fist: laser sword", "Light aura" },
+                    new[] { "Cupped hand at an object: lift it, then throw", "Brighter aura with a halo" },
+                },
+            },
+            new CharacterDef
+            {
+                Id = CharacterId.Archer, Name = "Valkyr", Tagline = "Winged archer",
+                Color = "#E8E8FF", AuraStyle = new[] { 0, 0, 0 }, Shield = "Knight's shield",
+                Controls = new[]
+                {
+                    new[] { "Finger gun, flick up: crossbow bolt (reloads)" },
+                    new[] { "Fists together at arm's length: bow. Pull one back, open it to shoot", "Soldier gauntlets" },
+                    new[] { "Underhand throw with a fist: smoke bomb", "Arrows pierce", "Wings" },
+                },
+            },
+            new CharacterDef
+            {
+                Id = CharacterId.Spider, Name = "Webline", Tagline = "Web slinger",
+                Color = "#E02030", AuraStyle = new[] { 0, 0, 0 }, Shield = "Web cocoon",
+                Controls = new[]
+                {
+                    new[] { "Spider sign (index and little finger out): web shot", "Spider sense warns of unseen enemies" },
+                    new[] { "Web an object, then swing your arm: fling it", "Webbed gloves" },
+                    new[] { "Black webs, more damage", "Black gloves" },
+                },
+            },
+        };
+
+        public static CharacterDef Get(CharacterId id) => All[(int)id];
+    }
+}
