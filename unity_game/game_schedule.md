@@ -52,11 +52,26 @@ The new build is installed. Pick it up and move around until it finds its positi
    - X arms, power-up pose (fists at your sides), hands together then push
    - triangle then fists, bow, finger-gun flick, punch
    Tell me which miss or misfire; the readings are also in the log.
-3. **Match:** Technoman. Burn orbs with the laser until the meter is full, then do the power-up pose. Try the X shield.
-   In the pause menu, DEBUG has HIT ME and KNOCK ME OUT to see the HP bar, death and respawn.
-4. **Variant batch 1, shields:** DEBUG > VARIANT LAB. Poke A-E, then SAVE PICK for each character you care about.
+3. **Match:** Technoman. Robots (red pills) and drones (orange discs) appear in purple bubbles and fire slow red
+   bolts you can dodge or block with the X shield. Laser them until the meter is full, then do the power-up pose
+   (level 2 adds repulsors, level 3 makes them explode). Touch the floating powerup balls.
+   In the pause menu, DEBUG has HIT ME, KNOCK ME OUT, FILL METER and SPAWN POWERUP.
+4. **Ki fighter (Ryuu):** fist and snap open for yellow comets. Use FILL METER and the pose to reach level 2:
+   hold your hands together to charge a ball, then push both forward. Level 3: punch fast for a dragon fist.
+5. **Variant batch 1, shields:** DEBUG > VARIANT LAB. Poke A-E, then SAVE PICK for each character you care about.
    PC renders are in `unity_game/Logs/preview_shield_*.png`.
-5. HUD: is it readable, in a good spot, too big or too small?
+6. HUD: is it readable, in a good spot, too big or too small?
+
+## Model candidates for enemies (pick one per enemy)
+
+All of these say CC0 on their pages. I'll check each licence file when downloading.
+
+| # | Model | For | Link |
+|---|---|---|---|
+| R1 | Quaternius Animated LowPoly Robot (14 animations, including walk and shoot) | robot | [itch.io](https://quaternius.itch.io/lowpoly-robot), [OpenGameArt](https://opengameart.org/content/animated-lowpoly-robot) |
+| R2 | Quaternius Animated Mech Pack | robot | OpenGameArt, CC0 |
+| R3 | Quaternius Sci-Fi Essentials Kit robot enemies | robot or drone | [quaternius.com](https://quaternius.com/packs/scifiessentialskit.html) |
+| D1 | Quaternius Ultimate Space Kit enemies (check for a flyer) | drone | [quaternius.com](https://quaternius.com/packs/ultimatespacekit.html) |
 
 ## Features
 
@@ -98,22 +113,22 @@ The new build is installed. Pick it up and move around until it finds its positi
 | Feature | Done | Good enough | Checked by you | Pick |
 |---|---|---|---|---|
 | Stand-in orb enemies with HP | ✅ | | | until robots exist |
-| Robot enemy (walk, bad-aim lasers) | | | | |
-| Drone enemy | | | | |
-| Spawn bubble + waves (5) | waves ✅ | | | spawn bubble not yet |
-| Powerups (charge, invincibility, 1.5x damage) | | | | |
-| Walls block attacks | | | | |
+| Robot enemy (walk, bad-aim lasers) | ✅ | | | placeholder body until you pick a model (see candidates below) |
+| Drone enemy | ✅ | | | weaves at head height, smaller; placeholder body |
+| Spawn bubble + waves (5) | ✅ | | | purple bubble grows, enemy fades in |
+| Powerups (charge, invincibility, 1.5x damage) | ✅ | | | touch to take; no glow on you yet |
+| Walls block attacks | ✅ | | | laser, blasts, shockwave and enemy bolts stop at live-depth surfaces |
 | Room objects (proxies, HP, pick up/throw) | | | | |
 
 ### Characters
 
 | Character | Name | L1 | L2 | L3 | Shield | Visuals | Checked by you |
 |---|---|---|---|---|---|---|---|
-| Technoman | | ✅ laser | ✅ +repulsor | stronger only, no AOE yet | ✅ hex | | |
-| Ki fighter | | | | | | | |
-| Mage | | | | | | | |
-| Saber | | | | | | | |
-| Archer | | | | | | | |
+| Technoman | | ✅ laser | ✅ +repulsor | ✅ AOE repulsor | ✅ hex | no gauntlets / tight aura yet | |
+| Ki fighter | | ✅ comet (yellow) | ✅ energy ball | ✅ dragon fist (placeholder look) | flame (needs work) | aura 2 at L2, blue at L3 | |
+| Mage | | ✅ fireball | force: needs room objects | ✅ fire pillar (placeholder look) | thin | rune aura L2-3 | |
+| Saber | | ✅ finger-gun blaster + aim line | ✅ laser sword | force: needs room objects | glass | light aura | |
+| Archer | | ✅ crossbow (reloads) | ✅ bow + aim line | smoke bomb, piercing: not yet | (knight shield: needs model) | | |
 | Spider | | | | | | | |
 
 ### Multiplayer

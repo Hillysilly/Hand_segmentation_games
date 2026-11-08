@@ -138,7 +138,7 @@ namespace Repulsor
                 + "Both hands OK sign for 2 s to pause.", new Vector2(80f, -45f), new Vector2(380f, 34f), 11,
                 TextAnchor.UpperLeft).color = Ui.Muted;
             if (!current.Ready)
-                Ui.Label(s, "* Preview: this character's own attacks aren't built yet, so it uses blasts.",
+                Ui.Label(s, "* Work in progress: some of this character's attacks aren't built yet.",
                     new Vector2(80f, -78f), new Vector2(380f, 18f), 11, TextAnchor.MiddleLeft).color = Ui.Warning;
 
             for (int i = 0; i < Swatches.Length; i++)

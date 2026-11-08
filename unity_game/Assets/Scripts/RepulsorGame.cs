@@ -84,6 +84,65 @@ namespace Repulsor
         public float DamageScale { get; set; } = 1f;
         public float LaserDps { get; set; } = Damage.LaserPerSecond;
         public float RepulsorDamage { get; set; } = Damage.Repulsor;
+        /// <summary>Repulsor shots explode over this radius where they land (Technoman level 3). 0 for none.</summary>
+        public float RepulsorAoe { get; set; }
+        public static readonly Color DefaultWeaponColor = new Color(0.1f, 0.4f, 1f);
+        public Color WeaponColor { get; private set; } = DefaultWeaponColor;
+
+        /// <summary>Recolours the hands' charge orbs, aim lines and lasers, and every shot fired from now on.</summary>
+        public void SetWeaponColor(Color color)
+        {
+            if (color == WeaponColor)
+                return;
+            WeaponColor = color;
+            Tint.Apply(leftHand.gameObject, color);
+            Tint.Apply(rightHand.gameObject, color);
+        }
+
+        /// <summary>A crackling energy ball, for charging effects. Its scale is its diameter.</summary>
+        public GameObject MakeEnergyBall(Transform parent)
+        {
+            GameObject ball = Instantiate(blastPrefab.Head.gameObject, parent);
+            Tint.Apply(ball, WeaponColor);
+            return ball;
+        }
+
+        /// <summary>Any shot built on the comet: size and speed multiply the repulsor's, damage and blast radius are set.</summary>
+        public void FireBlast(Vector3 position, Vector3 direction, float charge, float size, float speed, float damage, float aoe)
+            => FireBlast(position, direction, charge, size, speed, damage, aoe, WeaponColor);
+
+        public void FireBlast(Vector3 position, Vector3 direction, float charge, float size, float speed, float damage, float aoe, Color color)
+        {
+            Blast blast = Instantiate(blastPrefab, transform);
+            blast.Launch(this, position, direction, charge, size, speed);
+            blast.Damage = damage;
+            blast.Aoe = aoe;
+            blast.Color = color;
+            Tint.Apply(blast.gameObject, color);
+            if (room.TryDistance(position, direction.normalized, out float wall))
+                blast.WallDistance = wall;
+            PlayAt(position, size > 1.5f ? boom : zap);
+        }
+
+        /// <summary>Damages everything within the radius, with an explosion.</summary>
+        public void Explode(Vector3 center, float radius, float damage, Color color)
+        {
+            ParticleSystem explosion = Instantiate(explosionPrefab, center, Quaternion.identity, transform);
+            explosion.transform.localScale = Vector3.one * Mathf.Max(1f, radius * 1.5f);
+            Tint.Apply(explosion.gameObject, color);
+            Destroy(explosion.gameObject, explosion.main.duration + explosion.main.startLifetime.constantMax);
+            PlayAt(center, boom);
+            List<IHittable> all = Hittables.All;
+            for (int i = all.Count - 1; i >= 0; i--)
+            {
+                if (i >= all.Count)
+                    continue;
+                IHittable target = all[i];
+                if (target.Alive && target.Team == Team.Enemies
+                    && Vector3.Distance(target.Center, center) < radius + target.Radius)
+                    Strike(target, damage, center, "Explosion");
+            }
+        }
         public XRHandSubsystem Hands => hands;
         public Transform Head => head;
         public XROrigin Origin => origin;
@@ -329,6 +388,10 @@ namespace Repulsor
         {
             Blast blast = Instantiate(blastPrefab, transform);
             blast.Launch(this, position, direction, charge);
+            blast.Aoe = Legacy ? 0f : RepulsorAoe;
+            blast.Color = WeaponColor;
+            if (WeaponColor != DefaultWeaponColor)
+                Tint.Apply(blast.gameObject, WeaponColor);
             // Walls and furniture stop shots.
             if (room.TryDistance(position, direction.normalized, out float wall))
                 blast.WallDistance = wall;
@@ -341,6 +404,8 @@ namespace Repulsor
         {
             Shockwave wave = Instantiate(shockwavePrefab, transform);
             wave.Launch(this, position, direction, charge);
+            if (WeaponColor != DefaultWeaponColor)
+                Tint.Apply(wave.gameObject, WeaponColor);
             if (room.TryDistance(position, direction.normalized, out float wall))
                 wave.WallDistance = wall;
             PlayAt(position, whoosh);

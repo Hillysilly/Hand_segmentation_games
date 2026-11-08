@@ -21,6 +21,12 @@ namespace Repulsor
         [SerializeField] Transform head;
         [SerializeField] Transform tail;
 
+        public Transform Head => head;
+        /// <summary>Radius of the explosion where it lands, 0 for none.</summary>
+        public float Aoe { get; set; }
+        public Color Color { get; set; }
+        public float Damage { get => damage; set => damage = value; }
+
         RepulsorGame game;
         Vector3 velocity;
         float radius;
@@ -34,13 +40,13 @@ namespace Repulsor
         /// <summary>Where a real surface stops this shot, measured from where it was fired.</summary>
         public float WallDistance { set => wallAt = value; }
 
-        public void Launch(RepulsorGame owner, Vector3 position, Vector3 direction, float charge)
+        public void Launch(RepulsorGame owner, Vector3 position, Vector3 direction, float charge, float size = 1f, float speed = 1f)
         {
             game = owner;
-            damage = (owner != null ? owner.RepulsorDamage : Damage.Repulsor) * Mathf.Lerp(0.6f, 1f, charge);
-            radius = Mathf.Lerp(MinRadius, MaxRadius, charge);
-            velocity = direction.normalized * Mathf.Lerp(MinSpeed, MaxSpeed, charge);
-            tailLength = Mathf.Lerp(MinTail, MaxTail, charge);
+            damage = (owner != null ? owner.RepulsorDamage : global::Repulsor.Damage.Repulsor) * Mathf.Lerp(0.6f, 1f, charge);
+            radius = Mathf.Lerp(MinRadius, MaxRadius, charge) * size;
+            velocity = direction.normalized * (Mathf.Lerp(MinSpeed, MaxSpeed, charge) * speed);
+            tailLength = Mathf.Lerp(MinTail, MaxTail, charge) * Mathf.Sqrt(size);
             transform.SetPositionAndRotation(position, Quaternion.LookRotation(-velocity));
             head.localScale = Vector3.one * (radius * HeadOverRadius);
             ShowTail(0f);
@@ -62,8 +68,13 @@ namespace Repulsor
             ShowTail(travelled + velocity.magnitude * Time.deltaTime);
 
             flown += velocity.magnitude * Time.deltaTime;
-            if (game.TryHit(from, to, radius, damage) || age > LifeSeconds || flown >= wallAt)
+            bool hit = game.TryHit(from, to, radius, damage);
+            if (hit || age > LifeSeconds || flown >= wallAt)
+            {
+                if (Aoe > 0f && (hit || flown >= wallAt))
+                    game.Explode(to, Aoe, damage * 0.6f, Color);
                 Destroy(gameObject);
+            }
         }
     }
 }

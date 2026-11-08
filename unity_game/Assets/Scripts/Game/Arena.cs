@@ -66,6 +66,7 @@ namespace Repulsor
             foes.SetParent(transform, false);
             CreateMenu();
             CreateGestureLab();
+            CreateAbilityViews();
 
             player = new Fighter(settings.Lives, settings.RespawnSeconds);
             player.Died += OnDied;
@@ -398,13 +399,20 @@ namespace Repulsor
         void UpdateArms()
         {
             if (phase == Phase.Sandbox)
+            {
+                game.SetWeaponColor(RepulsorGame.DefaultWeaponColor);
+                game.RepulsorAoe = 0f;
                 return;
+            }
             bool fighting = phase == Phase.Playing && !paused && !player.IsDead && !player.Shield.Up && !xArms.Held
                 && waves != null && waves.State != WaveState.Countdown;
             game.Arm(fighting ? WeaponFor(character, player.Level) : Weapon.None);
             int level = phase == Phase.Playing ? player.Level : 1;
             game.LaserDps = Damage.LaserPerSecond * (1f + 0.4f * (level - 1));
-            game.RepulsorDamage = Damage.Repulsor * (character == CharacterId.Technoman && level >= 3 ? 1.4f : 1f);
+            game.RepulsorDamage = Damage.Repulsor * (level >= 2 && character == CharacterId.KiFighter ? 1.3f : 1f);
+            game.RepulsorAoe = character == CharacterId.Technoman && level >= 3 ? 0.8f : 0f;
+            game.SetWeaponColor(phase == Phase.Playing ? AttackColor : RepulsorGame.DefaultWeaponColor);
+            TickAbilities(fighting, paused ? 0f : Time.deltaTime);
         }
 
         static Weapon WeaponFor(CharacterId id, int level)
@@ -413,6 +421,11 @@ namespace Repulsor
             {
                 case CharacterId.Technoman:
                     return level >= 2 ? Weapon.LaserRepulsor : Weapon.Laser;
+                case CharacterId.Saber:
+                case CharacterId.Archer:
+                case CharacterId.Spider:
+                    // Their attacks are all gestures in Arena.Abilities.
+                    return Weapon.None;
                 default:
                     // Until each character's own attacks are built, everyone else gets blasts.
                     return Weapon.Repulsor;

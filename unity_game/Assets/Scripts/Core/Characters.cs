@@ -48,7 +48,7 @@ namespace Repulsor
             new CharacterDef
             {
                 Id = CharacterId.KiFighter, Name = "Ryuu", Tagline = "Martial artist",
-                Color = "#FFD23F", AuraStyle = new[] { 0, 2, 2 }, Shield = "Flaming bubble",
+                Color = "#FFD23F", AuraStyle = new[] { 0, 2, 2 }, Shield = "Flaming bubble", Ready = true,
                 Controls = new[]
                 {
                     new[] { "Fist, then snap open: comet blast" },

@@ -18,6 +18,25 @@ public static class GamePreview
     {
         RenderScreens();
         RenderShields();
+        RenderTinted();
+    }
+
+    /// <summary>A Ki-yellow energy ball and comet, to check player colours reach the energy shaders.</summary>
+    public static void RenderTinted()
+    {
+        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        var prefab = AssetDatabase.LoadAssetAtPath<Blast>("Assets/Prefabs/Blast.prefab");
+        Blast small = Object.Instantiate(prefab);
+        small.Launch(null, new Vector3(-0.5f, 1.5f, 2f), Vector3.right, 1f);
+        small.ShowTail(1.2f);
+        Tint.Apply(small.gameObject, new Color(1f, 0.75f, 0.1f));
+        Blast big = Object.Instantiate(prefab);
+        big.Launch(null, new Vector3(0.6f, 1.3f, 2.5f), new Vector3(1f, 0f, -0.3f), 1f, 3.5f, 0.6f);
+        big.ShowTail(1.5f);
+        Tint.Apply(big.gameObject, new Color(0.25f, 0.6f, 1f));
+        foreach (ElectricBall ball in Object.FindObjectsByType<ElectricBall>())
+            ball.Crackle(0.1f);
+        Save(new Vector3(0f, 1.5f, 0f), Quaternion.identity, 70f, "Logs/preview_tinted_blasts.png");
     }
 
     public static void RenderScreens()

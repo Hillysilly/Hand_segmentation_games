@@ -47,6 +47,24 @@ namespace Repulsor
         public Vector3 IndexTip { get; private set; }
         public HandGesture Gesture => gesture;
 
+        /// <summary>Draws the laser beam as a sword blade this frame (the Saber). Only while the hand has no weapon.</summary>
+        public void ShowBlade(Vector3 hilt, Vector3 tip)
+        {
+            laserBeam.Aim(hilt, tip, false, Vector3.up);
+            if (!laserHum.isPlaying)
+                laserHum.Play();
+            bladeShown = true;
+        }
+
+        bool bladeShown;
+
+        void LateUpdate()
+        {
+            if (!bladeShown && !lasing && laserHum.isPlaying)
+                laserHum.Stop();
+            bladeShown = false;
+        }
+
         public void Init(RepulsorGame owner, Transform handTrackingSpace, AudioClip hum)
         {
             game = owner;
