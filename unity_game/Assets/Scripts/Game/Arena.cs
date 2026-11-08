@@ -438,7 +438,14 @@ namespace Repulsor
 
         void OnTransformed(int level)
         {
-            TransformWave.Spawn(head.position + Vector3.down * TransformShake, PlayerColor, transform);
+            // Archer and Mage send a flat ring (white for the Archer's wings, fire for the Mage); others a sphere.
+            Vector3 waist = head.position + Vector3.down * TransformShake;
+            if (character == CharacterId.Archer && level >= 3)
+                TransformWave.SpawnRing(waist, Color.white, transform);
+            else if (character == CharacterId.Mage)
+                TransformWave.SpawnRing(new Vector3(waist.x, 0.1f, waist.z), new Color(1f, 0.45f, 0.1f), transform);
+            else
+                TransformWave.Spawn(waist, AttackColor, transform);
             game.PlayAt(head.position, powerUpSound);
             game.PlayAt(head.position, game.BoomSound);
             // Tell the player what the new level unlocked.

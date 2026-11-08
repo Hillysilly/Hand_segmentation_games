@@ -78,8 +78,17 @@ namespace Repulsor
         Bubble bubble;
         Color color;
         float age;
+        bool ring;
 
-        public static void Spawn(Vector3 center, Color color, Transform parent)
+        /// <summary>A flat ring racing out along the floor instead of a sphere.</summary>
+        public static void SpawnRing(Vector3 center, Color color, Transform parent)
+        {
+            TransformWave wave = Spawn(center, color, parent);
+            wave.ring = true;
+            wave.Update();
+        }
+
+        public static TransformWave Spawn(Vector3 center, Color color, Transform parent)
         {
             Bubble bubble = Bubble.Create("Transform Wave", parent);
             bubble.transform.position = center;
@@ -87,6 +96,7 @@ namespace Repulsor
             wave.bubble = bubble;
             wave.color = color;
             wave.Update();
+            return wave;
         }
 
         void Update()
@@ -94,7 +104,8 @@ namespace Repulsor
             age += Time.deltaTime;
             float t = Mathf.Clamp01(age / Seconds);
             float eased = 1f - (1f - t) * (1f - t) * (1f - t);
-            bubble.transform.localScale = Vector3.one * (0.3f + EndRadius * 2f * eased);
+            float size = 0.3f + EndRadius * 2f * eased;
+            bubble.transform.localScale = ring ? new Vector3(size, 0.08f, size) : Vector3.one * size;
             bubble.Show(color, BubbleStyle.Energy, 1f - t);
             if (t >= 1f)
                 Destroy(gameObject);
