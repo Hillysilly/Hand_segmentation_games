@@ -162,7 +162,8 @@ namespace Repulsor
             }
 
             fireTimer -= dt;
-            if (fireTimer <= 0f && distance < 6f)
+            // Smoke blinds them: no shooting from inside it, or through it.
+            if (fireTimer <= 0f && distance < 6f && !SmokeCloud.Blocks(transform.position, target))
             {
                 fireTimer = Kind == EnemyKind.Robot ? Random.Range(2.2f, 3.2f) : Random.Range(3f, 4.5f);
                 Fire(target + Vector3.down * 0.25f);

@@ -132,7 +132,7 @@ All of these say CC0 on their pages. I'll check each licence file when downloadi
 | Ki fighter | | ✅ comet (yellow) | ✅ energy ball | ✅ dragon fist (placeholder look) | flame (needs work) | aura 2 at L2, blue at L3 | |
 | Mage | | ✅ fireball | force: needs room objects | ✅ fire pillar (placeholder look) | thin | rune aura L2-3 | |
 | Saber | | ✅ finger-gun blaster + aim line | ✅ laser sword | force: needs room objects | glass | light aura | |
-| Archer | | ✅ crossbow (reloads) | ✅ bow + aim line | smoke bomb, piercing: not yet | (knight shield: needs model) | | |
+| Archer | | ✅ crossbow (reloads) | ✅ bow + aim line | ✅ smoke bomb (blinds enemies), piercing arrows | (knight shield: needs model) | wings: needs model | |
 | Spider | | | | | | | |
 
 ### Multiplayer
@@ -143,7 +143,7 @@ All of these say CC0 on their pages. I'll check each licence file when downloadi
 | Colocation | ✅ manual | | | both touch the same 2 real points; shared anchors not tried |
 | Player sync (pose, aura, shield, attacks) | ✅ partial | | | HP bar, level, shield, head and palm markers, blasts; no remote aura yet |
 | Co-op PVE | ✅ | | | host runs enemies and waves, client sees copies and its hits count; ends when both are out |
-| PVP (best of 3, friendly fire toggle) | | | | |
+| PVP (best of 3, friendly fire toggle) | ✅ | | | victim's headset applies hits; levels reset each round; co-op friendly fire toggle in pause |
 
 ### Submission
 

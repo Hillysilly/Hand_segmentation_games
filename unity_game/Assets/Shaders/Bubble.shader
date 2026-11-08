@@ -153,6 +153,13 @@ Shader "Repulsor/Bubble"
                     glow = lines * 0.9 + rim * 0.25;
                     color = lerp(_Color.rgb, float3(0.95, 0.95, 0.95), 0.7);
                 }
+                else if (style == 6)
+                {
+                    // Smoke: a soft grey mass, thicker in the middle, slowly churning. Greys out what's behind it.
+                    float churn = Noise(p * 3.0 + float3(t * 0.3, t * 0.5, 0)) * 0.6 + Noise(p * 7.0 - t * 0.4) * 0.4;
+                    glow = pow(facing, 1.6) * (0.5 + 0.7 * churn) * 1.1;
+                    color = _Color.rgb;
+                }
                 else
                 {
                     // Energy shell for the transformation shockwave: bright rim, streaky interior.
@@ -165,7 +172,7 @@ Shader "Repulsor/Bubble"
                 // From inside (your own shield) it's faint, so you can still see to fight.
                 float3 centre = UNITY_MATRIX_M._m03_m13_m23;
                 float radius = length(UNITY_MATRIX_M._m00_m10_m20) * 0.5;
-                if (distance(GetCameraPositionWS(), centre) < radius && style != 5)
+                if (distance(GetCameraPositionWS(), centre) < radius && style != 5 && style != 6)
                     glow *= 0.35 + 0.65 * _Hit;
                 float shown = _Alpha * Visibility(input.positionWS);
                 return float4(color * glow * shown, saturate(glow) * shown * 0.85);

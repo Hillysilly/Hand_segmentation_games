@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Repulsor
 {
-    public enum BubbleStyle { Hex, Flame, Glass, Thin, Web, Energy }
+    public enum BubbleStyle { Hex, Flame, Glass, Thin, Web, Energy, Smoke }
 
     /// <summary>A sphere drawn with the Bubble shader: shields and the transformation shockwave.</summary>
     public sealed class Bubble : MonoBehaviour

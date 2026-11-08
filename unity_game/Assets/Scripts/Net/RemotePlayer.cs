@@ -19,6 +19,7 @@ namespace Repulsor
         readonly Bar bar;
         readonly Bubble shield;
         readonly Bubble glow;
+        readonly Bubble auraGlow;
         readonly Bubble[] markers = new Bubble[3];
         PlayerSnapshot latest;
         Vector3 shownHead;
@@ -40,6 +41,7 @@ namespace Repulsor
             bar.Trail = true;
             shield = Bubble.Create("Remote Shield", parent);
             glow = Bubble.Create("Remote Powerup Glow", parent);
+            auraGlow = Bubble.Create("Remote Aura", parent);
             for (int i = 0; i < markers.Length; i++)
                 markers[i] = Bubble.Create("Remote Marker " + i, parent);
             Hide();
@@ -99,6 +101,16 @@ namespace Repulsor
             glow.Show(latest.Invincible ? new Color(1f, 0.85f, 0.3f) : new Color(1f, 0.2f, 0.15f), BubbleStyle.Energy,
                 powered ? 0.45f + 0.15f * Mathf.Sin(Time.time * 10f) : 0f);
 
+            // Their aura or glow outline, as a body-shaped shell. The real auras use shared shader values, so a
+            // second one can't be drawn; this stands in until it can.
+            int style = character.AuraStyle[Mathf.Clamp(latest.Level, 1, 3) - 1];
+            bool technoGlow = character.Id == CharacterId.Technoman && latest.Level >= 3;
+            bool aura = !latest.Dead && (style > 0 || technoGlow);
+            auraGlow.transform.position = new Vector3(shownHead.x, (shownHead.y + 0.1f) * 0.5f, shownHead.z);
+            auraGlow.transform.localScale = new Vector3(0.75f, shownHead.y + 0.2f, 0.6f);
+            Color auraColor = character.Id == CharacterId.KiFighter && latest.Level >= 3 ? new Color(0.25f, 0.6f, 1f) : color;
+            auraGlow.Show(auraColor, technoGlow ? BubbleStyle.Energy : BubbleStyle.Flame, aura ? 0.7f : 0f);
+
             ShowMarker(0, shownHead + Vector3.up * 0.15f, 0.06f, color, ShowMarkers);
             ShowMarker(1, shownLeft, 0.04f, color, ShowMarkers && latest.LeftTracked);
             ShowMarker(2, shownRight, 0.04f, color, ShowMarkers && latest.RightTracked);
@@ -116,6 +128,7 @@ namespace Repulsor
             tag.gameObject.SetActive(false);
             shield.Show(Color.white, BubbleStyle.Hex, 0f);
             glow.Show(Color.white, BubbleStyle.Energy, 0f);
+            auraGlow.Show(Color.white, BubbleStyle.Flame, 0f);
             foreach (Bubble marker in markers)
                 marker.Show(Color.white, BubbleStyle.Energy, 0f);
         }

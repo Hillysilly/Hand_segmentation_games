@@ -108,10 +108,10 @@ namespace Repulsor
         }
 
         /// <summary>Any shot built on the comet: size and speed multiply the repulsor's, damage and blast radius are set.</summary>
-        public void FireBlast(Vector3 position, Vector3 direction, float charge, float size, float speed, float damage, float aoe)
+        public Blast FireBlast(Vector3 position, Vector3 direction, float charge, float size, float speed, float damage, float aoe)
             => FireBlast(position, direction, charge, size, speed, damage, aoe, WeaponColor);
 
-        public void FireBlast(Vector3 position, Vector3 direction, float charge, float size, float speed, float damage, float aoe, Color color)
+        public Blast FireBlast(Vector3 position, Vector3 direction, float charge, float size, float speed, float damage, float aoe, Color color)
         {
             Blast blast = Instantiate(blastPrefab, transform);
             blast.Launch(this, position, direction, charge, size, speed);
@@ -123,6 +123,28 @@ namespace Repulsor
                 blast.WallDistance = wall;
             PlayAt(position, size > 1.5f ? boom : zap);
             BlastFired?.Invoke(position, direction, size, speed, color);
+            return blast;
+        }
+
+        /// <summary>Hits everything the moving shot touches that it hasn't hit yet. True if anything was hit.</summary>
+        public bool HitAllAlong(Vector3 from, Vector3 to, float blastRadius, float damage, HashSet<IHittable> already)
+        {
+            bool any = false;
+            List<IHittable> all = Hittables.All;
+            for (int i = all.Count - 1; i >= 0; i--)
+            {
+                if (i >= all.Count)
+                    continue;
+                IHittable target = all[i];
+                if (target.Alive && target.Team == Team.Enemies && !already.Contains(target)
+                    && GameMath.SegmentHitsSphere(from, to, target.Center, target.Radius + blastRadius))
+                {
+                    already.Add(target);
+                    Strike(target, damage, from, "Arrow");
+                    any = true;
+                }
+            }
+            return any;
         }
 
         /// <summary>Damages everything within the radius, with an explosion.</summary>

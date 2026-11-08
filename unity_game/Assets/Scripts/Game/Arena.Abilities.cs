@@ -18,6 +18,9 @@ namespace Repulsor
         const float BladeRadius = 0.05f;
         const float BladeDps = 30f;
         const float CrossbowReload = 2.5f;
+        const float SmokeCooldown = 15f;
+        readonly UnderhandThrowDetector[] bomb = { new UnderhandThrowDetector(), new UnderhandThrowDetector() };
+        float smokeReady;
         static readonly Color KiBlue = new Color(0.25f, 0.6f, 1f);
         static readonly Color BlasterRed = new Color(1f, 0.12f, 0.08f);
 
@@ -36,6 +39,7 @@ namespace Repulsor
         int heldHand = -1;
         float heldFor;
         float nextRoomRefresh;
+        float noFurnitureHint;
         GameObject chargeBall;
         LineRenderer[] playAim;
         LineRenderer playRing;
@@ -186,14 +190,29 @@ namespace Repulsor
         {
             if (player.Level >= 2 && bow.Step(input.Left, input.Right, body, dt, out Vector3 from, out Vector3 aim, out float draw))
             {
-                game.FireBlast(from + aim * 0.1f, aim, 0.3f, 0.4f, Mathf.Lerp(1.2f, 2.2f, draw), player.Outgoing(6f + 10f * draw), 0f);
-                Log($"Arrow, draw {draw:0.00}");
+                Blast arrow = game.FireBlast(from + aim * 0.1f, aim, 0.3f, 0.4f, Mathf.Lerp(1.2f, 2.2f, draw), player.Outgoing(6f + 10f * draw), 0f);
+                arrow.Pierce = player.Level >= 3;
+                Log($"Arrow, draw {draw:0.00}{(arrow.Pierce ? ", piercing" : "")}");
             }
             if (bow.Formed)
             {
                 // Where the arrow will go.
                 ShowAim(2, bow.BowPosition, bow.BowPosition + bow.Direction * (1.5f + 3f * bow.Draw));
                 return;
+            }
+
+            if (player.Level >= 3)
+            {
+                for (int i = 0; i < 2; i++)
+                {
+                    HandPose thrower = i == 0 ? input.Left : input.Right;
+                    if (bomb[i].Step(thrower, body, dt, out Vector3 from2, out Vector3 velocity) && matchTime >= smokeReady)
+                    {
+                        smokeReady = matchTime + SmokeCooldown;
+                        SmokeCloud.Throw(from2, velocity, foes);
+                        Log("Smoke bomb");
+                    }
+                }
             }
 
             for (int i = 0; i < 2; i++)
@@ -248,6 +267,11 @@ namespace Repulsor
                 }
                 if (held != null || !(force[i].Forming || force[i].Holding))
                     continue;
+                if (room.Count == 0 && matchTime > noFurnitureHint)
+                {
+                    noFurnitureHint = matchTime + 15f;
+                    hud.Message("NO FURNITURE FOUND", "Force powers need Space Setup: headset Settings > Environment setup", 3f);
+                }
                 bool aimed = room.TryAim(force[i].AimOrigin, force[i].AimDirection, out var box);
                 ShowAim(i, force[i].AimOrigin, force[i].AimOrigin + force[i].AimDirection * (aimed ? 1.5f : 3f));
                 if (!aimed)

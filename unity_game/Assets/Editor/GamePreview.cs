@@ -21,6 +21,25 @@ public static class GamePreview
         RenderTinted();
     }
 
+    /// <summary>The smoke bomb's cloud in front of a stand-in person, as seven overlapping smoke spheres.</summary>
+    public static void RenderSmoke()
+    {
+        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        var person = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        person.transform.position = new Vector3(0.4f, 0.87f, 3.2f);
+        person.transform.localScale = new Vector3(0.5f, 0.87f, 0.3f);
+        var random = new System.Random(3);
+        for (int i = 0; i < 7; i++)
+        {
+            Bubble puff = Bubble.Create("Puff", null);
+            Vector3 offset = i == 0 ? Vector3.zero : new Vector3((float)random.NextDouble() - 0.5f, (float)random.NextDouble() - 0.5f, (float)random.NextDouble() - 0.5f) * 1.2f;
+            puff.transform.position = new Vector3(0f, 0.9f, 2.4f) + offset;
+            puff.transform.localScale = Vector3.one * 1.25f;
+            puff.Show(new Color(0.55f, 0.56f, 0.6f), BubbleStyle.Smoke, 0.75f);
+        }
+        Save(new Vector3(0f, 1.5f, 0f), Quaternion.LookRotation(new Vector3(0f, -0.25f, 1f)), 70f, "Logs/preview_smoke.png");
+    }
+
     /// <summary>A Ki-yellow energy ball and comet, to check player colours reach the energy shaders.</summary>
     public static void RenderTinted()
     {

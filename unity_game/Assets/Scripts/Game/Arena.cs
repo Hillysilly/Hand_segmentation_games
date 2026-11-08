@@ -220,6 +220,8 @@ namespace Repulsor
             announcedWave = -1;
             matchTime = 0f;
             nextPowerup = Random.Range(20f, 30f);
+            noFurnitureHint = 0f;
+            smokeReady = 0f;
             phase = Phase.Playing;
             paused = false;
             Time.timeScale = 1f;

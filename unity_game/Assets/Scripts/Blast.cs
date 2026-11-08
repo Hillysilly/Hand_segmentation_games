@@ -26,6 +26,9 @@ namespace Repulsor
         public float Aoe { get; set; }
         public Color Color { get; set; }
         public float Damage { get => damage; set => damage = value; }
+        /// <summary>Flies through enemies, hitting each once, instead of stopping at the first.</summary>
+        public bool Pierce { get; set; }
+        readonly System.Collections.Generic.HashSet<IHittable> pierced = new System.Collections.Generic.HashSet<IHittable>();
 
         RepulsorGame game;
         Vector3 velocity;
@@ -68,7 +71,17 @@ namespace Repulsor
             ShowTail(travelled + velocity.magnitude * Time.deltaTime);
 
             flown += velocity.magnitude * Time.deltaTime;
-            bool hit = game.TryHit(from, to, radius, damage);
+            // A piercing shot keeps flying after a hit; others stop at the first.
+            bool hit;
+            if (Pierce)
+            {
+                game.HitAllAlong(from, to, radius, damage, pierced);
+                hit = false;
+            }
+            else
+            {
+                hit = game.TryHit(from, to, radius, damage);
+            }
             if (hit || age > LifeSeconds || flown >= wallAt)
             {
                 if (Aoe > 0f && (hit || flown >= wallAt))
