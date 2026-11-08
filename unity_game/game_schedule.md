@@ -100,6 +100,7 @@ says how much furniture the game found, which the force powers need.
    - DRAGON FIST: A comet, B three twisting comets, C punch wave, D both. Poke to fire one, then SAVE PICK.
    - ENERGY BALL: A crackle, B glowing shell, C fiery shell. PC render: `unity_game/Logs/preview_energy_balls.png`.
    - FIRE PILLAR: A flame column, B energy column, C both with a floor ring. PC render: `unity_game/Logs/preview_fire_pillars.png`.
+   - COMET (Ki fighter's blast): A comet, B streak, C orb. PC render: `unity_game/Logs/preview_comets.png`.
    PC renders are in `unity_game/Logs/preview_shield_*.png`.
 6. HUD: is it readable, in a good spot, too big or too small?
 7. **When the second Quest arrives:** install the same build on both (`build_and_run.ps1 -NoBuild` with each plugged

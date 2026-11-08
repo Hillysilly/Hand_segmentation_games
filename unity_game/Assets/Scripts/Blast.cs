@@ -22,6 +22,12 @@ namespace Repulsor
         [SerializeField] Transform tail;
 
         public Transform Head => head;
+
+        /// <summary>Stretches or shortens the tail; set after <see cref="Launch"/>.</summary>
+        public float TailScale
+        {
+            set => tailLength *= value;
+        }
         /// <summary>Radius of the explosion where it lands, 0 for none.</summary>
         public float Aoe { get; set; }
         public Color Color { get; set; }

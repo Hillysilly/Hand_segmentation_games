@@ -21,6 +21,33 @@ public static class GamePreview
         RenderTinted();
     }
 
+    /// <summary>The three comet looks flying left, top to bottom: comet, streak, orb.</summary>
+    public static void RenderComets()
+    {
+        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        var prefab = AssetDatabase.LoadAssetAtPath<Blast>("Assets/Prefabs/Blast.prefab");
+        var yellow = new Color(1f, 0.75f, 0.1f);
+        float[] sizes = { 1f, 0.75f, 1.35f };
+        float[] tails = { 1f, 1.9f, 0.45f };
+        for (int i = 0; i < 3; i++)
+        {
+            Blast blast = Object.Instantiate(prefab);
+            blast.Launch(null, new Vector3(-0.3f, 1.9f - i * 0.45f, 2.2f), Vector3.left, 1f, sizes[i], 1f);
+            blast.TailScale = tails[i];
+            blast.ShowTail(3f);
+            Tint.Apply(blast.gameObject, yellow);
+            if (i == 2)
+            {
+                Bubble shell = Bubble.Create("Shell", blast.Head);
+                shell.transform.localScale = Vector3.one * 1.4f;
+                shell.Show(yellow, BubbleStyle.Energy, 0.8f);
+            }
+        }
+        foreach (ElectricBall crackle in Object.FindObjectsByType<ElectricBall>())
+            crackle.Crackle(0.1f);
+        Save(new Vector3(0f, 1.5f, 0f), Quaternion.identity, 60f, "Logs/preview_comets.png");
+    }
+
     /// <summary>The three fire pillar looks, half a second in, left to right A B C.</summary>
     public static void RenderPillars()
     {

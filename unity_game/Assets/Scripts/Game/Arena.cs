@@ -491,6 +491,7 @@ namespace Repulsor
             game.RepulsorDamage = Damage.Repulsor * (level >= 2 && character == CharacterId.KiFighter ? 1.3f : 1f);
             game.RepulsorAoe = character == CharacterId.Technoman && level >= 3 ? 0.8f : 0f;
             game.SetWeaponColor(phase == Phase.Playing ? AttackColor : RepulsorGame.DefaultWeaponColor);
+            game.CometStyle = character == CharacterId.KiFighter ? PickedComet : 0;
             TickAbilities(fighting, paused ? 0f : Time.deltaTime);
         }
 

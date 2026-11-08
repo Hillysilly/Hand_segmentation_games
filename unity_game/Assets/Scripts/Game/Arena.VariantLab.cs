@@ -57,7 +57,45 @@ namespace Repulsor
             Ui.Button(s, "BACK", new Vector2(90f, -55f), new Vector2(150f, 44f), () => ShowDebug(debugBack), 16);
         }
 
-        static readonly string[] LabItems = { "SHIELDS", "DRAGON FIST", "ENERGY BALL", "FIRE PILLAR", "HUD" };
+        static readonly string[] LabItems = { "SHIELDS", "DRAGON FIST", "ENERGY BALL", "FIRE PILLAR", "HUD", "COMET" };
+        const string CometPickKey = "variant.comet";
+        int PickedComet => PlayerPrefs.GetInt(CometPickKey, 0);
+        int cometTried = -1;
+
+        void ShowCometLab()
+        {
+            Time.timeScale = 1f;
+            RectTransform s = OpenScreen(new Vector2(480f, 320f), "VARIANT LAB");
+            LabTabs(s);
+            Ui.Label(s, "The Ki fighter's fist-and-release blast. Poke a style to fire one ahead of you.",
+                new Vector2(0f, 72f), new Vector2(450f, 20f), 12).color = Ui.Muted;
+            for (int i = 0; i < RepulsorGame.CometStyleNames.Length; i++)
+            {
+                int style = i;
+                PokeButton b = Ui.Button(s, RepulsorGame.CometStyleNames[i], new Vector2(-130f + i * 130f, 25f), new Vector2(120f, 44f), () =>
+                {
+                    Vector3 forward = Vector3.ProjectOnPlane(head.forward, Vector3.up).normalized;
+                    game.SetWeaponColor(PlayerColor);
+                    int before = game.CometStyle;
+                    game.CometStyle = style;
+                    game.Fire(head.position + Vector3.down * 0.3f + forward * 0.5f + head.right * 0.3f, forward, 1f);
+                    game.CometStyle = before;
+                    cometTried = style;
+                    ShowVariantLab();
+                }, 13);
+                b.Selected = i == (cometTried >= 0 ? cometTried : PickedComet);
+            }
+            Ui.Button(s, "SAVE PICK", new Vector2(-90f, -55f), new Vector2(150f, 44f), () =>
+            {
+                if (cometTried < 0)
+                    return;
+                PlayerPrefs.SetInt(CometPickKey, cometTried);
+                PlayerPrefs.Save();
+                Debug.Log($"[Variant] Comet: {RepulsorGame.CometStyleNames[cometTried]}");
+                hud.Message("SAVED", $"Comet {RepulsorGame.CometStyleNames[cometTried]}", 1.5f);
+            }, 16);
+            Ui.Button(s, "BACK", new Vector2(90f, -55f), new Vector2(150f, 44f), () => ShowDebug(debugBack), 16);
+        }
 
         /// <summary>The lab's item switcher: previous, the item's name, next.</summary>
         void LabTabs(RectTransform s)
@@ -212,6 +250,11 @@ namespace Repulsor
             if (labItem == 4)
             {
                 ShowHudLab();
+                return;
+            }
+            if (labItem == 5)
+            {
+                ShowCometLab();
                 return;
             }
             RectTransform s = OpenScreen(new Vector2(480f, 320f), "VARIANT LAB");
