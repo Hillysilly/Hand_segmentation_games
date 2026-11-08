@@ -40,6 +40,7 @@ namespace Repulsor
         ShieldView shield;
         DeathView death;
         HurtFlash hurtFlash;
+        DamageNumbers damageNumbers;
         AudioClip enemyShotSound;
         AudioClip spawnSound;
         AudioClip chimeSound;
@@ -69,6 +70,7 @@ namespace Repulsor
             shield = new ShieldView(transform);
             death = new DeathView(eye);
             hurtFlash = new HurtFlash(transform, head);
+            damageNumbers = new DamageNumbers(transform, head);
             enemyShotSound = Sfx.EnemyShot();
             spawnSound = Sfx.Spawn();
             chimeSound = Sfx.Chime();
@@ -134,6 +136,7 @@ namespace Repulsor
             TickVariantLab(dt);
             death.Tick(playing && player.IsDead, dt);
             hurtFlash.Tick(dt);
+            damageNumbers.Tick(dt);
             TickGestureLab(dt);
             UpdateArms();
             LogPerformance(dt);
@@ -306,6 +309,7 @@ namespace Repulsor
         void CleanUpMatch()
         {
             ShowPowerUpCharge(0f);
+            damageNumbers?.Clear();
             enemies.Clear();
             if (net != null)
                 ClearProxies();
@@ -450,7 +454,10 @@ namespace Repulsor
         void OnDealt(IHittable target, float amount)
         {
             if (phase == Phase.Playing && !applyingRemoteHit)
+            {
                 player.DealtDamage(amount);
+                damageNumbers.Add(target, amount);
+            }
         }
 
         void OnKilled(IHittable target)
@@ -595,6 +602,10 @@ namespace Repulsor
         /// <summary>PlayMode smoke test: fill the meter and transform.</summary>
         public void TestAdvance()
         {
+            // Hit every enemy once, as an attack would, so damage numbers and kills run too.
+            foreach (IHittable foe in enemies.ToArray())
+                if (foe is Object alive && alive != null && foe.Alive)
+                    game.Strike(foe, 12f, foe.Center, "test");
             player.FillMeter();
             player.TryTransform();
         }
