@@ -66,6 +66,45 @@ namespace Repulsor
             return noise * (0.1f + 0.1f * Mathf.Sin(2f * Mathf.PI * 23f * t));
         });
 
+        /// <summary>A low, buzzy downward blip: an enemy firing. Lower and harsher than the player's zap.</summary>
+        public static AudioClip EnemyShot() => Render("enemy shot", 0.25f, (t, u, rng) =>
+        {
+            float f = Mathf.Lerp(520f, 180f, u);
+            float square = Mathf.Sign(Mathf.Sin(2f * Mathf.PI * f * t));
+            return square * (1f - u) * 0.22f;
+        });
+
+        /// <summary>A wobbling upward warp: an enemy appearing in its bubble.</summary>
+        public static AudioClip Spawn() => Render("spawn", 0.8f, (t, u, rng) =>
+        {
+            float f = Mathf.Lerp(120f, 640f, u * u) * (1f + 0.08f * Mathf.Sin(2f * Mathf.PI * 14f * t));
+            return Mathf.Sin(2f * Mathf.PI * f * t) * Mathf.Sin(Mathf.PI * u) * 0.35f;
+        });
+
+        /// <summary>Two bright rising notes: a powerup taken.</summary>
+        public static AudioClip Chime() => Render("chime", 0.45f, (t, u, rng) =>
+        {
+            float f = u < 0.4f ? 880f : 1320f;
+            float local = u < 0.4f ? u / 0.4f : (u - 0.4f) / 0.6f;
+            return (Mathf.Sin(2f * Mathf.PI * f * t) + 0.3f * Mathf.Sin(4f * Mathf.PI * f * t)) * (1f - local) * 0.3f;
+        });
+
+        /// <summary>A long rising roar into a bang: transforming to the next level.</summary>
+        public static AudioClip PowerUp() => Render("power up", 1.3f, (t, u, rng) =>
+        {
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+            float rise = Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(60f, 420f, u * u) * t);
+            float build = u < 0.8f ? u / 0.8f : 1f - (u - 0.8f) / 0.2f;
+            return (rise * 0.4f + noise * 0.15f) * build;
+        });
+
+        /// <summary>A dull thud: you got hit.</summary>
+        public static AudioClip Hurt() => Render("hurt", 0.2f, (t, u, rng) =>
+        {
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0) * Mathf.Pow(1f - u, 4f);
+            return (Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(140f, 60f, u) * t) * 0.6f + noise * 0.3f) * (1f - u);
+        });
+
         delegate float Wave(float seconds, float progress, System.Random rng);
 
         static AudioClip Render(string name, float seconds, Wave wave)

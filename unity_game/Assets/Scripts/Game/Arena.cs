@@ -40,6 +40,11 @@ namespace Repulsor
         ShieldView shield;
         DeathView death;
         HurtFlash hurtFlash;
+        AudioClip enemyShotSound;
+        AudioClip spawnSound;
+        AudioClip chimeSound;
+        AudioClip powerUpSound;
+        AudioClip hurtSound;
         Phase phase;
         bool paused;
         int announcedWave = -1;
@@ -64,6 +69,11 @@ namespace Repulsor
             shield = new ShieldView(transform);
             death = new DeathView(eye);
             hurtFlash = new HurtFlash(transform, head);
+            enemyShotSound = Sfx.EnemyShot();
+            spawnSound = Sfx.Spawn();
+            chimeSound = Sfx.Chime();
+            powerUpSound = Sfx.PowerUp();
+            hurtSound = Sfx.Hurt();
             foes = new GameObject("Enemies").transform;
             foes.SetParent(transform, false);
             CreateMenu();
@@ -77,7 +87,7 @@ namespace Repulsor
             player.Damaged += lost =>
             {
                 hurtFlash.Hit(lost);
-                game.PlayAt(head.position + head.forward * 0.3f, game.ZapSound);
+                game.PlayAt(head.position + head.forward * 0.3f, hurtSound);
             };
             player.Respawned += OnRespawned;
             player.Transformed += OnTransformed;
@@ -316,7 +326,7 @@ namespace Repulsor
             Enemy enemy = Enemy.Spawn(kind, point, this, head, foes, ++nextEnemyId);
             enemies.Add(enemy);
             OverheadBar.Attach(enemy, head, foes, false);
-            game.PlayAt(point, game.WhooshSound);
+            game.PlayAt(point, spawnSound);
             Log($"{kind} spawned {distance:0.0} m away");
         }
 
@@ -346,8 +356,7 @@ namespace Repulsor
                 {
                     player.ApplyPowerup(powerup.Kind);
                     hud.Message(Powerup.NameOf(powerup.Kind), "", 1.2f);
-                    game.PlayAt(powerup.transform.position, game.ClickSound);
-                    game.PlayAt(powerup.transform.position, game.WhooshSound);
+                    game.PlayAt(powerup.transform.position, chimeSound);
                     Log($"Powerup taken: {powerup.Kind}");
                     Destroy(powerup.gameObject);
                     powerup = null;
@@ -382,7 +391,7 @@ namespace Repulsor
             EnemyBolt.Launch(muzzle, direction, range, this, head, foes);
             if (Multiplayer && net.Connected)
                 net.SendEnemyBolt(frame.ToShared(muzzle), frame.DirectionToShared(direction));
-            game.PlayAt(muzzle, game.ZapSound);
+            game.PlayAt(muzzle, enemyShotSound);
         }
 
         void OnDealt(IHittable target, float amount)
@@ -428,7 +437,7 @@ namespace Repulsor
         void OnTransformed(int level)
         {
             TransformWave.Spawn(head.position + Vector3.down * TransformShake, PlayerColor, transform);
-            game.PlayAt(head.position, game.WhooshSound);
+            game.PlayAt(head.position, powerUpSound);
             game.PlayAt(head.position, game.BoomSound);
             // Tell the player what the new level unlocked.
             hud.Message($"LEVEL {level}", Character.Controls[Mathf.Clamp(level - 1, 0, Character.Controls.Length - 1)][0], 2.5f);
