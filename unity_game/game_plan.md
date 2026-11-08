@@ -579,7 +579,43 @@ Yeah start game branch
 
 Ok
 
+## Round 2 (11/7)
+
+Same format: each question has a default.
+
+51. You said PVE first, then co-op. Where does PVP go: third, or cut from v1? **Default:** third. Once co-op
+    networking works, PVP is mostly a friendly-fire switch plus rounds, so about 2 hours.
+52. "Dying goes to 0": does that mean the meter drops to 0 and you go back to level 1 (100 max HP)?
+    **Default:** yes.
+53. Co-op lives with no revives. **Default:** each player has their own lives, and the game ends when both are
+    out. A player with no lives left watches in the grey view until the game ends.
+54. Do abilities add up across levels? For example, does Saber at level 3 still have the finger gun and the
+    sword? **Default:** yes, they add up. "Upgraded" replaces the older version of that same attack.
+55. Some gestures aren't specified yet. Defaults:
+    - Technoman lasers and repulsors use today's gestures.
+    - The Ki fighter's comet blast and the Mage's fireball use today's repulsor gesture.
+    - Spider webs: one web each time you form the spider sign, with a 0.4 s cooldown.
+    - Archer smoke bomb: a closed-fist underhand throw, with a 15 s cooldown.
+56. Spider suit on the *other* player: the camera tracker can now fit a full suit on another person (it works on
+    the PC replay and holds 72 FPS on the Quest). Should the other player get a full suit with our own design, or
+    should everyone get webbed gloves only? **Default:** you see webbed gloves on yourself. The other player gets
+    a full suit when the camera locks on, as a stretch goal after co-op.
+57. Gauntlets: what if I can't find a sci-fi gauntlet model we're allowed to use? **Default:** skip the
+    gauntlets, and show level 2 through a brighter hand glow and upgraded beams. Either way, you'll see the 3-4
+    candidate models I find first.
+58. Names. **Default:** I propose 3 original names per character in `game_schedule.md`, and you pick.
+59. How do you open the debug menu? **Default:** a "Debug" button at the bottom of the pause menu. It holds:
+    - the old-controls toggle (OK sign switches the aura, palm-to-face opens the colour wheel)
+    - aura style cycling
+    - the Variant Lab
+    - an FPS overlay
+    - buttons to spawn an enemy or a powerup
+    - invincibility
+
 # Claude's feasibility notes
+
+**Update 11/7:** you consider the plan feasible, since 5 hours a day is a lower bound. The target is now all 5 characters, in the order PVE solo, then co-op, then PVP. `game_schedule.md` has the day plan. The pivot checkpoint is the evening of 11/11: whatever isn't on track by then gets cut.
+
 
 **Short version: the whole plan does not fit in 11/7-11/16. About half of it does.** That's 10 days at about
 5 Claude-hours a day, so ~50 hours. Coding hours aren't the tightest limit, though. The real limits are:
