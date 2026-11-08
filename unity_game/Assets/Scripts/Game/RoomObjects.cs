@@ -98,7 +98,8 @@ namespace Repulsor
             return ThrownObject.Create(box.transform.position, box.transform.rotation, size, color, label, arena, parent);
         }
 
-        static bool RayHitsBox(Vector3 origin, Vector3 direction, Transform box, Vector3 size, out float distance)
+        /// <summary>Distance along a ray to where it enters a box (centred on its transform, of this size).</summary>
+        public static bool RayHitsBox(Vector3 origin, Vector3 direction, Transform box, Vector3 size, out float distance)
         {
             // Into the box's own frame, where it's axis-aligned and centred.
             Vector3 o = box.InverseTransformPoint(origin);
