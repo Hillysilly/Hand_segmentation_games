@@ -145,5 +145,69 @@ namespace Repulsor.Tests
             }
             Assert.That(arena.TestEnemyCount, Is.EqualTo(0));
         }
+
+        [UnityTest]
+        public IEnumerator PvpHostTakesHitsAndWinsTheRoundWhenTheClientFalls()
+        {
+            LogAssert.ignoreFailingMessages = true;
+            SceneManager.LoadScene("Main");
+            yield return null;
+            yield return null;
+            var arena = Object.FindAnyObjectByType<Arena>();
+            Assert.That(arena.TestHost(Port + 2, true), Is.True);
+
+            using var client = new NetSession();
+            client.Join(0, Port + 2, IPAddress.Loopback);
+            int roundsSeen = 0;
+            byte winner = 255;
+            client.RoundReceived += (round, hostWins, clientWins, who, over) =>
+            {
+                roundsSeen++;
+                winner = who;
+            };
+            for (int i = 0; i < 300 && !(client.Connected && arena.TestPartnerConnected); i++)
+            {
+                client.Poll(Time.unscaledDeltaTime);
+                yield return null;
+            }
+            Assert.That(client.Connected, Is.True);
+            Assert.That(client.Mode, Is.EqualTo((byte)GameMode.Pvp), "the welcome didn't carry the mode");
+
+            arena.TestStartHosting();
+            var alive = new PlayerSnapshot { Slot = 1, Head = new Vector3(0f, 1.6f, 2f), HeadRotation = Quaternion.identity, Hp = 100f, MaxHp = 100f, Level = 1, Lives = 3 };
+
+            // Through the 3 s round countdown, then hit the host.
+            float until = Time.realtimeSinceStartup + 3.5f;
+            while (Time.realtimeSinceStartup < until)
+            {
+                client.SendPlayer(alive, 1f);
+                client.Poll(Time.unscaledDeltaTime);
+                yield return null;
+            }
+            float before = arena.TestHp;
+            client.SendPlayerHit(10f);
+            until = Time.realtimeSinceStartup + 1f;
+            while (Time.realtimeSinceStartup < until && arena.TestHp >= before)
+            {
+                client.SendPlayer(alive, 1f);
+                client.Poll(Time.unscaledDeltaTime);
+                yield return null;
+            }
+            Assert.That(arena.TestHp, Is.EqualTo(before - 10f).Within(0.01f), "the client's hit didn't land on the host");
+
+            // The client falls: the host should win the round and tell the client.
+            PlayerSnapshot fallen = alive;
+            fallen.Dead = true;
+            fallen.Hp = 0f;
+            until = Time.realtimeSinceStartup + 2f;
+            while (Time.realtimeSinceStartup < until && roundsSeen == 0)
+            {
+                client.SendPlayer(fallen, 1f);
+                client.Poll(Time.unscaledDeltaTime);
+                yield return null;
+            }
+            Assert.That(roundsSeen, Is.EqualTo(1), "no round result reached the client");
+            Assert.That(winner, Is.EqualTo(0), "the host should have won the round");
+        }
     }
 }

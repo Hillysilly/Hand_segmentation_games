@@ -614,9 +614,9 @@ namespace Repulsor
         public void TestSandbox() => EnterSandbox();
 
         /// <summary>PlayMode co-op test: host a co-op room on this port.</summary>
-        public bool TestHost(int port)
+        public bool TestHost(int port, bool pvp = false)
         {
-            mode = GameMode.PveCoop;
+            mode = pvp ? GameMode.Pvp : GameMode.PveCoop;
             bool ok = net.Host(port);
             net.Mode = (byte)mode;
             phase = Phase.Lobby;
@@ -627,8 +627,11 @@ namespace Repulsor
         public void TestStartHosting()
         {
             StartMatch();
-            waves.Tick(WaveDirector.CountdownSeconds + 0.1f);
+            if (!Pvp)
+                waves.Tick(WaveDirector.CountdownSeconds + 0.1f);
         }
+
+        public float TestHp => player.Hp;
 
         /// <summary>PlayMode co-op test: join a host on this machine at this port.</summary>
         public bool TestJoin(int port)
