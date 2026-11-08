@@ -139,6 +139,27 @@ namespace Repulsor
             LogPerformance(dt);
         }
 
+        readonly GameObject[] fistGlow = new GameObject[2];
+
+        /// <summary>While posing to transform: energy gathering in both fists, growing until it goes off.</summary>
+        void ShowPowerUpCharge(float progress)
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                HandPose hand = i == 0 ? input.Left : input.Right;
+                bool show = progress > 0.02f && hand.Tracked;
+                if (show && fistGlow[i] == null)
+                    fistGlow[i] = game.MakeEnergyBall(transform);
+                if (fistGlow[i] == null)
+                    continue;
+                fistGlow[i].SetActive(show);
+                if (!show)
+                    continue;
+                fistGlow[i].transform.position = hand.Palm;
+                fistGlow[i].transform.localScale = Vector3.one * Mathf.Lerp(0.03f, 0.16f, progress);
+            }
+        }
+
         float perfTimer;
         int perfFrames;
         float slowestFrame;
@@ -189,6 +210,7 @@ namespace Repulsor
 
             if (powerUp.Step(input.Left, input.Right, body, dt) && player.CanTransform)
                 player.TryTransform();
+            ShowPowerUpCharge(player.CanTransform && powerUp.Posing ? powerUp.Progress : 0f);
 
             // In co-op the host runs the waves and enemies; the client mirrors them (Arena.Net).
             bool client = Multiplayer && net.Role == NetRole.Client;
@@ -283,6 +305,7 @@ namespace Repulsor
 
         void CleanUpMatch()
         {
+            ShowPowerUpCharge(0f);
             enemies.Clear();
             if (net != null)
                 ClearProxies();
