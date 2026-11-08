@@ -539,8 +539,9 @@ namespace Repulsor
                 game.RepulsorAoe = 0f;
                 return;
             }
+            // Not while posing to transform either: opening the fists afterwards would fire into the floor.
             bool fighting = phase == Phase.Playing && !paused && !player.IsDead && !player.Shield.Up && !xArms.Held
-                && waves != null && !CountingDown;
+                && !powerUp.Posing && waves != null && !CountingDown;
             game.Arm(fighting ? WeaponFor(character, player.Level) : Weapon.None);
             int level = phase == Phase.Playing ? player.Level : 1;
             game.LaserDps = Damage.LaserPerSecond * (1f + 0.4f * (level - 1));
