@@ -295,6 +295,7 @@ namespace Repulsor
             CleanUpMatch();
             phase = Phase.Sandbox;
             game.Legacy = true;
+            Shader.SetGlobalFloat("_AuraFloorHidden", 0f);
             HideMenu();
             Log("Old controls on");
         }
@@ -464,6 +465,8 @@ namespace Repulsor
                 game.Aura.Extinguish();
                 return;
             }
+            // The Saber gets the light aura without its floor halo at level 2, and with it at level 3.
+            Shader.SetGlobalFloat("_AuraFloorHidden", character == CharacterId.Saber && player.Level == 2 ? 1f : 0f);
             Color tint = character == CharacterId.KiFighter && player.Level >= 3 ? Hex("#3FA8FF") : PlayerColor;
             if (!game.Aura.IsLit)
                 game.Aura.Ignite(head.position);

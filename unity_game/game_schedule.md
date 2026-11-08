@@ -113,7 +113,6 @@ All of these say CC0 on their pages. I'll check each licence file when downloadi
 
 ## Known gaps
 
-- **Saber aura:** level 2 should have no floor halo, but the Light Halo style draws its halo, beams and ring as one mesh, so both levels show the halo for now.
 - **Assets still needed:** the enemy models, the gauntlets, the Archer's wings and the knight shield.
 - **Other player's aura:** in multiplayer it's a body-shaped shell, not the real aura.
 - **Effect sounds** are synthesized. The Kenney CC0 pack needs a browser download.

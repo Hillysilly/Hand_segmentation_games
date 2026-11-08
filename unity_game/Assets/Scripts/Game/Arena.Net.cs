@@ -177,6 +177,9 @@ namespace Repulsor
                 Log($"Network: {net.Status}");
                 remoteReady = false;
                 hud.Message("PLAYER LEFT", net.Status, 2f);
+                // Mid-match: the client can't go on without the host's enemies; in PVP the one left standing wins.
+                if (phase == Phase.Playing && (net.Role == NetRole.Client || Pvp))
+                    EndMatch(Pvp);
                 if (phase == Phase.Lobby)
                     ShowLobby();
             };

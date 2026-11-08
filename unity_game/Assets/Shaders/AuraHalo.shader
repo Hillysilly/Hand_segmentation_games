@@ -30,6 +30,8 @@ Shader "Repulsor/AuraHalo"
             #include "AuraColor.hlsl"
 
             TEXTURE2D(_Noise);
+            // Set globally by the game: 1 hides the floor pattern (the Saber's level 2 aura has no halo yet).
+            float _AuraFloorHidden;
             SAMPLER(sampler_Noise);
 
             float _AuraPower;     // Set by AuraView: 0 when out, 1 when fully lit.
@@ -174,7 +176,7 @@ Shader "Repulsor/AuraHalo"
                 }
                 else if (part > 0.5)
                 {
-                    light = FloorLight(around, along, time);
+                    light = FloorLight(around, along, time) * (1.0 - saturate(_AuraFloorHidden));
                 }
                 else
                 {
