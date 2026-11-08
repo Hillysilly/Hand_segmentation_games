@@ -1,8 +1,8 @@
 # 2026-11-05: Suit overlay on a real person
 
-**Where it stands:** Iron Man and Spider-Man fit a real person in a recorded headset clip, on the PC. The
-whole path is built and installed in the game as two extra aura styles, but **it hasn't run on the Quest
-yet**, so its speed there is unknown. The headset was still, so it refused to start apps.
+**Where it stands:** Iron Man and Spider-Man fit a person in a recorded headset clip, and on the Quest both hold
+72 FPS with tracking at about 17 runs a second. That's replayed pictures on a still headset. Nobody real has
+worn a suit yet.
 
 Branch: `quest-suit-overlay`.
 
@@ -39,6 +39,22 @@ and end are mostly where the Home menu covers the view. Only one clip was tested
 | Iron Man | 639,859 | 93,213 | 92,014 |
 | Spider-Man | 195,498 | 99,985 | 60,512 |
 
+## Test results, on the Quest
+
+Each run was about 22 seconds, with the headset on a desk and the recorded clip replayed through the tracker. No
+hands were in view and targets were cleared, so nothing else in the game was running.
+
+| Style | FPS (target 72) | Tracking runs a second | Each run | Holds up the frame |
+|---|---|---|---|---|
+| Iron Man | 72 | 17 | 45 ms | 3 ms |
+| Spider-Man | 73 | 18 | 43 ms | 3 ms |
+| Spike Shells | 73 | 4 | 49 ms | 3 ms |
+| Fire Shells | 73 | 4 | 49 ms | 3 ms |
+| Suit style, live camera, nobody in view | 72 | 18 | 40 ms | 4 ms |
+
+The first run showed 61 FPS, but that was the test: it decoded a JPEG on the main thread for each run, which took
+12-19 ms. Pictures are now decoded once at the start. Reading the live camera holds up the frame for only 2 ms.
+
 ## What went wrong along the way
 
 - **Tilted crops:** the detector's idea of up depends on the face, and the headset hid it, so the crop came out
@@ -49,6 +65,8 @@ and end are mostly where the Home menu covers the view. Only one clip was tested
   head upside down.
 - **Wrong arm that wasn't:** bones were within 1-3 cm of the joints, but the mesh drew old poses. Skinned meshes
   refresh in the game loop, which batch rendering skips. Only the test tool was wrong.
+- **JPEG format on the headset:** a loaded JPEG is stored differently on Android than in the editor, so reading its
+  raw data ran off the end and crashed the game. `BodyTracker.CopyPicture` reads colours instead.
 - **Non-VR build changes `QuestURP.asset`:** it strips VR shaders, which could break the real game.
   `BuildBench` now puts the file back.
 
@@ -64,17 +82,26 @@ work. No commit on this branch changes them. Removing them from GitHub means rew
 
 1. Put the headset on, or move it around for a few seconds so it finds its position.
 2. Select AURA and light it on someone at least 1.5 m away.
-3. Make an OK sign until the HUD says IronMan or SpiderMan, styles 7 and 8.
+3. Make an OK sign until the HUD says IronMan or SpiderMan, styles 6 and 7.
 
 For a test with nobody in the headset, push pictures to the app's `files/frames` folder and write
-`2.0 7 #FF8000 replay` to `files/aura_test.txt`. `RepulsorBench` is a separate non-VR benchmark app, but the
-headset wouldn't start it while it couldn't track itself.
+`2.0 6 #FF8000 replay` to `files/aura_test.txt`. Remove that file before playing. `RepulsorBench` is a separate
+non-VR benchmark app, but it stalls with nobody wearing the headset, because the headset stops drawing its window.
 
 ## Not known yet
 
-- Speed on the Quest: the model, the suit, and whether it holds 72 FPS
+- Speed with a real person, a moving head and the weapons all in play
+- How the headset's temperature affects speed over a long session
 - Whether the suit lines up in real depth. Only flat video was tested, with an assumed camera field of view
 - How well it hides behind hands and furniture
 - Whether it holds someone facing away or side-on. This detector leans on the face and upper body
-- How much it lags. The aura took about half a second at 4 runs a second; suits ask for up to 20 a second
+- How much it lags with someone real. Tracking now runs about 17 times a second, against 4 for the aura
 - The camera lens offset in `PersonDetector` is an estimate
+
+## Suit offset and soft edges
+
+First worn test: the suit followed the person but sat off them. Cause: the camera looks 11.1 degrees below the head (`android.lens.poseRotation` in `dumpsys media.camera`) and the code assumed 0, about 0.59 m too high at 3 m. Hips read 1.45 m above the floor, which fits. Lens position and scale were already right. Fixed with `PersonDetector.LensRotation`.
+
+Hand edges over the ball were blocky from one depth sample per pixel. `EnvironmentDepth.hlsl` now tests four depth pixels and blends the results. Checked in a PC render with a fake hand (`LaserPreview.RenderOcclusion`). 65 of 65 tests pass. Neither fix has been seen on the headset, and frame rate with them hasn't been measured.
+
+Later that evening, after hearing the hands glitched and the person showed behind the suit: `JointSmoother` steadies joints by speed and holds unseen ones against their shoulder or hip, `SuitRig.PoseHand` turns hands to the knuckle points, up to 80 degrees from the forearm. A 3 cm mesh padding was tried and removed: the user found it far too puffy. On the clip at an assumed 18 Hz, wrist jumps went from 39 to 25 cm at the 95th percentile and 82 to 50 cm at worst. Both models already rest with curled fingers, so don't add curl. The person's outline will likely still show. The tracker lost the body in 34 of 132 clip frames. 68 of 68 tests pass. Not yet seen on the headset.

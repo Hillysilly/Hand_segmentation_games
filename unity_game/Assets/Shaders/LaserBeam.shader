@@ -1,6 +1,5 @@
 // The laser: a ribbon that always faces the eye, painted with soft bands of light and flowing noise, so
 // there is no geometry to see. Bloom can't do this job because passthrough needs post-processing off.
-// The mesh has x = -1..1 across and z = 0..1 along; the transform's x scale is the half width.
 Shader "Repulsor/Laser Beam"
 {
     Properties
@@ -30,6 +29,7 @@ Shader "Repulsor/Laser Beam"
             #pragma multi_compile_instancing
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "EyeRibbon.hlsl"
 
             TEXTURE2D(_Noise);
             SAMPLER(sampler_Noise);
@@ -65,27 +65,11 @@ Shader "Repulsor/Laser Beam"
                 UNITY_TRANSFER_INSTANCE_ID(input, output);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
-                float3 widthAxis = float3(UNITY_MATRIX_M[0].x, UNITY_MATRIX_M[1].x, UNITY_MATRIX_M[2].x);
-                float3 lengthAxis = float3(UNITY_MATRIX_M[0].z, UNITY_MATRIX_M[1].z, UNITY_MATRIX_M[2].z);
-                float metersLong = length(lengthAxis);
-                float3 direction = lengthAxis / max(metersLong, 0.0001);
-
-                float z = input.positionOS.z;
-                float3 axisWS = TransformObjectToWorld(float3(0.0, 0.0, z));
-
-                // Turn the ribbon to face this eye. Looking straight down the beam leaves nothing to
-                // cross with, so fall back to the transform's own side.
-                float3 side = cross(direction, GetCameraPositionWS() - axisWS);
-                float sideLength = length(side);
-                side = sideLength > 0.0001 ? side / sideLength : normalize(widthAxis);
-
-                float alongMeters = z * metersLong;
-                float3 positionWS = axisWS + side * input.positionOS.x * length(widthAxis);
+                float3 positionWS = EyeRibbonPosition(input.positionOS.xyz, output.alongMeters);
 
                 output.positionCS = TransformWorldToHClip(positionWS);
                 output.across = input.positionOS.x;
-                output.alongMeters = alongMeters;
-                output.along01 = z;
+                output.along01 = input.positionOS.z;
                 return output;
             }
 

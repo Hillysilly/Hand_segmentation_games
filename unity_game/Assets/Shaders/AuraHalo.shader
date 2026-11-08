@@ -21,6 +21,7 @@ Shader "Repulsor/AuraHalo"
             Cull Off
 
             HLSLPROGRAM
+            #pragma target 4.5
             #pragma vertex Vertex
             #pragma fragment Fragment
             #pragma multi_compile_instancing
@@ -164,7 +165,7 @@ Shader "Repulsor/AuraHalo"
                 float part = input.details.w;
                 float time = _Time.y;
                 float power = saturate(_AuraPower * 2.0);
-                float visible = VisibleAt(DistanceToRealQuick(input.positionWS), DistanceToPoint(input.positionWS));
+                float visible = VisibilityQuick(input.positionWS);
 
                 float light;
                 if (part > 1.5)

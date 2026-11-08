@@ -7,13 +7,13 @@ namespace Repulsor
     /// Shows a suit on the person <see cref="PersonDetector"/> is following. The models load by name from
     /// Resources, because they're licensed and kept out of the project's history, so a copy of the game built
     /// without them simply has no suit styles. Bodies arrive far less often than frames, so joints glide
-    /// between them, reaching a little ahead to make up for how old each body already is.
+    /// between them, reaching a little ahead to make up for how old each body already is. They're steadied
+    /// first, because reaching ahead from noisy joints makes the noise worse.
     /// </summary>
     public sealed class SuitView : MonoBehaviour
     {
         const float Smoothing = 18f;
-        const float LeadSeconds = 0.08f;
-        const float VelocityEase = 0.4f;
+        const float LeadSeconds = 0.05f;
         const float MaxSpeed = 6f;
         const float HideAfterSeconds = 1.5f;
 
@@ -29,8 +29,7 @@ namespace Repulsor
         readonly List<Suit> suits = new List<Suit>();
         readonly Vector3[] shown = new Vector3[BodyFrame.JointCount];
         readonly Vector3[] goal = new Vector3[BodyFrame.JointCount];
-        readonly Vector3[] velocity = new Vector3[BodyFrame.JointCount];
-        readonly Vector3[] latest = new Vector3[BodyFrame.JointCount];
+        readonly JointSmoother smoother = new JointSmoother(BodyFrame.JointCount);
         Suit current;
         int seenVersion = -1;
         float lastBodyTime = float.MinValue;
@@ -77,7 +76,7 @@ namespace Repulsor
             if (person.BodyVersion != seenVersion)
             {
                 seenVersion = person.BodyVersion;
-                TakeBody(person.Joints);
+                TakeBody(person.Joints, person.Seen);
             }
 
             bool visible = hasBody && Time.time - lastBodyTime < HideAfterSeconds;
@@ -92,23 +91,19 @@ namespace Repulsor
             current.Rig.Pose(shown);
         }
 
-        void TakeBody(Vector3[] joints)
+        void TakeBody(Vector3[] joints, float[] seen)
         {
             float elapsed = Mathf.Max(Time.time - lastBodyTime, 0.001f);
             bool fresh = !hasBody || elapsed > HideAfterSeconds;
+            if (fresh)
+                smoother.Reset();
+            smoother.Step(joints, seen, elapsed);
+
             for (int i = 0; i < joints.Length; i++)
             {
+                goal[i] = smoother.Joints[i] + Vector3.ClampMagnitude(smoother.Velocity[i], MaxSpeed) * LeadSeconds;
                 if (fresh)
-                {
-                    shown[i] = goal[i] = latest[i] = joints[i];
-                    velocity[i] = Vector3.zero;
-                    continue;
-                }
-
-                Vector3 moved = Vector3.ClampMagnitude((joints[i] - latest[i]) / elapsed, MaxSpeed);
-                velocity[i] = Vector3.Lerp(velocity[i], moved, VelocityEase);
-                latest[i] = joints[i];
-                goal[i] = joints[i] + velocity[i] * LeadSeconds;
+                    shown[i] = goal[i];
             }
             lastBodyTime = Time.time;
             hasBody = true;

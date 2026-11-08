@@ -24,6 +24,7 @@ Shader "Repulsor/Suit"
             Blend One OneMinusSrcAlpha
 
             HLSLPROGRAM
+            #pragma target 4.5
             #pragma vertex Vertex
             #pragma fragment Fragment
             #pragma multi_compile_instancing
@@ -97,9 +98,7 @@ Shader "Repulsor/Suit"
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
-                float real = DistanceToRealQuick(input.positionWS);
-                float distance = DistanceToPoint(input.positionWS);
-                float visible = saturate((real - distance + HIDE_MARGIN) / 0.08);
+                float visible = VisibilityQuick(input.positionWS, HIDE_MARGIN, 0.08);
                 if (visible <= 0.0)
                     discard;
 

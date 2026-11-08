@@ -16,6 +16,7 @@ Shader "Repulsor/Orb"
             Blend One OneMinusSrcAlpha
 
             HLSLPROGRAM
+            #pragma target 4.5
             #pragma vertex Vertex
             #pragma fragment Fragment
             #pragma multi_compile_instancing
@@ -68,7 +69,7 @@ Shader "Repulsor/Orb"
                 float3 color = _BaseColor.rgb * (0.3 + 0.75 * facing);
                 color += float3(1.0, 0.8, 0.5) * pow(facing, 6.0) * 0.35;
 
-                float visible = VisibleAt(DistanceToReal(input.positionWS), DistanceToPoint(input.positionWS));
+                float visible = Visibility(input.positionWS);
                 return float4(color * visible, visible);
             }
             ENDHLSL

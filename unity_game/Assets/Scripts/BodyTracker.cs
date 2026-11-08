@@ -111,6 +111,29 @@ namespace Repulsor
             landmarker = new Worker(ModelLoader.Load(landmarkModel), backend);
         }
 
+        /// <summary>
+        /// Copies a loaded picture into RGBA bytes for the tracker, top row first. Reads colours rather than the
+        /// raw data, because how a decoded JPEG is stored differs between the editor and the headset.
+        /// </summary>
+        public static void CopyPicture(Texture2D picture, byte[] rgba)
+        {
+            Color32[] pixels = picture.GetPixels32();
+            int width = picture.width, height = picture.height;
+            for (int y = 0; y < height; y++)
+            {
+                int source = (height - 1 - y) * width;
+                int target = y * width * 4;
+                for (int x = 0; x < width; x++)
+                {
+                    Color32 pixel = pixels[source + x];
+                    rgba[target + x * 4] = pixel.r;
+                    rgba[target + x * 4 + 1] = pixel.g;
+                    rgba[target + x * 4 + 2] = pixel.b;
+                    rgba[target + x * 4 + 3] = pixel.a;
+                }
+            }
+        }
+
         /// <summary>Forgets the person, so the next run searches the whole image.</summary>
         public void Reset() => tracking = false;
 

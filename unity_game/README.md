@@ -49,12 +49,12 @@ Or in the Editor: **Window > General > Test Runner**.
 | `Assets/Scripts/RepulsorGesture.cs` | charge and fire rules, fist and open classification |
 | `Assets/Scripts/HandRepulsor.cs` | reads one tracked hand, fires, draws the charge orb and aim line |
 | `Assets/Scripts/AimLock.cs` | remembers the fist's aim, because tracking jumps as the hand opens |
-| `Assets/Scripts/Weapons.cs`, `Shockwave.cs` | weapon list, pinch to switch, laser trigger, shockwave ring |
+| `Assets/Scripts/Weapons.cs`, `Shockwave.cs` | weapon list, pinch to switch, laser trigger, shockwave front |
 | `Assets/Scripts/LaserBeamView.cs`, `RoomDim.cs`, `Assets/Shaders/` | the laser's look: beam, burst, sparks and room dimming |
 | `Assets/Scripts/RoomSense.cs` | finds real surfaces from live depth, so the laser stops at them |
-| `Assets/Scripts/AuraView.cs`, `Assets/Scripts/AuraTracker.cs`, `Assets/Scripts/ColorPicker.cs`, `Assets/Shaders/AuraSprite.shader`, `Assets/Shaders/AuraShell.shader`, `Assets/Shaders/AuraHalo.shader` | six aura looks to compare (OK sign while lit) in any colour from a hand-worked wheel, cut by live depth, that follow a person found by a model |
+| `Assets/Scripts/AuraView.cs`, `Assets/Scripts/AuraTracker.cs`, `Assets/Scripts/ColorPicker.cs`, `Assets/Shaders/AuraShell.shader`, `Assets/Shaders/AuraHalo.shader` | five aura looks to compare (OK sign while lit) in any colour from a hand-worked wheel, cut by live depth, that follow a person found by a model |
 | `Assets/Scripts/RepulsorGame.cs` | targets, score, HUD, sound |
-| `Assets/Scripts/Blast.cs`, `Target.cs`, `GameMath.cs`, `Sfx.cs` | shots, orbs, hit math, synthesized sounds |
+| `Assets/Scripts/Blast.cs`, `ElectricBall.cs`, `Target.cs`, `GameMath.cs`, `Sfx.cs` | comet shots, the crackling ball, orbs, hit math, synthesized sounds |
 | `Assets/Editor/ProjectSetup.cs` | configures the project and generates the scene, prefabs and materials |
 | `Assets/Editor/QuestBuild.cs` | APK build |
 | `Assets/Tests/EditMode/` | unit tests |

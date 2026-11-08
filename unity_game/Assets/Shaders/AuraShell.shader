@@ -1,13 +1,16 @@
 // Fire painted on real curved surfaces that wrap the body, the way mesh effects in games are made. Because
 // the surfaces have a real shape and position, both eyes see their depth, and they're brightest where they
 // turn edge-on, so the person stays visible through the middle. Flat parts of the mesh are a ring on the floor.
-// The mesh's uv holds (around 0..1, up 0..1, shell seed, 1 on the floor ring).
+// The mesh's uv holds (around 0..1, up 0..1, shell seed, 1 on the floor ring). A second uv holds (ridge, phase)
+// on meshes torn into flame tips: ridge is 1 on a tip's centre line, and each tip has its own phase.
 Shader "Repulsor/AuraShell"
 {
     Properties
     {
         [NoScaleOffset] _Noise ("Noise", 2D) = "gray" {}
         _RiseSpeed ("Rise Speed", Float) = 1
+        _FadeStart ("Fade Start", Range(0, 1.2)) = 0.58
+        _FadeEnd ("Fade End", Range(0, 1.2)) = 0.9
     }
 
     SubShader
@@ -21,6 +24,7 @@ Shader "Repulsor/AuraShell"
             Cull Off
 
             HLSLPROGRAM
+            #pragma target 4.5
             #pragma vertex Vertex
             #pragma fragment Fragment
             #pragma multi_compile_instancing
@@ -35,6 +39,8 @@ Shader "Repulsor/AuraShell"
 
             CBUFFER_START(UnityPerMaterial)
                 float _RiseSpeed;
+                float _FadeStart;
+                float _FadeEnd;
             CBUFFER_END
 
             struct Attributes
@@ -42,6 +48,7 @@ Shader "Repulsor/AuraShell"
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
                 float4 details : TEXCOORD0;
+                float2 spike : TEXCOORD1;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -51,6 +58,7 @@ Shader "Repulsor/AuraShell"
                 float3 positionWS : TEXCOORD0;
                 float3 normalWS : TEXCOORD1;
                 float4 details : TEXCOORD2;
+                float ridge : TEXCOORD3;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -71,10 +79,16 @@ Shader "Repulsor/AuraShell"
                     + sin(around * 7.0 - up * 5.0 - time * 4.3) * 0.025;
                 position.xz *= 1.0 + ripple * up * (1.0 - input.details.w);
 
+                // Flame tips stretch and whip about, each in its own time. Their bases stay still.
+                float tip = input.spike.x * up * up;
+                position.y *= 1.0 + tip * sin(time * 3.7 + input.spike.y * 2.0) * 0.13;
+                position.xz += position.zx * float2(1.0, -1.0) * tip * sin(time * 2.3 + input.spike.y) * 0.16;
+
                 output.positionWS = TransformObjectToWorld(position);
                 output.positionCS = TransformWorldToHClip(output.positionWS);
                 output.normalWS = TransformObjectToWorldNormal(input.normalOS);
                 output.details = input.details;
+                output.ridge = input.spike.x;
                 return output;
             }
 
@@ -88,7 +102,7 @@ Shader "Repulsor/AuraShell"
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
-                float visible = VisibleAt(DistanceToRealQuick(input.positionWS), DistanceToPoint(input.positionWS));
+                float visible = VisibilityQuick(input.positionWS);
                 float power = saturate(_AuraPower * 2.0);
                 float time = _Time.y * _RiseSpeed;
                 float around = input.details.x;
@@ -112,8 +126,9 @@ Shader "Repulsor/AuraShell"
                 float wisps = slow * 0.6 + fast * 0.4;
 
                 // Tall licks: the surface burns away higher up, leaving flame-shaped tips with no clean top.
-                float burn = saturate((wisps - 0.2 - up * 0.17) * 9.0);
-                float base = smoothstep(0.0, 0.1, up) * (1.0 - smoothstep(0.58, 0.9, up));
+                // Ridges burn away less higher up, so the tips keep their points and the middle stays see-through.
+                float burn = saturate((wisps - 0.2 - up * 0.17 + input.ridge * up * 0.3) * 9.0);
+                float base = smoothstep(0.0, 0.1, up) * (1.0 - smoothstep(_FadeStart, _FadeEnd, up));
 
                 // Bright where the surface turns edge-on, nearly clear where it faces the viewer.
                 float3 toEye = normalize(GetCameraPositionWS() - input.positionWS);

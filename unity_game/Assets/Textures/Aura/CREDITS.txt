@@ -1,5 +1,0 @@
-Textures in this folder, all under CC0 (https://creativecommons.org/publicdomain/zero/1.0/):
-
-Flame02.tga, Flame03Hollow.tga
-  Unity Labs, "Free VFX Image Sequences & Flipbooks"
-  https://unity.com/blog/engine-platform/free-vfx-image-sequences-flipbooks

@@ -3,7 +3,6 @@ using System.Collections;
 using System.IO;
 using System.Linq;
 using System.Text;
-using Unity.Collections;
 using Unity.InferenceEngine;
 using UnityEngine;
 
@@ -82,12 +81,8 @@ namespace Repulsor
                 texture.LoadImage(File.ReadAllBytes(files[i]));
                 pictureWidth = texture.width;
                 pictureHeight = texture.height;
-                var bytes = new byte[pictureWidth * pictureHeight * 4];
-                NativeArray<byte> pixels = texture.GetRawTextureData<byte>();
-                int stride = pictureWidth * 4;
-                for (int y = 0; y < pictureHeight; y++)
-                    NativeArray<byte>.Copy(pixels, (pictureHeight - 1 - y) * stride, bytes, y * stride, stride);
-                pictures[i] = bytes;
+                pictures[i] = new byte[pictureWidth * pictureHeight * 4];
+                BodyTracker.CopyPicture(texture, pictures[i]);
             }
             Destroy(texture);
         }

@@ -29,6 +29,8 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _FadeEnd: 0.9
+    - _FadeStart: 0.58
     - _RiseSpeed: 1
     m_Colors:
     - _FlameColor: {r: 1, g: 0.37999994, b: 0.03, a: 1}

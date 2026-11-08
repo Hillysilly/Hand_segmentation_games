@@ -17,6 +17,7 @@ Shader "Repulsor/Spark"
             Cull Off
 
             HLSLPROGRAM
+            #pragma target 4.5
             #pragma vertex Vertex
             #pragma fragment Fragment
             #pragma multi_compile_instancing
@@ -75,7 +76,7 @@ Shader "Repulsor/Spark"
                 float3 color = tint * (halo + core) + float3(1.0, 1.0, 1.0) * core * 0.5;
                 float fade = input.color.a;
                 if (_DepthTest > 0.5)
-                    fade *= VisibleAt(DistanceToReal(input.positionWS), DistanceToPoint(input.positionWS));
+                    fade *= Visibility(input.positionWS);
                 return float4(color * fade, core * fade * 0.15);
             }
             ENDHLSL

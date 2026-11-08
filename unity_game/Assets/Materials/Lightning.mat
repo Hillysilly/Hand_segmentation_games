@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: AuraStyleWildFire
-  m_Shader: {fileID: 4800000, guid: b9a7fc1b9a9f0cf4ab6d72aaeaec8ef1, type: 3}
+  m_Name: Lightning
+  m_Shader: {fileID: 4800000, guid: 1b7e55b401c95704181d8b2cbc941ae7, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -22,18 +22,10 @@ Material:
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
-    m_TexEnvs:
-    - _MainTex:
-        m_Texture: {fileID: 2800000, guid: 30528107754e62f41b991a97a8acc410, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
+    m_TexEnvs: []
     m_Ints: []
-    m_Floats:
-    - _BaseFade: 0.25
-    - _Brightness: 1.2
-    - _FrontStrength: 0.2
-    - _UseAlpha: 0
+    m_Floats: []
     m_Colors:
-    - _Tiles: {r: 16, g: 4, b: 0, a: 0}
+    - _GlowColor: {r: 0.5, g: 0.88, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

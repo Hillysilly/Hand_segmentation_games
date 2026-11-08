@@ -3,8 +3,8 @@ using UnityEngine;
 namespace Repulsor
 {
     /// <summary>
-    /// A ring perpendicular to the palm that travels along it and widens, as in the web prototype.
-    /// Destroys every target the front reaches. A stronger charge travels further.
+    /// A blast front that travels along the palm's direction and widens, as in the web prototype, drawn on a
+    /// real section of cone. Destroys every target the front reaches. A stronger charge travels further.
     /// </summary>
     public sealed class Shockwave : MonoBehaviour
     {
@@ -14,25 +14,18 @@ namespace Repulsor
         const float Speed = 5.5f;
         const float MinRange = 2f;
         const float MaxRange = 3.5f;
-        const float StartWidth = 0.06f;
-        const float EndWidth = 0.008f;
 
-        [SerializeField] LineRenderer ring;
+        static readonly int Life = Shader.PropertyToID("_Life");
 
+        [SerializeField] Transform front;
+        [SerializeField] Renderer frontRenderer;
+
+        MaterialPropertyBlock properties;
         RepulsorGame game;
         Vector3 origin;
         Vector3 direction;
         float range;
         float travelled;
-
-        void Awake()
-        {
-            for (int i = 0; i < ring.positionCount; i++)
-            {
-                float angle = i * Mathf.PI * 2f / ring.positionCount;
-                ring.SetPosition(i, new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f));
-            }
-        }
 
         public void Launch(RepulsorGame owner, Vector3 position, Vector3 aim, float charge)
         {
@@ -41,28 +34,33 @@ namespace Repulsor
             direction = aim.normalized;
             range = Mathf.Lerp(MinRange, MaxRange, charge);
             transform.rotation = Quaternion.LookRotation(direction);
-            Place();
+            ShowAt(0f);
         }
 
         void Update()
         {
-            travelled += Speed * Time.deltaTime;
-            if (travelled >= range)
+            float distance = travelled + Speed * Time.deltaTime;
+            if (distance >= range)
             {
                 Destroy(gameObject);
                 return;
             }
 
-            Place();
+            ShowAt(distance);
             game.HitWithShockwave(origin, direction, travelled);
         }
 
-        void Place()
+        /// <summary>Puts the front this far along. Public so the editor preview can pick a moment.</summary>
+        public void ShowAt(float distance)
         {
+            travelled = distance;
             float radius = StartRadius + travelled * Mathf.Tan(HalfAngleDegrees * Mathf.Deg2Rad);
             transform.position = origin + direction * travelled;
-            transform.localScale = new Vector3(radius, radius, 1f);
-            ring.widthMultiplier = Mathf.Lerp(StartWidth, EndWidth, travelled / range);
+            front.localScale = Vector3.one * radius;
+
+            properties ??= new MaterialPropertyBlock();
+            properties.SetFloat(Life, travelled / range);
+            frontRenderer.SetPropertyBlock(properties);
         }
     }
 }

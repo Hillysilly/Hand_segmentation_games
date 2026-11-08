@@ -7,13 +7,12 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: AuraStyleRealFire
-  m_Shader: {fileID: 4800000, guid: b9a7fc1b9a9f0cf4ab6d72aaeaec8ef1, type: 3}
+  m_Name: EnergyBall
+  m_Shader: {fileID: 4800000, guid: d0e35a6bfee9b84459c9c94989d9f24d, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
-  m_InvalidKeywords:
-  - _USEALPHA_ON
+  m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -24,17 +23,17 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
-    - _MainTex:
-        m_Texture: {fileID: 2800000, guid: d3f770efbaa00334485b2dcedc2ef852, type: 3}
+    - _Noise:
+        m_Texture: {fileID: 2800000, guid: 906e6979cc3eae641a5da67966086408, type: 2}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _BaseFade: 0.45
-    - _Brightness: 1.2
-    - _FrontStrength: 0.2
-    - _UseAlpha: 1
+    - _BallSize: 0.3846154
+    - _Cover: 0.12
+    - _PulseSpeed: 9
     m_Colors:
-    - _Tiles: {r: 16, g: 4, b: 0, a: 0}
+    - _CoreColor: {r: 0.5, g: 0.88, b: 1, a: 1}
+    - _OuterColor: {r: 0.08, g: 0.36, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

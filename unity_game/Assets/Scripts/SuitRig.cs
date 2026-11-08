@@ -14,10 +14,12 @@ namespace Repulsor
         const float MinStretch = 0.6f;
         const float MaxStretch = 1.6f;
         const float NoseTilt = 0.15f * Mathf.Rad2Deg;
+        const float MaxHandTurn = 80f;
 
         // BlazePose joint numbers.
         const int Nose = 0, EarLeft = 7, EarRight = 8, ShoulderLeft = 11, ShoulderRight = 12;
         const int HipLeft = 23, HipRight = 24;
+        const int WristLeft = 15, WristRight = 16, PinkyLeft = 17, PinkyRight = 18, IndexLeft = 19, IndexRight = 20;
 
         static readonly string[] Spine = { "Spine", "Spine1", "Spine2", "Spine3" };
         static readonly Regex Prefix = new Regex(@"^.*?mixamorig[:_]?", RegexOptions.IgnoreCase);
@@ -104,7 +106,23 @@ namespace Repulsor
                 Vector3 forward = body * Vector3.forward * bend;
                 hinges[limb.Upper] = Quaternion.Inverse(bones[limb.Upper].rotation) * Vector3.Cross(along, forward).normalized;
             }
+
+            foreach (string side in new[] { "Left", "Right" })
+                PrepareHand(side);
         }
+
+        /// <summary>Remembers how a hand's bone sits against its knuckles. The models' fingers already rest curled.</summary>
+        void PrepareHand(string side)
+        {
+            string index = side + "HandIndex1", pinky = side + "HandPinky1", hand = side + "Hand";
+            if (!bones.ContainsKey(index) || !bones.ContainsKey(pinky))
+                return;
+
+            offsets[hand] = Quaternion.Inverse(HandFrame(Pos(hand), Pos(pinky), Pos(index))) * bones[hand].rotation;
+        }
+
+        static Quaternion HandFrame(Vector3 wrist, Vector3 pinky, Vector3 index) =>
+            Frame(index - pinky, Mid(index, pinky) - wrist);
 
         public static string BoneName(string name)
         {
@@ -194,6 +212,19 @@ namespace Repulsor
 
             foreach (Limb limb in Limbs)
                 PoseLimb(limb, joints[limb.A], joints[limb.B], joints[limb.C]);
+
+            PoseHand("LeftHand", joints[WristLeft], joints[PinkyLeft], joints[IndexLeft]);
+            PoseHand("RightHand", joints[WristRight], joints[PinkyRight], joints[IndexRight]);
+        }
+
+        /// <summary>Turns a hand to its knuckles, as far as a wrist can turn from the forearm.</summary>
+        void PoseHand(string name, Vector3 wrist, Vector3 pinky, Vector3 index)
+        {
+            if (!offsets.TryGetValue(name, out Quaternion offset))
+                return;
+
+            Transform hand = bones[name];
+            hand.rotation = Quaternion.RotateTowards(hand.rotation, HandFrame(wrist, pinky, index) * offset, MaxHandTurn);
         }
 
         void SetFrame(string name, Quaternion frame)

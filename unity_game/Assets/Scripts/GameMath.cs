@@ -114,5 +114,22 @@ namespace Repulsor
             float height = Mathf.Lerp(minHeight, maxHeight, height01);
             return head + direction * distance + Vector3.up * height;
         }
+
+        /// <summary>
+        /// Fills points with a jagged line from start to end. Its ends stay put, and it strays furthest in the
+        /// middle, up to jitter along each axis.
+        /// </summary>
+        public static void LightningPath(Vector3 start, Vector3 end, float jitter, Vector3[] points, System.Random random)
+        {
+            for (int i = 0; i < points.Length; i++)
+            {
+                float along = i / (float)(points.Length - 1);
+                float reach = jitter * Mathf.Sin(along * Mathf.PI);
+                var stray = new Vector3(Scatter(random), Scatter(random), Scatter(random));
+                points[i] = Vector3.Lerp(start, end, along) + stray * reach;
+            }
+        }
+
+        static float Scatter(System.Random random) => (float)random.NextDouble() * 2f - 1f;
     }
 }

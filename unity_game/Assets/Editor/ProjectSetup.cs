@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using Repulsor;
 using Unity.XR.CoreUtils;
@@ -108,6 +109,28 @@ public static class ProjectSetup
         CreateOrbMaterial();
         AssetDatabase.SaveAssets();
         Debug.Log("[Setup] Orb rebuilt");
+    }
+
+    /// <summary>Updates the ball, the shot and the shockwave, leaving everything else in the scene alone.</summary>
+    [MenuItem("Repulsor/Rebuild Weapons")]
+    public static void RebuildWeapons()
+    {
+        CreateBlastPrefab();
+        CreateShockwavePrefab();
+
+        Scene scene = EditorSceneManager.OpenScene("Assets/Scenes/Main.unity");
+        foreach (HandRepulsor hand in Object.FindObjectsByType<HandRepulsor>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            var fields = new SerializedObject(hand);
+            SerializedProperty orb = fields.FindProperty("chargeOrb");
+            Object.DestroyImmediate(((Transform)orb.objectReferenceValue).gameObject);
+            orb.objectReferenceValue = CreateChargeOrb(hand.transform).transform;
+            fields.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        EditorSceneManager.SaveScene(scene);
+        AssetDatabase.SaveAssets();
+        Debug.Log("[Setup] Weapons rebuilt");
     }
 
     static void ConfigurePlayer()
@@ -243,10 +266,10 @@ public static class ProjectSetup
         Material orange = CreateOrbMaterial();
 
         Target targetPrefab = CreateSpherePrefab<Target>("Target", orange);
-        Blast blastPrefab = CreateSpherePrefab<Blast>("Blast", blue);
-        Shockwave shockwavePrefab = CreateShockwavePrefab(blue);
-        ParticleSystem explosionPrefab = CreateExplosionPrefab();
         LaserBeamView laserPrefab = CreateLaserPrefab();
+        Blast blastPrefab = CreateBlastPrefab();
+        Shockwave shockwavePrefab = CreateShockwavePrefab();
+        ParticleSystem explosionPrefab = CreateExplosionPrefab();
         AuraView auraPrefab = CreateAuraPrefab();
 
         new GameObject("AR Session", typeof(ARSession), typeof(ARInputManager));
@@ -365,9 +388,7 @@ public static class ProjectSetup
 
         LaserBeamView beam = InstantiateLaser(laserPrefab, handObject.transform);
 
-        GameObject orb = CreateSphere("Charge Orb", material);
-        orb.transform.SetParent(handObject.transform, false);
-        orb.SetActive(false);
+        GameObject orb = CreateChargeOrb(handObject.transform);
 
         var hum = handObject.GetComponent<AudioSource>();
         hum.playOnAwake = false;
@@ -466,9 +487,8 @@ public static class ProjectSetup
         Mesh haloMesh = CreateHaloMesh("Assets/Meshes/AuraHalo.asset");
         GameObject[] styles =
         {
-            CreateFlipbookStyle("Real Fire", "Flame02.tga", true, 40f, 1f, 0.5f, 0.75f, 0.25f, 0.45f),
-            CreateFlipbookStyle("Wild Fire", "Flame03Hollow.tga", false, 20f, 1f, 0.6f, 0.85f, 0.25f, 0.25f),
-            CreateShellStyle(),
+            CreateShellStyle("Fire Shells", "AuraShell", CreateShellMesh("Assets/Meshes/AuraShells.asset"), 0.58f, 0.9f),
+            CreateShellStyle("Spike Shells", "AuraSpikes", CreateSpikeMesh("Assets/Meshes/AuraSpikes.asset"), 0.88f, 1.02f),
             CreateHaloStyle("Light Halo", "AuraLightHalo", haloMesh, 0f, 1.9f),
             CreateHaloStyle("Sun Halo", "AuraSunHalo", haloMesh, 1f, 0.9f),
             CreateHaloStyle("Rune Circle", "AuraRuneCircle", haloMesh, 2f, 0.45f),
@@ -507,38 +527,19 @@ public static class ProjectSetup
         return prefab.GetComponent<AuraView>();
     }
 
-    /// <summary>A style that plays a 16x4 flipbook on flames spread around a standing body. Sizes are widths.</summary>
-    static GameObject CreateFlipbookStyle(string name, string file, bool hasAlpha, float rate, float lifetime,
-        float minWidth, float maxWidth, float lift, float baseFade)
-    {
-        Texture2D texture = ImportAuraTexture(file);
-        Material material = CreateSpriteMaterial($"AuraStyle{name.Replace(" ", "")}", texture, hasAlpha);
-        material.SetVector("_Tiles", new Vector4(16f, 4f, 0f, 0f));
-        material.SetFloat("_BaseFade", baseFade);
-        ParticleSystem particles = CreateFlameParticles(name, material, rate, lifetime, minWidth, maxWidth, 2f, lift);
-
-        ParticleSystem.TextureSheetAnimationModule sheet = particles.textureSheetAnimation;
-        sheet.enabled = true;
-        sheet.numTilesX = 16;
-        sheet.numTilesY = 4;
-        sheet.animation = ParticleSystemAnimationType.WholeSheet;
-        sheet.frameOverTime = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0f, 1f, 1f));
-        sheet.startFrame = new ParticleSystem.MinMaxCurve(0f, 1f);
-        sheet.cycleCount = 1;
-        return particles.gameObject;
-    }
-
     /// <summary>
     /// Fire on real curved surfaces around the body, a ring on the floor, and thin streaks of light rising
     /// at real places, which is how mesh effects get their depth.
     /// </summary>
-    static GameObject CreateShellStyle()
+    static GameObject CreateShellStyle(string name, string materialName, Mesh mesh, float fadeStart, float fadeEnd)
     {
-        Material material = CreateShaderMaterial("AuraShell", "Repulsor/AuraShell");
+        Material material = CreateShaderMaterial(materialName, "Repulsor/AuraShell");
         material.SetTexture("_Noise", AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/BeamNoise.asset"));
+        material.SetFloat("_FadeStart", fadeStart);
+        material.SetFloat("_FadeEnd", fadeEnd);
 
-        var style = new GameObject("Fire Shells", typeof(MeshFilter), typeof(MeshRenderer));
-        style.GetComponent<MeshFilter>().sharedMesh = CreateShellMesh("Assets/Meshes/AuraShells.asset");
+        var style = new GameObject(name, typeof(MeshFilter), typeof(MeshRenderer));
+        style.GetComponent<MeshFilter>().sharedMesh = mesh;
         ConfigureRenderer(style.GetComponent<MeshRenderer>(), material);
 
         CreateStreaks(style.transform, 26f, 0.75f);
@@ -616,14 +617,70 @@ public static class ProjectSetup
             {
                 // Out from the feet to the shoulders, then in to a point well above the head.
                 float height = v * 2.5f;
-                float shoulders = (height - 1.35f) / 0.65f;
-                float width = (0.34f + 0.26f * Mathf.Exp(-shoulders * shoulders)) * Mathf.Sqrt(Mathf.Clamp01(1f - v * v * v));
+                float width = BodyWidth(height) * Mathf.Sqrt(Mathf.Clamp01(1f - v * v * v));
                 return new Vector2(width * scale + 0.08f, height);
             }, shell * 0.37f, 0f);
         }
 
         mesh.Add(3, v => new Vector2(Mathf.Lerp(0.35f, 1.05f, v), 0.02f), 0f, 1f);
         return mesh.Save(path, "AuraShells");
+    }
+
+    /// <summary>How far a shell stands from the body's centre at this height, widest at the shoulders.</summary>
+    static float BodyWidth(float height)
+    {
+        float shoulders = (height - 1.35f) / 0.65f;
+        return 0.34f + 0.26f * Mathf.Exp(-shoulders * shoulders);
+    }
+
+    /// <summary>
+    /// The same three shells around the body, torn into tall flame tips of uneven width and height, then the
+    /// same ring on the floor. The surface folds in between tips, so each tip has its own edge-on sides.
+    /// </summary>
+    static Mesh CreateSpikeMesh(string path)
+    {
+        var random = new System.Random(11);
+        var mesh = new RevolvedMesh(40);
+        AddSpikeShell(mesh, random, 9, 0.82f, 0f);
+        AddSpikeShell(mesh, random, 11, 1f, 0.37f);
+        AddSpikeShell(mesh, random, 8, 1.2f, 0.74f);
+        mesh.Add(3, v => new Vector2(Mathf.Lerp(0.35f, 1.05f, v), 0.02f), 0f, 1f);
+        return mesh.Save(path, "AuraSpikes");
+    }
+
+    static void AddSpikeShell(RevolvedMesh mesh, System.Random random, int spikes, float scale, float seed)
+    {
+        const int Columns = 10;
+        const int Rows = 22;
+        const float ValleyHeight = 1f;
+
+        float Between(float low, float high) => low + (float)random.NextDouble() * (high - low);
+
+        var widths = new float[spikes];
+        for (int i = 0; i < spikes; i++)
+            widths[i] = Between(0.6f, 1.4f);
+        float widthTotal = widths.Sum();
+
+        float around = Between(0f, 1f);
+        float twist = Between(-0.3f, 0.3f);
+        for (int i = 0; i < spikes; i++)
+        {
+            float width = widths[i] / widthTotal;
+            float peak = Between(1.6f, 2.5f);
+            float lean = Between(-0.12f, 0.16f);
+            float bend = Between(-0.3f, 0.3f);
+
+            mesh.AddSpike(Columns, Rows, around, width, seed, Between(0f, 6.2831853f), (position, ridge, v) =>
+            {
+                // Squaring the ridge narrows the tip into a point instead of a plain triangle.
+                float height = v * Mathf.Lerp(ValleyHeight, peak, ridge * ridge);
+                float rise = height / peak;
+                float radius = BodyWidth(height) * scale + 0.08f + ridge * lean * rise * rise - (1f - ridge) * 0.16f * rise;
+                float angle = position * Mathf.PI * 2f + twist * height + bend * ridge * rise * rise;
+                return new Vector3(Mathf.Cos(angle) * radius, height, Mathf.Sin(angle) * radius);
+            });
+            around += width;
+        }
     }
 
     /// <summary>A curtain of height 1 for the shader to stretch, a floor pattern, and a ring over the head.</summary>
@@ -642,8 +699,10 @@ public static class ProjectSetup
         readonly List<Vector3> vertices = new List<Vector3>();
         readonly List<Vector3> normals = new List<Vector3>();
         readonly List<Vector4> details = new List<Vector4>();
+        readonly List<Vector2> spikes = new List<Vector2>();
         readonly List<int> triangles = new List<int>();
         readonly int around;
+        bool hasSpikes;
 
         public RevolvedMesh(int around) => this.around = around;
 
@@ -665,13 +724,49 @@ public static class ProjectSetup
                     vertices.Add(outward * point.x + Vector3.up * point.y);
                     normals.Add(part > 0.5f ? Vector3.up : (outward * slope.y - Vector3.up * slope.x).normalized);
                     details.Add(new Vector4(u, v, seed, part));
+                    spikes.Add(Vector2.zero);
                 }
             }
 
-            int stride = around + 1;
+            Stitch(start, around, rows);
+        }
+
+        /// <summary>
+        /// Adds one flame tip across a slice of the circle, from valley to tip to valley. The shape gets the
+        /// position around (0..1), the ridge (1 on the tip's centre line, 0 in the valleys) and the height along
+        /// (0..1). The second uv holds (ridge, phase), for the shader to move the tip.
+        /// </summary>
+        public void AddSpike(int columns, int rows, float start, float width, float seed, float phase,
+            System.Func<float, float, float, Vector3> shape)
+        {
+            hasSpikes = true;
+            int first = vertices.Count;
+            for (int row = 0; row <= rows; row++)
+            {
+                float v = row / (float)rows;
+                for (int column = 0; column <= columns; column++)
+                {
+                    // Columns crowd towards the centre line, where the tip needs the detail.
+                    float t = column * 2f / columns - 1f;
+                    float side = Mathf.Sign(t) * Mathf.Pow(Mathf.Abs(t), 1.4f);
+                    float ridge = 1f - Mathf.Abs(side);
+                    float u = start + (side + 1f) * 0.5f * width;
+                    vertices.Add(shape(u, ridge, v));
+                    normals.Add(Vector3.up);
+                    details.Add(new Vector4(u, v, seed, 0f));
+                    spikes.Add(new Vector2(ridge, phase));
+                }
+            }
+
+            Stitch(first, columns, rows);
+        }
+
+        void Stitch(int start, int columns, int rows)
+        {
+            int stride = columns + 1;
             for (int row = 0; row < rows; row++)
             {
-                for (int column = 0; column < around; column++)
+                for (int column = 0; column < columns; column++)
                 {
                     int a = start + row * stride + column;
                     int b = a + stride;
@@ -680,93 +775,24 @@ public static class ProjectSetup
             }
         }
 
-        public Mesh Save(string path, string name)
+        public Mesh Save(string path, string name) =>
+            Save(path, name, new Bounds(new Vector3(0f, 1.4f, 0f), new Vector3(3.2f, 3.2f, 3.2f)));
+
+        public Mesh Save(string path, string name, Bounds bounds)
         {
             AssetDatabase.DeleteAsset(path);
             var mesh = new Mesh { name = name, indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
             mesh.SetVertices(vertices);
             mesh.SetNormals(normals);
             mesh.SetUVs(0, details);
+            mesh.SetUVs(1, spikes);
             mesh.SetTriangles(triangles, 0);
-            mesh.bounds = new Bounds(new Vector3(0f, 1.4f, 0f), new Vector3(3.2f, 3.2f, 3.2f));
+            if (hasSpikes)
+                mesh.RecalculateNormals();
+            mesh.bounds = bounds;
             AssetDatabase.CreateAsset(mesh, path);
             return mesh;
         }
-    }
-
-    static Texture2D ImportAuraTexture(string file)
-    {
-        string path = $"Assets/Textures/Aura/{file}";
-        AssetDatabase.ImportAsset(path);
-        var importer = (TextureImporter)AssetImporter.GetAtPath(path);
-        importer.alphaIsTransparency = false;
-        importer.wrapMode = TextureWrapMode.Clamp;
-        importer.mipmapEnabled = true;
-        importer.SaveAndReimport();
-        return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-    }
-
-    static Material CreateSpriteMaterial(string name, Texture2D texture, bool hasAlpha)
-    {
-        Material material = CreateShaderMaterial(name, "Repulsor/AuraSprite");
-        material.SetTexture("_MainTex", texture);
-        material.SetFloat("_UseAlpha", hasAlpha ? 1f : 0f);
-        return material;
-    }
-
-    /// <summary>Upright flames that start on the surface of a body-sized cylinder and rise slowly.</summary>
-    static ParticleSystem CreateFlameParticles(string name, Material material, float rate, float lifetime,
-        float minWidth, float maxWidth, float heightOverWidth, float lift)
-    {
-        var flameObject = new GameObject(name, typeof(ParticleSystem));
-        flameObject.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
-        flameObject.transform.localPosition = new Vector3(0f, lift, 0f);
-        var particles = flameObject.GetComponent<ParticleSystem>();
-        particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-
-        ParticleSystem.MainModule main = particles.main;
-        main.loop = true;
-        main.playOnAwake = true;
-        main.prewarm = true;
-        main.maxParticles = 150;
-        main.startLifetime = new ParticleSystem.MinMaxCurve(lifetime * 0.75f, lifetime * 1.25f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(0.05f, 0.25f);
-        main.startSize3D = true;
-        main.startSizeX = new ParticleSystem.MinMaxCurve(minWidth, maxWidth);
-        main.startSizeY = new ParticleSystem.MinMaxCurve(minWidth * heightOverWidth, maxWidth * heightOverWidth);
-        main.startSizeZ = 1f;
-        main.simulationSpace = ParticleSystemSimulationSpace.Local;
-
-        ParticleSystem.EmissionModule emission = particles.emission;
-        emission.rateOverTime = rate;
-
-        ParticleSystem.ShapeModule shape = particles.shape;
-        shape.shapeType = ParticleSystemShapeType.ConeVolume;
-        shape.angle = 0f;
-        shape.radius = 0.28f;
-        shape.radiusThickness = 0f;
-        shape.length = 1.4f;
-
-        var fade = new Gradient();
-        fade.SetKeys(
-            new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
-            new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.2f), new GradientAlphaKey(1f, 0.65f), new GradientAlphaKey(0f, 1f) });
-        ParticleSystem.ColorOverLifetimeModule color = particles.colorOverLifetime;
-        color.enabled = true;
-        color.color = new ParticleSystem.MinMaxGradient(fade);
-
-        var renderer = particles.GetComponent<ParticleSystemRenderer>();
-        renderer.renderMode = ParticleSystemRenderMode.VerticalBillboard;
-        renderer.sortMode = ParticleSystemSortMode.None;
-        renderer.SetActiveVertexStreams(new List<ParticleSystemVertexStream>
-        {
-            ParticleSystemVertexStream.Position,
-            ParticleSystemVertexStream.Color,
-            ParticleSystemVertexStream.UV,
-            ParticleSystemVertexStream.Center,
-        });
-        ConfigureRenderer(renderer, material);
-        return particles;
     }
 
     /// <summary>Sparks rising from a body-sized ring, cooler than the laser's and hidden by real things.</summary>
@@ -1009,28 +1035,180 @@ public static class ProjectSetup
         line.enabled = false;
     }
 
-    static Shockwave CreateShockwavePrefab(Material material)
+    /// <summary>A material in the laser's colours, for effects that belong with it.</summary>
+    static Material CreateEnergyMaterial(string name, string shaderName)
     {
-        var waveObject = new GameObject("Shockwave", typeof(LineRenderer), typeof(Shockwave));
+        Material material = CreateShaderMaterial(name, shaderName);
+        material.SetTexture("_Noise", AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/BeamNoise.asset"));
+        material.SetColor("_CoreColor", LaserCoreBlue);
+        material.SetColor("_OuterColor", LaserOuterBlue);
+        return material;
+    }
 
-        // Positions are a unit circle, set in Shockwave.Awake; the transform scales it to size.
-        LineRenderer ring = waveObject.GetComponent<LineRenderer>();
-        ring.positionCount = 48;
-        ring.loop = true;
-        ring.useWorldSpace = false;
-        ring.startWidth = 1f;
-        ring.endWidth = 1f;
-        ring.sharedMaterial = material;
-        ring.shadowCastingMode = ShadowCastingMode.Off;
-        ring.receiveShadows = false;
+    /// <summary>A pulsing ball of plasma with crackling arcs. Its scale sets the diameter.</summary>
+    static GameObject CreateEnergyBall(string name)
+    {
+        const float GlowOverBall = 2.6f;
 
-        var wave = new SerializedObject(waveObject.GetComponent<Shockwave>());
-        wave.FindProperty("ring").objectReferenceValue = ring;
+        var root = new GameObject(name, typeof(ElectricBall));
+
+        Material glow = CreateEnergyMaterial("EnergyBall", "Repulsor/Energy Ball");
+        glow.SetFloat("_BallSize", 1f / GlowOverBall);
+        GameObject quad = CreateQuad("Glow", glow);
+        quad.transform.SetParent(root.transform, false);
+        quad.transform.localScale = Vector3.one * GlowOverBall;
+
+        Material bolt = CreateShaderMaterial("Lightning", "Repulsor/Lightning");
+        bolt.SetColor("_GlowColor", LaserCoreBlue);
+
+        var arcs = new LineRenderer[7];
+        for (int i = 0; i < arcs.Length; i++)
+        {
+            var arcObject = new GameObject("Arc", typeof(LineRenderer));
+            arcObject.transform.SetParent(root.transform, false);
+            LineRenderer arc = arcObject.GetComponent<LineRenderer>();
+            arc.positionCount = 9;
+            arc.useWorldSpace = false;
+            arc.startWidth = 1f;
+            arc.endWidth = 0.35f;
+            arc.sharedMaterial = bolt;
+            arc.shadowCastingMode = ShadowCastingMode.Off;
+            arc.receiveShadows = false;
+            arc.enabled = false;
+            arcs[i] = arc;
+        }
+
+        var ball = new SerializedObject(root.GetComponent<ElectricBall>());
+        SerializedProperty arcList = ball.FindProperty("arcs");
+        arcList.arraySize = arcs.Length;
+        for (int i = 0; i < arcs.Length; i++)
+            arcList.GetArrayElementAtIndex(i).objectReferenceValue = arcs[i];
+        ball.ApplyModifiedPropertiesWithoutUndo();
+        return root;
+    }
+
+    static GameObject CreateChargeOrb(Transform hand)
+    {
+        GameObject orb = CreateEnergyBall("Charge Orb");
+        orb.transform.SetParent(hand, false);
+        orb.SetActive(false);
+        return orb;
+    }
+
+    /// <summary>The shot: a ball at the front, a tail running back along the root's forward axis, and shed embers.</summary>
+    static Blast CreateBlastPrefab()
+    {
+        var root = new GameObject("Blast", typeof(Blast));
+
+        GameObject head = CreateEnergyBall("Head");
+        head.transform.SetParent(root.transform, false);
+
+        var tail = new GameObject("Tail", typeof(MeshFilter), typeof(MeshRenderer));
+        tail.transform.SetParent(root.transform, false);
+        tail.GetComponent<MeshFilter>().sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>("Assets/Meshes/BeamRibbon.asset");
+        ConfigureRenderer(tail.GetComponent<MeshRenderer>(), CreateEnergyMaterial("CometTail", "Repulsor/Comet Tail"));
+
+        CreateCometEmbers().transform.SetParent(root.transform, false);
+
+        var blast = new SerializedObject(root.GetComponent<Blast>());
+        blast.FindProperty("head").objectReferenceValue = head.transform;
+        blast.FindProperty("tail").objectReferenceValue = tail.transform;
+        blast.ApplyModifiedPropertiesWithoutUndo();
+
+        GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, "Assets/Prefabs/Blast.prefab");
+        Object.DestroyImmediate(root);
+        return prefab.GetComponent<Blast>();
+    }
+
+    /// <summary>Sparks left hanging in the air along the shot's path.</summary>
+    static ParticleSystem CreateCometEmbers()
+    {
+        var emberObject = new GameObject("Embers", typeof(ParticleSystem));
+        var particles = emberObject.GetComponent<ParticleSystem>();
+        particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        ParticleSystem.MainModule main = particles.main;
+        main.loop = true;
+        main.playOnAwake = true;
+        main.maxParticles = 60;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.2f, 0.5f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.1f, 0.6f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.006f, 0.016f);
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+
+        ParticleSystem.EmissionModule emission = particles.emission;
+        emission.rateOverTime = 0f;
+        emission.rateOverDistance = 14f;
+
+        ParticleSystem.ShapeModule shape = particles.shape;
+        shape.shapeType = ParticleSystemShapeType.Sphere;
+        shape.radius = 0.04f;
+
+        ConfigureSparks(particles, LaserCoreBlue, LaserOuterBlue);
+        return particles;
+    }
+
+    /// <summary>The front is a section of cone, scaled to its radius, with sparks thrown ahead of it.</summary>
+    static Shockwave CreateShockwavePrefab()
+    {
+        var root = new GameObject("Shockwave", typeof(Shockwave));
+
+        // Revolved meshes turn around y, so this child turns that axis to face along the shot.
+        var front = new GameObject("Front", typeof(MeshFilter), typeof(MeshRenderer));
+        front.transform.SetParent(root.transform, false);
+        front.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        front.GetComponent<MeshFilter>().sharedMesh = CreateWaveMesh("Assets/Meshes/ShockWave.asset");
+        var renderer = front.GetComponent<MeshRenderer>();
+        ConfigureRenderer(renderer, CreateEnergyMaterial("ShockWave", "Repulsor/Shock Wave"));
+
+        CreateWaveSparks().transform.SetParent(root.transform, false);
+
+        var wave = new SerializedObject(root.GetComponent<Shockwave>());
+        wave.FindProperty("front").objectReferenceValue = front.transform;
+        wave.FindProperty("frontRenderer").objectReferenceValue = renderer;
         wave.ApplyModifiedPropertiesWithoutUndo();
 
-        GameObject prefab = PrefabUtility.SaveAsPrefabAsset(waveObject, "Assets/Prefabs/Shockwave.prefab");
-        Object.DestroyImmediate(waveObject);
+        GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, "Assets/Prefabs/Shockwave.prefab");
+        Object.DestroyImmediate(root);
         return prefab.GetComponent<Shockwave>();
+    }
+
+    /// <summary>The cone's wall behind a front of radius 1, keeping to the wave's own widening angle.</summary>
+    static Mesh CreateWaveMesh(string path)
+    {
+        float slope = Mathf.Tan(Shockwave.HalfAngleDegrees * Mathf.Deg2Rad);
+        var mesh = new RevolvedMesh(64);
+        mesh.Add(12, v => new Vector2(Mathf.Lerp(1f, 0.6f, v), -v * 0.4f / slope), 0f, 0f);
+        return mesh.Save(path, "ShockWave", new Bounds(new Vector3(0f, -0.4f, 0f), new Vector3(2.2f, 1f, 2.2f)));
+    }
+
+    static ParticleSystem CreateWaveSparks()
+    {
+        var sparkObject = new GameObject("Sparks", typeof(ParticleSystem));
+        var particles = sparkObject.GetComponent<ParticleSystem>();
+        particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        ParticleSystem.MainModule main = particles.main;
+        main.duration = 0.2f;
+        main.loop = false;
+        main.playOnAwake = true;
+        main.maxParticles = 40;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.2f, 0.55f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(3f, 6.5f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.008f, 0.02f);
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+
+        ParticleSystem.EmissionModule emission = particles.emission;
+        emission.rateOverTime = 0f;
+        emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 36) });
+
+        ParticleSystem.ShapeModule shape = particles.shape;
+        shape.shapeType = ParticleSystemShapeType.Cone;
+        shape.angle = Shockwave.HalfAngleDegrees;
+        shape.radius = 0.1f;
+
+        ConfigureSparks(particles, LaserCoreBlue, LaserOuterBlue);
+        return particles;
     }
 
     static Transform CreateHud(out Text text)
@@ -1142,15 +1320,18 @@ public static class ProjectSetup
     }
 
     /// <summary>Draws particles as streaks along their flight, white hot and cooling through orange.</summary>
-    static void ConfigureSparks(ParticleSystem particles)
+    static void ConfigureSparks(ParticleSystem particles) =>
+        ConfigureSparks(particles, new Color(1f, 0.75f, 0.35f), new Color(1f, 0.25f, 0.05f));
+
+    static void ConfigureSparks(ParticleSystem particles, Color warm, Color cool)
     {
         var cooling = new Gradient();
         cooling.SetKeys(
             new[]
             {
                 new GradientColorKey(Color.white, 0f),
-                new GradientColorKey(new Color(1f, 0.75f, 0.35f), 0.35f),
-                new GradientColorKey(new Color(1f, 0.25f, 0.05f), 1f),
+                new GradientColorKey(warm, 0.35f),
+                new GradientColorKey(cool, 1f),
             },
             new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 0.6f), new GradientAlphaKey(0f, 1f) });
         ParticleSystem.ColorOverLifetimeModule color = particles.colorOverLifetime;

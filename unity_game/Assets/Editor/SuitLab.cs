@@ -275,6 +275,7 @@ public static class SuitLab
     const string BenchFolder = "Logs/bench";
     const float AssumedVerticalFov = 60f;
     const int SaveEvery = 12;
+    const float SecondsBetweenBodies = 0.055f;
 
     static readonly int[,] Bones =
     {
@@ -339,8 +340,10 @@ public static class SuitLab
         string anchors = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Models/pose_anchors.csv").text;
 
         var results = new StringBuilder("frame,found,presence,detector_ms,landmark_ms,distance,scale\n");
+        var jointLog = new StringBuilder("frame,joint,px,py,x,y,z,seen\n");
         var frame = new BodyFrame();
         var joints = new Vector3[BodyFrame.JointCount];
+        var smoother = new JointSmoother(BodyFrame.JointCount);
         var landmarkTimes = new List<float>();
         var detectorTimes = new List<float>();
         int found = 0;
@@ -362,7 +365,14 @@ public static class SuitLab
                     found++;
                     landmarkTimes.Add(tracker.LandmarkMilliseconds);
                     frame.Place(Vector3.zero, Quaternion.identity, new Vector2(focal, focal), new Vector2(width, height) * 0.5f, distance, joints);
+                    smoother.Step(joints, frame.Seen, SecondsBetweenBodies);
+                    System.Array.Copy(smoother.Joints, joints, joints.Length);
                     rig.Pose(joints);
+                    for (int j = 11; j <= 22; j++)
+                    {
+                        jointLog.AppendLine(string.Format(CultureInfo.InvariantCulture, "{0},{1},{2:0.0},{3:0.0},{4:0.000},{5:0.000},{6:0.000},{7:0.00}",
+                            i, j, frame.Image[j].x, frame.Image[j].y, joints[j].x, joints[j].y, joints[j].z, frame.Seen[j]));
+                    }
                 }
                 if (tracker.DetectorMilliseconds > 0f)
                     detectorTimes.Add(tracker.DetectorMilliseconds);
@@ -382,6 +392,7 @@ public static class SuitLab
             + $"landmark median {Median(landmarkTimes):0.0} ms, detector median {Median(detectorTimes):0.0} ms over {detectorTimes.Count} runs, "
             + $"model joints ok {rig.HasBone("LeftArm")}";
         File.WriteAllText($"{BenchFolder}/{landmarkModel}.csv", results.ToString());
+        File.WriteAllText($"{BenchFolder}/{landmarkModel}_joints.csv", jointLog.ToString());
         File.AppendAllText($"{BenchFolder}/summary.txt", summary + "\n");
         Debug.Log("[Suit] " + summary);
     }
