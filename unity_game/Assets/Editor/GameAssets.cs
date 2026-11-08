@@ -28,6 +28,8 @@ public static class GameAssets
         PlayerSettings.Android.forceInternetPermission = true;   // LAN multiplayer
         Save("EnemyPlaceholder", "Repulsor/Orb", m => m.SetColor("_BaseColor", new Color(0.85f, 0.2f, 0.15f)));
         Save("EnemyBolt", "Repulsor/Orb", m => m.SetColor("_BaseColor", new Color(1f, 0.25f, 0.2f)));
+        // Sprites/Default uses the line's vertex colour, so strands can fade and turn dark.
+        Save("WebLine", "Sprites/Default", m => m.SetColor("_Color", Color.white));
         Save("AimLine", "Universal Render Pipeline/Unlit", m => m.SetColor("_BaseColor", new Color(0.35f, 0.75f, 1f)));
         AssetDatabase.SaveAssets();
         Debug.Log("[Setup] Game assets built");

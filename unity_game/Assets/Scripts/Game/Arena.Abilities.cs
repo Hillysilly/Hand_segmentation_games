@@ -352,7 +352,7 @@ namespace Repulsor
                 return;
             }
 
-            // Placeholder look: webs are pale comets, darker and stronger at level 3. Web pull waits for room objects.
+            // Webs: a strand to a small pale shot and a splat where it lands; darker and stronger at level 3.
             bool black = player.Level >= 3;
             Color color = black ? new Color(0.35f, 0.1f, 0.45f) : new Color(0.9f, 0.92f, 1f);
             for (int i = 0; i < 2; i++)
@@ -365,7 +365,8 @@ namespace Repulsor
                     LiftBox(box, i, color);
                     continue;
                 }
-                game.FireBlast(origin, direction, 0.3f, 0.5f, 1.6f, player.Outgoing(black ? 7f : 5f), 0f, color);
+                Blast shot = game.FireBlast(origin, direction, 0.3f, 0.35f, 1.6f, player.Outgoing(black ? 7f : 5f), 0f, color);
+                WebStrand.Attach(shot, origin, black ? new Color(0.25f, 0.2f, 0.3f) : Color.white, foes);
             }
         }
 
