@@ -136,15 +136,19 @@ namespace Repulsor
             if (powerUp.Step(input.Left, input.Right, body, dt) && player.CanTransform)
                 player.TryTransform();
 
-            waves.Tick(dt);
-            // In co-op only the host runs enemies, until enemy sync is built.
-            if (settings.EnemiesEnabled && !(Multiplayer && net.Role == NetRole.Client))
+            // In co-op the host runs the waves and enemies; the client mirrors them (Arena.Net).
+            bool client = Multiplayer && net.Role == NetRole.Client;
+            if (!client)
             {
-                while (waves.TakeSpawn())
-                    SpawnEnemy();
+                waves.Tick(dt);
+                if (settings.EnemiesEnabled)
+                {
+                    while (waves.TakeSpawn())
+                        SpawnEnemy();
+                }
+                if (player.IsOut && RemoteOut)
+                    waves.AllPlayersOut();
             }
-            if (player.IsOut)
-                waves.AllPlayersOut();
 
             TickPowerups();
             Announce();
@@ -206,6 +210,8 @@ namespace Repulsor
             Log($"Match over: {(won ? "won" : "lost")}, wave {waves.Wave}, kills {waves.Kills}, "
                 + $"dealt {player.DamageDealt:0}, taken {player.DamageTaken:0}, {matchTime:0} s");
             phase = Phase.Results;
+            if (Multiplayer && net.Role == NetRole.Host)
+                net.SendEnd(won);
             CleanUpMatch();
             ShowResults(won);
         }
@@ -213,6 +219,8 @@ namespace Repulsor
         void CleanUpMatch()
         {
             enemies.Clear();
+            if (net != null)
+                ClearProxies();
             if (foes != null)
                 Ui.Clear(foes);
             if (game != null)
@@ -278,11 +286,17 @@ namespace Repulsor
                 distance = Mathf.Clamp(wall - 0.5f, 1.2f, distance);
             Vector3 point = head.position + direction * distance;
             point.y = kind == EnemyKind.Robot ? 0.65f : head.position.y + 0.2f;
-            Enemy enemy = Enemy.Spawn(kind, point, this, head, foes);
+            Enemy enemy = Enemy.Spawn(kind, point, this, head, foes, ++nextEnemyId);
             enemies.Add(enemy);
             OverheadBar.Attach(enemy, head, foes, false);
             game.PlayAt(point, game.WhooshSound);
             Log($"{kind} spawned {distance:0.0} m away");
+        }
+
+        void ClearProxies()
+        {
+            proxies.Clear();
+            killedAt.Clear();
         }
 
         void SpawnOrb()
@@ -339,12 +353,14 @@ namespace Repulsor
         {
             float range = game.Room.TryDistance(muzzle, direction, out float wall) ? wall : 12f;
             EnemyBolt.Launch(muzzle, direction, range, this, head, foes);
+            if (Multiplayer && net.Connected)
+                net.SendEnemyBolt(frame.ToShared(muzzle), frame.DirectionToShared(direction));
             game.PlayAt(muzzle, game.ZapSound);
         }
 
         void OnDealt(IHittable target, float amount)
         {
-            if (phase == Phase.Playing)
+            if (phase == Phase.Playing && !applyingRemoteHit)
                 player.DealtDamage(amount);
         }
 
@@ -352,6 +368,8 @@ namespace Repulsor
         {
             if (phase == Phase.Playing && enemies.Remove(target))
                 waves.EnemyKilled();
+            if (target is Enemy enemy && enemy.IsProxy)
+                ForgetProxy(enemy.Id);
         }
 
         /// <summary>Damage to the local player, from enemies, other players or the debug menu.</summary>

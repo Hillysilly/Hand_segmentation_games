@@ -116,6 +116,16 @@ namespace Repulsor
                 State = WaveState.Lost;
         }
 
+        /// <summary>Co-op client: copies the host's wave state instead of running its own.</summary>
+        public void Mirror(int wave, WaveState state, float timer, int kills)
+        {
+            Wave = wave;
+            State = state;
+            this.timer = timer;
+            Kills = kills;
+            ToSpawn = 0;
+        }
+
         /// <summary>Debug: ends the current wave by clearing what's left to spawn.</summary>
         public void SkipWave()
         {

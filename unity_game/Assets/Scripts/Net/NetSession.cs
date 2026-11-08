@@ -39,6 +39,10 @@ namespace Repulsor
         public event Action<LobbyState> LobbyReceived;
         public event Action<int, byte> StartReceived;
         public event Action<ShotEvent> ShotReceived;
+        public event Action<WaveNet, List<EnemyNet>> EnemiesReceived;
+        public event Action<ushort, float> EnemyHitReceived;
+        public event Action<Vector3, Vector3> EnemyBoltReceived;
+        public event Action<bool> EndReceived;
         public event Action PeerJoined;
         public event Action PeerLeft;
 
@@ -189,6 +193,14 @@ namespace Repulsor
                             return;
                         ShotReceived?.Invoke(NetProtocol.ReadShot(reader));
                         break;
+                    case NetMessage.Enemies:
+                    case NetMessage.EnemyHit:
+                    case NetMessage.EnemyBolt:
+                    case NetMessage.End:
+                        if (!FromPeer(from))
+                            return;
+                        HandleGame(type, reader);
+                        break;
                     case NetMessage.Bye:
                         if (!FromPeer(from))
                             return;
@@ -198,6 +210,55 @@ namespace Repulsor
                         break;
                 }
             }
+        }
+
+        readonly List<EnemyNet> enemyBuffer = new List<EnemyNet>();
+
+        bool HandleGame(NetMessage type, BinaryReader reader)
+        {
+            switch (type)
+            {
+                case NetMessage.Enemies when Role == NetRole.Client:
+                    NetProtocol.ReadEnemies(reader, out WaveNet wave, enemyBuffer);
+                    EnemiesReceived?.Invoke(wave, enemyBuffer);
+                    return true;
+                case NetMessage.EnemyHit when Role == NetRole.Host:
+                    NetProtocol.ReadEnemyHit(reader, out ushort id, out float damage);
+                    EnemyHitReceived?.Invoke(id, damage);
+                    return true;
+                case NetMessage.EnemyBolt when Role == NetRole.Client:
+                    NetProtocol.ReadEnemyBolt(reader, out Vector3 origin, out Vector3 direction);
+                    EnemyBoltReceived?.Invoke(origin, direction);
+                    return true;
+                case NetMessage.End when Role == NetRole.Client:
+                    EndReceived?.Invoke(NetProtocol.ReadEnd(reader));
+                    return true;
+            }
+            return false;
+        }
+
+        public void SendEnemies(WaveNet wave, List<EnemyNet> enemies)
+        {
+            if (Connected)
+                Send(NetProtocol.Enemies(wave, enemies));
+        }
+
+        public void SendEnemyHit(ushort id, float damage)
+        {
+            if (Connected)
+                Send(NetProtocol.EnemyHit(id, damage));
+        }
+
+        public void SendEnemyBolt(Vector3 origin, Vector3 direction)
+        {
+            if (Connected)
+                Send(NetProtocol.EnemyBolt(origin, direction));
+        }
+
+        public void SendEnd(bool won)
+        {
+            if (Connected)
+                Send(NetProtocol.End(won));
         }
 
         bool FromPeer(IPEndPoint from)

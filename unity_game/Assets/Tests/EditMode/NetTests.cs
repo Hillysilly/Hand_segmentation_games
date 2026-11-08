@@ -49,6 +49,27 @@ namespace Repulsor.Tests
         }
 
         [Test]
+        public void EnemyListRoundTrips()
+        {
+            var list = new System.Collections.Generic.List<EnemyNet>
+            {
+                new EnemyNet { Id = 7, Kind = 1, Position = new Vector3(1f, 2f, 3f), Hp = 12f, MaxHp = 15f, Spawning = true },
+                new EnemyNet { Id = 9, Kind = 0, Position = new Vector3(-1f, 0.65f, 2f), Hp = 30f, MaxHp = 30f },
+            };
+            byte[] packet = NetProtocol.Enemies(new WaveNet { Wave = 3, WaveCount = 5, State = 1, Timer = 2.5f, Kills = 11 }, list);
+            Assert.That(NetProtocol.TryRead(packet, packet.Length, out NetMessage type, out var reader), Is.True);
+            Assert.That(type, Is.EqualTo(NetMessage.Enemies));
+            var got = new System.Collections.Generic.List<EnemyNet>();
+            NetProtocol.ReadEnemies(reader, out WaveNet wave, got);
+            Assert.That(wave.Wave, Is.EqualTo(3));
+            Assert.That(wave.Kills, Is.EqualTo(11));
+            Assert.That(got.Count, Is.EqualTo(2));
+            Assert.That(got[0].Id, Is.EqualTo(7));
+            Assert.That(got[0].Spawning, Is.True);
+            Assert.That(got[1].Position, Is.EqualTo(new Vector3(-1f, 0.65f, 2f)));
+        }
+
+        [Test]
         public void ForeignPacketsAreIgnored()
         {
             byte[] junk = { 1, 2, 3, 4, 5, 6 };

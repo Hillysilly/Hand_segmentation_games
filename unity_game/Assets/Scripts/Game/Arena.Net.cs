@@ -30,6 +30,129 @@ namespace Repulsor
         LobbyState remoteLobby;
         float lobbyTimer;
         bool replayingShot;
+        bool applyingRemoteHit;
+        ushort nextEnemyId;
+        float enemySendTimer;
+        readonly System.Collections.Generic.Dictionary<ushort, Enemy> proxies = new System.Collections.Generic.Dictionary<ushort, Enemy>();
+        readonly System.Collections.Generic.Dictionary<ushort, float> killedAt = new System.Collections.Generic.Dictionary<ushort, float>();
+        readonly System.Collections.Generic.List<EnemyNet> enemyStates = new System.Collections.Generic.List<EnemyNet>();
+        readonly System.Collections.Generic.List<ushort> gone = new System.Collections.Generic.List<ushort>();
+
+        /// <summary>The other player has no lives left (or there is no other player).</summary>
+        bool RemoteOut => !Multiplayer || !net.Connected || !remote.Visible || (remote.Latest.Dead && remote.Latest.Lives == 0);
+
+        /// <summary>Whichever player's head is nearest, for enemies to go after.</summary>
+        public Vector3 NearestPlayerHead(Vector3 from)
+        {
+            Vector3 mine = head.position;
+            if (!Multiplayer || !remote.Visible || remote.Latest.Dead)
+                return mine;
+            Vector3 theirs = remote.Latest.Head;
+            return (theirs - from).sqrMagnitude < (mine - from).sqrMagnitude ? theirs : mine;
+        }
+
+        /// <summary>Client: a hit on a copied enemy goes to the host, which owns its HP.</summary>
+        public void ReportEnemyHit(ushort id, float damage)
+        {
+            if (Multiplayer && net.Role == NetRole.Client)
+                net.SendEnemyHit(id, damage);
+        }
+
+        void ForgetProxy(ushort id)
+        {
+            proxies.Remove(id);
+            killedAt[id] = Time.unscaledTime;
+        }
+
+        /// <summary>Host: every enemy's id, kind, place and HP, plus the wave.</summary>
+        void SendEnemies(float dt)
+        {
+            enemySendTimer -= dt;
+            if (enemySendTimer > 0f)
+                return;
+            enemySendTimer = 0.1f;
+            enemyStates.Clear();
+            foreach (IHittable foe in enemies)
+            {
+                if (foe is Enemy enemy && enemy != null && enemy.Alive)
+                {
+                    enemyStates.Add(new EnemyNet
+                    {
+                        Id = enemy.Id,
+                        Kind = (byte)enemy.Kind,
+                        Position = frame.ToShared(enemy.transform.position),
+                        Hp = enemy.Hp,
+                        MaxHp = enemy.MaxHp,
+                        Spawning = enemy.Spawning,
+                    });
+                }
+            }
+            net.SendEnemies(new WaveNet
+            {
+                Wave = (byte)waves.Wave,
+                WaveCount = (byte)waves.WaveCount,
+                State = (byte)waves.State,
+                Timer = waves.Timer,
+                Kills = (ushort)waves.Kills,
+            }, enemyStates);
+        }
+
+        /// <summary>Client: make the copies match the host's list.</summary>
+        void OnEnemies(WaveNet wave, System.Collections.Generic.List<EnemyNet> states)
+        {
+            if (phase != Phase.Playing || waves == null)
+                return;
+            WaveState state = (WaveState)wave.State;
+            // The match end comes as its own message; don't end on a copied state.
+            if (state != WaveState.Won && state != WaveState.Lost)
+                waves.Mirror(wave.Wave, state, wave.Timer, wave.Kills);
+
+            gone.Clear();
+            foreach (ushort id in proxies.Keys)
+                gone.Add(id);
+            foreach (EnemyNet e in states)
+            {
+                gone.Remove(e.Id);
+                Vector3 position = frame.ToWorld(e.Position);
+                if (proxies.TryGetValue(e.Id, out Enemy proxy) && proxy != null)
+                {
+                    proxy.ApplyState(position, e.Hp);
+                    continue;
+                }
+                if (killedAt.TryGetValue(e.Id, out float when) && Time.unscaledTime - when < 3f)
+                    continue;
+                proxy = Enemy.SpawnProxy(e.Id, (EnemyKind)e.Kind, position, e.Hp, e.MaxHp, this, head, foes);
+                proxies[e.Id] = proxy;
+                enemies.Add(proxy);
+                OverheadBar.Attach(proxy, head, foes, false);
+            }
+            // Ones the host no longer has were destroyed there.
+            foreach (ushort id in gone)
+            {
+                if (proxies.TryGetValue(id, out Enemy proxy) && proxy != null)
+                {
+                    game.Explode(proxy.Center, 0.01f, 0f, new Color(1f, 0.5f, 0.2f));
+                    enemies.Remove(proxy);
+                    Destroy(proxy.gameObject);
+                }
+                proxies.Remove(id);
+            }
+        }
+
+        /// <summary>Host: the client hit one of our enemies.</summary>
+        void OnEnemyHit(ushort id, float damage)
+        {
+            foreach (IHittable foe in enemies)
+            {
+                if (foe is Enemy enemy && enemy != null && enemy.Id == id && enemy.Alive)
+                {
+                    applyingRemoteHit = true;
+                    game.Strike(enemy, damage, enemy.Center, "partner", false);
+                    applyingRemoteHit = false;
+                    return;
+                }
+            }
+        }
 
         bool Multiplayer => net != null && net.Role != NetRole.None;
 
@@ -80,6 +203,22 @@ namespace Repulsor
                     StartMatch();
                 }
             };
+            net.EnemiesReceived += OnEnemies;
+            net.EnemyHitReceived += OnEnemyHit;
+            net.EnemyBoltReceived += (origin, direction) =>
+            {
+                if (phase != Phase.Playing)
+                    return;
+                Vector3 from = frame.ToWorld(origin);
+                Vector3 aim = frame.DirectionToWorld(direction);
+                float range = game.Room.TryDistance(from, aim, out float wall) ? wall : 12f;
+                EnemyBolt.Launch(from, aim, range, this, head, foes);
+            };
+            net.EndReceived += won =>
+            {
+                if (phase == Phase.Playing)
+                    EndMatch(won);
+            };
             net.ShotReceived += shot =>
             {
                 replayingShot = true;
@@ -126,7 +265,10 @@ namespace Repulsor
                     Dead = phase == Phase.Playing && player.IsDead,
                     Color = PlayerColor,
                     Character = (byte)character,
+                    Lives = (byte)Mathf.Max(0, player.Lives),
                 }, dt);
+                if (net.Role == NetRole.Host && phase == Phase.Playing && waves != null)
+                    SendEnemies(dt);
 
                 lobbyTimer -= dt;
                 if (phase == Phase.Characters && lobbyTimer <= 0f)

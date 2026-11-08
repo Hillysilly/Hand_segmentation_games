@@ -36,6 +36,11 @@ namespace Repulsor
         float weaveSpeed;
 
         public EnemyKind Kind { get; private set; }
+        /// <summary>Shared by both headsets in co-op.</summary>
+        public ushort Id { get; private set; }
+        /// <summary>A copy of an enemy the host runs: no thinking or shooting of its own, it follows the host.</summary>
+        public bool IsProxy { get; private set; }
+        Vector3 netPosition;
         public float Radius => Kind == EnemyKind.Robot ? 0.28f : 0.16f;
         public Vector3 Center => transform.position;
         public bool Alive => Hp > 0f;
@@ -48,7 +53,25 @@ namespace Repulsor
         void OnEnable() => Hittables.Add(this);
         void OnDisable() => Hittables.Remove(this);
 
-        public static Enemy Spawn(EnemyKind kind, Vector3 position, Arena owner, Transform head, Transform parent)
+        public static Enemy SpawnProxy(ushort id, EnemyKind kind, Vector3 position, float hp, float maxHp, Arena owner,
+            Transform head, Transform parent)
+        {
+            Enemy enemy = Spawn(kind, position, owner, head, parent, id);
+            enemy.IsProxy = true;
+            enemy.netPosition = position;
+            enemy.Hp = hp;
+            enemy.MaxHp = maxHp;
+            return enemy;
+        }
+
+        /// <summary>The host's latest word on this enemy (client only).</summary>
+        public void ApplyState(Vector3 position, float hp)
+        {
+            netPosition = position;
+            Hp = Mathf.Min(Hp, hp);
+        }
+
+        public static Enemy Spawn(EnemyKind kind, Vector3 position, Arena owner, Transform head, Transform parent, ushort id = 0)
         {
             var go = new GameObject(kind.ToString(), typeof(MeshFilter), typeof(MeshRenderer));
             go.transform.SetParent(parent, false);
@@ -56,6 +79,7 @@ namespace Repulsor
             go.GetComponent<MeshFilter>().sharedMesh = Resources.Load<Mesh>("SphereMesh");
             var enemy = go.AddComponent<Enemy>();
             enemy.Kind = kind;
+            enemy.Id = id;
             enemy.arena = owner;
             enemy.head = head;
             enemy.Hp = enemy.MaxHp = kind == EnemyKind.Robot ? RobotHp : DroneHp;
@@ -86,6 +110,8 @@ namespace Repulsor
             float taken = Mathf.Min(damage, Hp);
             Hp -= taken;
             flash = 0.12f;
+            if (IsProxy)
+                arena.ReportEnemyHit(Id, taken);
             return taken;
         }
 
@@ -97,10 +123,21 @@ namespace Repulsor
             flash = Mathf.Max(0f, flash - dt);
             properties.SetColor(BaseColor, flash > 0f ? Color.white : color);
             body.SetPropertyBlock(properties);
-            if (Spawning || !Alive)
+            if (!Alive)
+                return;
+            if (IsProxy)
+            {
+                transform.position = Vector3.Lerp(transform.position, netPosition, 1f - Mathf.Exp(-12f * dt));
+                Vector3 facing = Vector3.ProjectOnPlane(head.position - transform.position, Vector3.up);
+                if (facing.sqrMagnitude > 1e-4f)
+                    transform.rotation = Quaternion.LookRotation(facing);
+                return;
+            }
+            if (Spawning)
                 return;
 
-            Vector3 target = head.position;
+            // Goes for whichever player is nearest.
+            Vector3 target = arena.NearestPlayerHead(transform.position);
             Vector3 toPlayer = target - transform.position;
             Vector3 flat = Vector3.ProjectOnPlane(toPlayer, Vector3.up);
             float distance = flat.magnitude;

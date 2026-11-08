@@ -13,6 +13,29 @@ namespace Repulsor
         Start = 5,      // host -> client: the match starts
         Bye = 6,        // either way: leaving
         Shot = 7,       // either way: I fired something (for the other headset to draw)
+        Enemies = 8,    // host -> client: every enemy and the wave, about 10 times a second
+        EnemyHit = 9,   // client -> host: I hit this enemy for this much
+        EnemyBolt = 10, // host -> client: an enemy fired
+        End = 11,       // host -> client: the match is over
+    }
+
+    public struct EnemyNet
+    {
+        public ushort Id;
+        public byte Kind;
+        public Vector3 Position;
+        public float Hp;
+        public float MaxHp;
+        public bool Spawning;
+    }
+
+    public struct WaveNet
+    {
+        public byte Wave;
+        public byte WaveCount;
+        public byte State;
+        public float Timer;
+        public ushort Kills;
     }
 
     /// <summary>A player's state as the other headset needs it. Positions are in the shared (calibrated) frame.</summary>
@@ -32,6 +55,7 @@ namespace Repulsor
         public bool Dead;
         public Color32 Color;
         public byte Character;
+        public byte Lives;
     }
 
     public struct LobbyState
@@ -95,8 +119,84 @@ namespace Repulsor
                 w.Write(s.Level);
                 WriteColor(w, s.Color);
                 w.Write(s.Character);
+                w.Write(s.Lives);
             });
         }
+
+        public static byte[] Enemies(WaveNet wave, System.Collections.Generic.List<EnemyNet> enemies) => Write(NetMessage.Enemies, w =>
+        {
+            w.Write(wave.Wave);
+            w.Write(wave.WaveCount);
+            w.Write(wave.State);
+            w.Write(wave.Timer);
+            w.Write(wave.Kills);
+            int count = Math.Min(enemies.Count, 40);
+            w.Write((byte)count);
+            for (int i = 0; i < count; i++)
+            {
+                EnemyNet e = enemies[i];
+                w.Write(e.Id);
+                w.Write(e.Kind);
+                WriteVector(w, e.Position);
+                w.Write(e.Hp);
+                w.Write(e.MaxHp);
+                w.Write(e.Spawning);
+            }
+        });
+
+        public static void ReadEnemies(BinaryReader r, out WaveNet wave, System.Collections.Generic.List<EnemyNet> into)
+        {
+            wave = new WaveNet
+            {
+                Wave = r.ReadByte(),
+                WaveCount = r.ReadByte(),
+                State = r.ReadByte(),
+                Timer = r.ReadSingle(),
+                Kills = r.ReadUInt16(),
+            };
+            into.Clear();
+            int count = r.ReadByte();
+            for (int i = 0; i < count; i++)
+            {
+                into.Add(new EnemyNet
+                {
+                    Id = r.ReadUInt16(),
+                    Kind = r.ReadByte(),
+                    Position = ReadVector(r),
+                    Hp = r.ReadSingle(),
+                    MaxHp = r.ReadSingle(),
+                    Spawning = r.ReadBoolean(),
+                });
+            }
+        }
+
+        public static byte[] EnemyHit(ushort id, float damage) => Write(NetMessage.EnemyHit, w =>
+        {
+            w.Write(id);
+            w.Write(damage);
+        });
+
+        public static void ReadEnemyHit(BinaryReader r, out ushort id, out float damage)
+        {
+            id = r.ReadUInt16();
+            damage = r.ReadSingle();
+        }
+
+        public static byte[] EnemyBolt(Vector3 origin, Vector3 direction) => Write(NetMessage.EnemyBolt, w =>
+        {
+            WriteVector(w, origin);
+            WriteVector(w, direction);
+        });
+
+        public static void ReadEnemyBolt(BinaryReader r, out Vector3 origin, out Vector3 direction)
+        {
+            origin = ReadVector(r);
+            direction = ReadVector(r);
+        }
+
+        public static byte[] End(bool won) => Write(NetMessage.End, w => w.Write(won));
+
+        public static bool ReadEnd(BinaryReader r) => r.ReadBoolean();
 
         public static byte[] Lobby(in LobbyState l)
         {
@@ -172,6 +272,7 @@ namespace Repulsor
             s.Level = r.ReadByte();
             s.Color = ReadColor(r);
             s.Character = r.ReadByte();
+            s.Lives = r.ReadByte();
             return s;
         }
 

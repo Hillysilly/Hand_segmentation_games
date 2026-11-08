@@ -489,11 +489,11 @@ namespace Repulsor
         }
 
         /// <summary>Applies one hit: damage, then the explosion if it finished the target off.</summary>
-        public void Strike(IHittable target, float damage, Vector3 from, string weapon)
+        public void Strike(IHittable target, float damage, Vector3 from, string weapon, bool scaled = true)
         {
             if (Legacy)
                 damage = float.MaxValue;
-            else
+            else if (scaled)
                 damage *= DamageScale;
             float taken = target.TakeHit(damage, from);
             if (taken > 0f)
