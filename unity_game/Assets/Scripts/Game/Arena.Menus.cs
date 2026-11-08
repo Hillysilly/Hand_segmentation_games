@@ -8,6 +8,9 @@ namespace Repulsor
     {
         public const string GameTitle = "POWER UP";
         const float ReplaceAfterTurn = 50f;
+        const float LostMenuDegrees = 75f;
+        const float LostMenuSeconds = 1.5f;
+        float menuAwayFor;
 
         static readonly string[] Swatches =
         {
@@ -31,6 +34,16 @@ namespace Repulsor
             bool headTracked = head.localPosition != Vector3.zero;
             if (!menuPlaced && headTracked)
                 PlaceMenu();
+
+            // Turned well away from the menu for a moment: bring it back in front.
+            Vector3 toMenu = Vector3.ProjectOnPlane(menu.position - head.position, Vector3.up);
+            Vector3 facing = Vector3.ProjectOnPlane(head.forward, Vector3.up);
+            menuAwayFor = Vector3.Angle(toMenu, facing) > LostMenuDegrees ? menuAwayFor + dt : 0f;
+            if (menuAwayFor > LostMenuSeconds)
+            {
+                menuAwayFor = 0f;
+                PlaceMenu();
+            }
             if (PokeInput.Tick(input.Left, input.Right, dt, out Vector3 clickedAt))
                 game.PlayAt(clickedAt, game.ClickSound);
         }
