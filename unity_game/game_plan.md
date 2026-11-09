@@ -249,7 +249,7 @@ Attacks:
 Level 1:
 They will have fireballs, similar to repulsors
 Level 2:
-Force powers, similar to the star wars one
+Holding palm out will shoot flames like a flame thrower
 Level 3:
 Making a triangle symbol with both hands will place an aimable aura circule on the floor. WHen they collapse their fingers together, it will shoot a fire pillar above where their hands were, dealing damage
 
@@ -261,11 +261,33 @@ Transformations:
 Circular, fire shockwave on both transformations
 
 
+
 ### Summoner
 WIP
 
+## Attacks with no character yet
+
+throwing swords at people
+
+somtehing with snapping
+
+clapping power
+
+elemental
+
+
 # Future work
 Drawing 3d models over people is hard, but maybe a future task
+
+
+# NO headset work
+- setup blender and tripo mcp to generate 3d models
+- Make more 3d model variants for different attacks, things don't look that good right now
+- brainstorm gameplay designs
+    - improve enemy spawn locations
+    - 3d models for bosses, ect
+    - Each player has healing ability
+- Change camera to 3d person perspetive
 
 # Claude's Clarifications
 
