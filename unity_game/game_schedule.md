@@ -10,6 +10,34 @@ Columns:
 - **Checked by you:** you saw it in the headset and approved it.
 - **Pick:** for visual items, the variant letter you chose (A/B/C/D).
 
+## Status, 11/14 morning (built overnight, not yet seen in the headset)
+
+New since 11/8 (details in `logs/2026-11-14-robots-boss-elements.md`):
+
+- **7 robot kinds**, each its own model: gunner, drone, brawler (punches), rocketeer (missiles that hurt robots
+  too), dasher, sniper, tank. They fire **red lasers** with an aim line first. **Hitboxes** match the models.
+- **Spawning** across the whole room, far from you: Space Setup's floor if there is one, otherwise a depth
+  scan (runs all match, plus **SCAN ROOM** on the title screen).
+- **Boss**: a 2.3 m Trilobite walker with a bar at the top of your view: laser fans, a ring that chases you
+  with strikes, missiles, helpers. Last wave of SOLO, or **BOSS FIGHT** in the mode menu.
+- **Valkyr**: crossbow and longbow models that charge up, arrow and bolt shots, knight shield.
+- **Tempest** (Elementalist) and **Terra** (Earth), the two new classes from the plan.
+- **Shield**: 5 s instead of 3, quicker to come back, looser X, a clear SHIELD BROKEN.
+
+The APK is built; install it with `build_and_run.ps1 -NoBuild` when the headset is plugged in.
+
+### Headset checklist for this build
+
+1. **Shield**: hold the X. Does it come up? What was broken before? It now lasts 5 s.
+2. **SCAN ROOM** (title screen): look around; do dots cover your floor? Then SOLO: do robots come from all over
+   the room, far from you? The log says where each came from.
+3. **Lasers**: is the red aim line easy to see and dodge? Are the hits fair?
+4. **Hitboxes**: shoot robots in the head and legs; do hits land?
+5. **Robot kinds**: DEBUG > SPAWN ENEMY gives random kinds. Brawler punches (step back), missiles (shoot them).
+6. **BOSS FIGHT**: is it readable, too hard or too easy? 700 HP is a guess.
+7. **Valkyr**: do the crossbow and bow sit in your hands right? (orientation is guessed from renders)
+8. **Tempest and Terra**: try each gesture; tell me which miss or misfire.
+
 ## Status, end of 11/8 session
 
 Most of the Claude-side work planned for 11/7-11/14 is built and installed on the headset. 138 of 138 unit tests pass, plus 4 PC tests: every character through a wave, co-op as host and as client, and a PVP round as host. **None of it has been seen in the headset yet.**
@@ -68,9 +96,11 @@ The first option is used as the placeholder for now.
 | Saber | Lumen, Starblade, Vex Solari |
 | Archer | Valkyr, Aethon, Skyhunter |
 | Spider | Webline, Silkstrike, Arachne |
+| Elementalist | Tempest, Zephyr, Stormcaller |
+| Earth | Terra, Bedrock, Quarry |
 | Game title | POWER UP (placeholder) |
 
-## Your headset checklist (next session)
+## Headset checklist from 11/8 (older build; the 11/14 one is at the top)
 
 The new build is installed. Pick it up and move around until it finds its position, then launch Repulsor Test.
 If Space Setup hasn't been done in this room, do it first (headset Settings > Environment setup). The title screen
@@ -111,7 +141,7 @@ says how much furniture the game found, which the force powers need.
    table corner with the right index finger and hold still, then a second point. The coloured dots should sit on the
    other person's head and hands. Then both pick characters and READY.
 
-## Enemy models (in the game since 11/8, pick in VARIANT LAB > ENEMIES)
+## Models (each enemy kind has its own since 11/14; VARIANT LAB > ENEMIES shows them all)
 
 All CC0 from OpenGameArt; licence files are next to the models in `Assets/Enemies/`.
 
@@ -120,10 +150,14 @@ All CC0 from OpenGameArt; licence files are next to the models in `Assets/Enemie
 | Robots A-D | Quaternius Animated Mech Pack: George, Leela, Mike, Stan (walk, idle, shoot) | [OpenGameArt](https://opengameart.org/content/animated-mech-pack) |
 | Robot E | Quaternius Animated Robot (walk, idle, punch) | [OpenGameArt](https://opengameart.org/content/animated-lowpoly-robot) |
 | Robot F, drone A | Quaternius Sci-Fi Essentials Kit: QuadShell, EyeDrone | [OpenGameArt](https://opengameart.org/content/sci-fi-essentials-kit) |
+| Boss | Quaternius Sci-Fi Essentials Kit: Trilobite | [OpenGameArt](https://opengameart.org/content/sci-fi-essentials-kit) |
+| Valkyr bows, arrow, knight shield | Quaternius LowPoly Medieval Weapons | [OpenGameArt](https://opengameart.org/node/88080) |
+| Valkyr crossbow, bolt | KayKit Adventurers (Kay Lousberg) | [itch.io](https://kaylousberg.itch.io/kaykit-adventurers) |
+| Terra's rocks and spikes | Kenney Nature Kit | [OpenGameArt](https://opengameart.org/content/nature-kit) |
 
 ## Known gaps
 
-- **Assets still needed:** the gauntlets, the Archer's wings and the knight shield.
+- **Assets still needed:** Technoman's gauntlets and the Valkyr's wings (the knight shield is in since 11/14).
 - **Other player's aura:** in multiplayer it's a body-shaped shell, not the real aura.
 - **Effect sounds** are synthesized. The Kenney CC0 pack needs a browser download.
 
@@ -191,8 +225,10 @@ Sketchfab needs a login to download. If you grab G1 as glTF into `assets/models/
 | Ki fighter | | ✅ comet (yellow) | ✅ energy ball | ✅ dragon fist (4 looks in Variant Lab) | flame | aura 2 at L2, blue at L3 | |
 | Mage | | ✅ fireball | ✅ flamethrower (palm out and hold) | ✅ fire pillar (inferno with rings) | thin | rune aura L2-3 | |
 | Saber | | ✅ finger-gun blaster + aim line | ✅ laser sword | force: needs room objects | glass | light aura | |
-| Archer | | ✅ crossbow (reloads) | ✅ bow + aim line | ✅ smoke bomb (blinds enemies), piercing arrows | flat glass shield (knight shield needs a model) | wings: needs model; white ring shockwave | |
+| Archer | | ✅ crossbow model that charges (reloads) | ✅ longbow model, string, nocked arrow + aim line | ✅ smoke bomb (blinds enemies), piercing arrows | knight shield model | wings: needs model; white ring shockwave | |
 | Spider | | ✅ web shots with strands, spider sense | ✅ web pull (furniture) | ✅ dark webs, more damage | web cocoon | no gloves yet | |
+| Tempest (Elementalist) | | ✅ palm-push gust, knockback | ✅ chain lightning, 5 s then rest | ✅ swirl-and-push tornado that pulls | wind | wind aura L2-3 | |
+| Terra (Earth) | | ✅ rock orbs, stone hands | ✅ uppercut rock spikes | ✅ sticky rocks, snap to blow | rock | crater L2, orbiting rocks L3 | |
 
 ### Multiplayer
 
