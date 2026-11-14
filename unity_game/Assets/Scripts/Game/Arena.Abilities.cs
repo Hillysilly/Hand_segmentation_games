@@ -218,7 +218,7 @@ namespace Repulsor
                     continue;
                 IHittable target = all[i];
                 if (target.Alive && target.Team == Team.Enemies
-                    && GameMath.SegmentHitsSphere(hilt, tip, target.Center, target.Radius + BladeRadius))
+                    && HitTest.Segment(target, hilt, tip, BladeRadius))
                     game.Strike(target, player.Outgoing(BladeDps * dt), hilt, "Sword");
             }
         }
@@ -374,7 +374,7 @@ namespace Repulsor
         public bool ThrownHits(Vector3 from, Vector3 to, float radius)
         {
             foreach (IHittable foe in Hittables.All)
-                if (foe.Alive && foe.Team == Team.Enemies && GameMath.SegmentHitsSphere(from, to, foe.Center, foe.Radius + radius))
+                if (foe.Alive && foe.Team == Team.Enemies && HitTest.Segment(foe, from, to, radius))
                     return true;
             return false;
         }

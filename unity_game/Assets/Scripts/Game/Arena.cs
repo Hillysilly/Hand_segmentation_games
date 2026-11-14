@@ -96,7 +96,13 @@ namespace Repulsor
             };
             player.Respawned += OnRespawned;
             player.Transformed += OnTransformed;
-            player.Shield.Shattered += () => Log("Shield broke");
+            player.Shield.Shattered += () =>
+            {
+                Log("Shield broke");
+                shield.Shatter();
+                hud.Message("SHIELD BROKEN", $"Back in {ShieldGauge.BreakCooldown:0} s. Let go of the X to save it next time", 1.6f);
+                game.PlayAt(head.position, game.BoomSound);
+            };
             player.Shield.Raised += () => Log($"Shield up, {PickedShield(character)}");
             game.Dealt += OnDealt;
             game.Killed += OnKilled;
@@ -119,7 +125,10 @@ namespace Repulsor
             body = Stance.From(head.position, head.forward, game.Origin.transform.position.y);
             // Diagnostic: a head can't move 30 cm in a frame, so a jump means tracking re-found its position.
             if (lastHead != Vector3.zero && (head.position - lastHead).sqrMagnitude > 0.09f)
-                Log($"Head jumped {(head.position - lastHead).magnitude:0.00} m: tracking re-found its position");
+            {
+                Log($"Head jumped {(head.position - lastHead).magnitude:0.00} m: tracking re-found its position; room map cleared");
+                roomMap.Clear();
+            }
             lastHead = head.position;
 
 #if DEVELOPMENT_BUILD
@@ -127,6 +136,8 @@ namespace Repulsor
 #endif
             TickMenu(dt);
             TickNet(dt);
+            TickRoomMap();
+            TickScan();
 
             if (pauseGesture.Step(input.Left, input.Right, dt) && (phase == Phase.Playing || phase == Phase.Sandbox))
             {
@@ -147,6 +158,7 @@ namespace Repulsor
             shield.Tick((playing || practicing) && player.Shield.Up, head.position, shieldFacing, PlayerColor, PickedShield(character), dt);
             TickVariantLab(dt);
             death.Tick(playing && player.IsDead, dt);
+            ShowBossBar();
             hurtFlash.Tick(dt);
             damageNumbers.Tick(dt);
             TickGestureLab(dt);
@@ -316,7 +328,8 @@ namespace Repulsor
             player.StartingLives = settings.Lives;
             player.RespawnSeconds = settings.RespawnSeconds;
             player.Reset();
-            waves = new WaveDirector(settings.Waves);
+            waves = new WaveDirector(settings.Waves, bossFight ? settings.Waves : 1);
+            boss = null;
             if (Pvp)
                 StartPvp();
             announcedWave = -1;
@@ -330,7 +343,7 @@ namespace Repulsor
             HideMenu();
             hud.Visible = true;
             UpdateAura();
-            Log($"Match starts: {mode}, {Character.Name}, colour #{ColorUtility.ToHtmlStringRGB(PlayerColor)}, lives {settings.Lives}, {room.Count} furniture boxes from Space Setup");
+            Log($"Match starts: {mode}{(bossFight ? " (boss fight only)" : "")}, {Character.Name}, colour #{ColorUtility.ToHtmlStringRGB(PlayerColor)}, lives {settings.Lives}, {room.Count} furniture boxes from Space Setup");
         }
 
         void EndMatch(bool won)
@@ -347,6 +360,7 @@ namespace Repulsor
         void CleanUpMatch()
         {
             ShowPowerUpCharge(0f);
+            boss = null;
             damageNumbers?.Clear();
             enemies.Clear();
             if (net != null)
@@ -401,68 +415,6 @@ namespace Repulsor
             Log("Old controls off");
         }
 
-        void SpawnEnemy()
-        {
-            EnemyKind kind = Random.value < WaveDirector.DroneShare(Mathf.Max(1, waves.Wave)) ? EnemyKind.Drone : EnemyKind.Robot;
-            SpawnEnemy(kind);
-        }
-
-        /// <summary>Enemies appear at least this far away, then walk in.</summary>
-        public static float SpawnMinDistance = 2.5f;
-        public static float SpawnMaxDistance = 4.5f;
-
-        void SpawnEnemy(EnemyKind kind)
-        {
-            Vector3 direction = SpawnDirection(out float distance, out bool atWall);
-            Vector3 point = head.position + direction * distance;
-            point.y = kind == EnemyKind.Robot ? FloorY + 0.65f : head.position.y + 0.2f;
-            Enemy enemy = Enemy.Spawn(kind, point, this, head, foes, ++nextEnemyId);
-            enemies.Add(enemy);
-            OverheadBar.Attach(enemy, head, foes, false);
-            game.PlayAt(point, spawnSound);
-            Log($"{kind} spawned {distance:0.0} m away{(atWall ? " out of a wall" : "")}, "
-                + $"{Vector3.SignedAngle(Vector3.ProjectOnPlane(head.forward, Vector3.up), direction, Vector3.up):0} deg from where you face");
-        }
-
-        float FloorY => game.Origin.transform.position.y;
-
-        /// <summary>
-        /// Picks where the next enemy comes from: somewhere you can see (within 80 degrees of where you face) with
-        /// the most room, so it can walk in from a distance. Out of the wall when the wall is in range, so it seems
-        /// to step out of your room. Rays start 0.5 m out so your own hands and arms aren't taken for a wall.
-        /// </summary>
-        Vector3 SpawnDirection(out float distance, out bool atWall)
-        {
-            Vector3 forward = Vector3.ProjectOnPlane(head.forward, Vector3.up);
-            if (forward.sqrMagnitude < 1e-4f)
-                forward = Vector3.forward;
-            forward.Normalize();
-            const int Tries = 9;
-            Vector3 bestDirection = forward;
-            float bestScore = -1f;
-            float free = SpawnMaxDistance + 1f;
-            float offset = Random.Range(-10f, 10f);
-            for (int i = 0; i < Tries; i++)
-            {
-                float angle = Mathf.Lerp(-80f, 80f, i / (Tries - 1f)) + offset;
-                Vector3 direction = Quaternion.AngleAxis(angle, Vector3.up) * forward;
-                float room = SpawnMaxDistance + 1f;
-                if (game.Room.TryDistance(head.position + direction * 0.5f, direction, out float wall))
-                    room = wall + 0.5f;
-                // A little randomness so enemies don't all come from the one longest direction.
-                float score = Mathf.Min(room, SpawnMaxDistance + 0.5f) + Random.Range(0f, 1.2f);
-                if (score > bestScore)
-                {
-                    bestScore = score;
-                    bestDirection = direction;
-                    free = room;
-                }
-            }
-            atWall = free <= SpawnMaxDistance + 0.4f;
-            distance = atWall ? Mathf.Max(1.2f, free - 0.4f) : Random.Range(SpawnMinDistance, SpawnMaxDistance);
-            return bestDirection;
-        }
-
         void ClearProxies()
         {
             proxies.Clear();
@@ -515,16 +467,6 @@ namespace Repulsor
             point.y = Mathf.Clamp(head.position.y - 0.35f, 0.8f, 1.5f);
             powerup = Powerup.Spawn(kind, point, foes);
             Log($"Powerup {kind} at {distance:0.0} m");
-        }
-
-        /// <summary>An enemy shot. It stops at the first real surface along its path.</summary>
-        public void FireEnemyBolt(Vector3 muzzle, Vector3 direction, Enemy shooter)
-        {
-            float range = game.Room.TryDistance(muzzle, direction, out float wall) ? wall : 12f;
-            EnemyBolt.Launch(muzzle, direction, range, this, head, foes);
-            if (Multiplayer && net.Connected)
-                net.SendEnemyBolt(frame.ToShared(muzzle), frame.DirectionToShared(direction));
-            game.PlayAt(muzzle, enemyShotSound);
         }
 
         void OnDealt(IHittable target, float amount)

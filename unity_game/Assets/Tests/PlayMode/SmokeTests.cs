@@ -77,6 +77,46 @@ namespace Repulsor.Tests
         }
 
         [UnityTest]
+        public IEnumerator EveryEnemyKindFightsWithoutCrashing()
+        {
+            SceneManager.LoadScene("Main");
+            yield return Frames(30);
+            var arena = Object.FindAnyObjectByType<Arena>();
+            arena.TestStart(CharacterId.Technoman);
+            arena.TestGod(true);
+            yield return Frames(5);
+            arena.TestSkipTime(WaveDirector.CountdownSeconds + 0.1f);
+            foreach (EnemySpec spec in EnemySpec.All)
+                if (spec.Kind != EnemyKind.Boss)
+                    arena.TestSpawn(spec.Kind);
+            // Long enough for everyone to walk in and attack a couple of times (lasers, punches, missiles, dashes).
+            yield return new WaitForSecondsRealtime(9f);
+            Assert.That(arena.TestEnemyCount, Is.GreaterThan(0));
+            Assert.That(crashes, Is.Empty, string.Join("\n\n", crashes));
+        }
+
+        [UnityTest]
+        public IEnumerator TheBossRunsItsWholeRoutine()
+        {
+            SceneManager.LoadScene("Main");
+            yield return Frames(30);
+            var arena = Object.FindAnyObjectByType<Arena>();
+            arena.TestStart(CharacterId.Technoman);
+            arena.TestGod(true);
+            yield return Frames(5);
+            arena.TestSkipTime(WaveDirector.CountdownSeconds + 0.1f);
+            Enemy boss = arena.TestSpawn(EnemyKind.Boss);
+            Assert.That(boss.IsBoss, Is.True);
+            // Fans, strikes, missiles and (after a hit below 60%) the call for help: about 15 s for one loop.
+            yield return new WaitForSecondsRealtime(8f);
+            arena.TestHurt(boss, boss.MaxHp * 0.5f);
+            yield return new WaitForSecondsRealtime(12f);
+            Assert.That(boss != null && boss.Alive, Is.True, "the boss died on its own");
+            Assert.That(arena.TestBossBarShown, Is.True, "no boss bar on the HUD");
+            Assert.That(crashes, Is.Empty, string.Join("\n\n", crashes));
+        }
+
+        [UnityTest]
         public IEnumerator SpiderWebsAnEnemyAndFlingsIt()
         {
             SceneManager.LoadScene("Main");
@@ -112,9 +152,9 @@ namespace Repulsor.Tests
             yield return Frames(5);
             Assert.That(arena.TestPracticeState(), Does.StartWith("True KiFighter 3 Repulsor"));
 
-            arena.TestOpenLab(5);   // enemies: a robot and a drone in the picked models
+            arena.TestOpenLab(5);   // enemies: the whole roster, each in its own model
             yield return new WaitForSecondsRealtime(Enemy.SpawnSeconds + 0.5f);
-            Assert.That(arena.TestLabEnemyLooks(), Does.Match(@"^Look \w+, Look \w+$"));
+            Assert.That(arena.TestLabEnemyLooks(), Does.Match(@"^Look \w+(, Look \w+){" + (EnemySpec.All.Length - 1) + "}$"));
 
             arena.TestLeaveLab();
             yield return Frames(5);

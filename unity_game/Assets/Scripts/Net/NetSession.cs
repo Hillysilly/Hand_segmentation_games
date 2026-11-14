@@ -41,7 +41,7 @@ namespace Repulsor
         public event Action<ShotEvent> ShotReceived;
         public event Action<WaveNet, List<EnemyNet>> EnemiesReceived;
         public event Action<ushort, float> EnemyHitReceived;
-        public event Action<Vector3, Vector3> EnemyBoltReceived;
+        public event Action<byte, Vector3, Vector3> EnemyBoltReceived;
         public event Action<bool> EndReceived;
         public event Action<float> PlayerHitReceived;
         public event Action<byte, byte, byte, byte, bool> RoundReceived;
@@ -235,8 +235,8 @@ namespace Repulsor
                     EnemyHitReceived?.Invoke(id, damage);
                     return true;
                 case NetMessage.EnemyBolt when Role == NetRole.Client:
-                    NetProtocol.ReadEnemyBolt(reader, out Vector3 origin, out Vector3 direction);
-                    EnemyBoltReceived?.Invoke(origin, direction);
+                    NetProtocol.ReadEnemyBolt(reader, out byte shot, out Vector3 origin, out Vector3 direction);
+                    EnemyBoltReceived?.Invoke(shot, origin, direction);
                     return true;
                 case NetMessage.PlayerHit:
                     PlayerHitReceived?.Invoke(reader.ReadSingle());
@@ -263,10 +263,10 @@ namespace Repulsor
                 Send(NetProtocol.EnemyHit(id, damage));
         }
 
-        public void SendEnemyBolt(Vector3 origin, Vector3 direction)
+        public void SendEnemyBolt(byte shot, Vector3 origin, Vector3 direction)
         {
             if (Connected)
-                Send(NetProtocol.EnemyBolt(origin, direction));
+                Send(NetProtocol.EnemyBolt(shot, origin, direction));
         }
 
         public void SendPlayerHit(float damage)

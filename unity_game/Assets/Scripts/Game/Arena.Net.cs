@@ -42,6 +42,9 @@ namespace Repulsor
         bool RemoteOut => !Multiplayer || !net.Connected || !remote.Visible || (remote.Latest.Dead && remote.Latest.Lives == 0);
 
         /// <summary>Whichever player's head is nearest, for enemies to go after.</summary>
+        /// <summary>The nearest player's chest, for aiming at bodies rather than heads.</summary>
+        public Vector3 NearestPlayerChest(Vector3 from) => NearestPlayerHead(from) + Vector3.down * 0.3f;
+
         public Vector3 NearestPlayerHead(Vector3 from)
         {
             Vector3 mine = head.position;
@@ -210,15 +213,15 @@ namespace Repulsor
             };
             net.EnemiesReceived += OnEnemies;
             net.EnemyHitReceived += OnEnemyHit;
-            net.EnemyBoltReceived += (origin, direction) =>
+            net.EnemyBoltReceived += (shot, origin, other) =>
             {
                 if (phase != Phase.Playing)
                     return;
-                Vector3 from = frame.ToWorld(origin);
-                Vector3 aim = frame.DirectionToWorld(direction);
-                float range = game.Room.TryDistance(from, aim, out float wall) ? wall : 12f;
-                EnemyBolt.Launch(from, aim, range, this, head, foes);
-                game.PlayAt(from, enemyShotSound);
+                var kind = (EnemyShot)shot;
+                Vector3 a = frame.ToWorld(origin);
+                // Lasers send a direction; missiles a target point; strikes only their own point.
+                Vector3 b = ShotSendsDirection(kind) ? frame.DirectionToWorld(other) : frame.ToWorld(other);
+                StartShot(kind, a, b, null);
             };
             net.EndReceived += won =>
             {

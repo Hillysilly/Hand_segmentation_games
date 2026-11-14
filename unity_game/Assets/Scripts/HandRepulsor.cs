@@ -43,6 +43,8 @@ namespace Repulsor
         const float LaserBlockSeconds = 0.4f;
         Flamethrower flames;
 
+        /// <summary>This hand's laser, to copy for other beams (enemies use the same look in red).</summary>
+        public LaserBeamView Beam => laserBeam;
         public bool IsTracked { get; private set; }
         public bool IsOpen => IsTracked && gesture == HandGesture.Open;
         public Vector3 PalmPosition { get; private set; }

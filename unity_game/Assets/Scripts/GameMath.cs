@@ -19,6 +19,72 @@ namespace Repulsor
         }
 
         /// <summary>
+        /// The closest points between segment p0-p1 and segment q0-q1, as fractions along each (0 to 1).
+        /// Standard clamped closest-approach of two segments.
+        /// </summary>
+        public static void ClosestOnSegments(Vector3 p0, Vector3 p1, Vector3 q0, Vector3 q1, out float s, out float t)
+        {
+            Vector3 d1 = p1 - p0;
+            Vector3 d2 = q1 - q0;
+            Vector3 r = p0 - q0;
+            float a = d1.sqrMagnitude;
+            float e = d2.sqrMagnitude;
+            float f = Vector3.Dot(d2, r);
+            if (a <= 1e-9f && e <= 1e-9f)
+            {
+                s = t = 0f;
+                return;
+            }
+            if (a <= 1e-9f)
+            {
+                s = 0f;
+                t = Mathf.Clamp01(f / e);
+                return;
+            }
+            float c = Vector3.Dot(d1, r);
+            if (e <= 1e-9f)
+            {
+                t = 0f;
+                s = Mathf.Clamp01(-c / a);
+                return;
+            }
+            float b = Vector3.Dot(d1, d2);
+            float denom = a * e - b * b;
+            s = denom > 1e-9f ? Mathf.Clamp01((b * f - c * e) / denom) : 0f;
+            t = (b * s + f) / e;
+            if (t < 0f)
+            {
+                t = 0f;
+                s = Mathf.Clamp01(-c / a);
+            }
+            else if (t > 1f)
+            {
+                t = 1f;
+                s = Mathf.Clamp01((b - c) / a);
+            }
+        }
+
+        /// <summary>True if a sphere moving from <paramref name="from"/> to <paramref name="to"/> touches a capsule.</summary>
+        public static bool SegmentHitsCapsule(Vector3 from, Vector3 to, Vector3 bottom, Vector3 top, float radius)
+        {
+            ClosestOnSegments(from, to, bottom, top, out float s, out float t);
+            Vector3 a = from + (to - from) * s;
+            Vector3 b = bottom + (top - bottom) * t;
+            return (a - b).sqrMagnitude <= radius * radius;
+        }
+
+        /// <summary>
+        /// Distance along a ray (normalized direction, up to <paramref name="reach"/>) to where it enters a capsule.
+        /// Close enough for game hits: the entry point is measured against the nearest point of the capsule's axis.
+        /// </summary>
+        public static bool RayHitsCapsule(Vector3 start, Vector3 direction, float reach, Vector3 bottom, Vector3 top, float radius, out float distance)
+        {
+            ClosestOnSegments(start, start + direction * reach, bottom, top, out float s, out float t);
+            Vector3 axisPoint = bottom + (top - bottom) * t;
+            return RayHitsSphere(start, direction, axisPoint, radius, out distance);
+        }
+
+        /// <summary>
         /// Distance along a ray (with a normalized direction) to where it enters a sphere.
         /// False if it misses, or the sphere is behind the start.
         /// </summary>

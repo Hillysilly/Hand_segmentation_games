@@ -435,7 +435,7 @@ Transform:
   m_GameObject: {fileID: 3717968453109126135}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.087, y: 0.533, z: 0.17}
+  m_LocalPosition: {x: 0.0928, y: 0.56853336, z: 0.18133335}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -453,7 +453,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0dc0805a08bd6a746aa28c3f03b142b3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Repulsor.Game::Repulsor.EnemyEye
-  Size: 0.11
+  Size: 0.11733334
 --- !u!1 &4015625497051086410
 GameObject:
   m_ObjectHideFlags: 0
@@ -512,7 +512,7 @@ Transform:
   m_GameObject: {fileID: 4030890562982117373}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.2, y: 0.533, z: 0.17}
+  m_LocalPosition: {x: -0.21333335, y: 0.56853336, z: 0.18133335}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -530,7 +530,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0dc0805a08bd6a746aa28c3f03b142b3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Repulsor.Game::Repulsor.EnemyEye
-  Size: 0.11
+  Size: 0.11733334
 --- !u!1 &4044248740381468960
 GameObject:
   m_ObjectHideFlags: 0
@@ -620,8 +620,8 @@ Transform:
   m_GameObject: {fileID: 4209340029304496888}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.00069767237, y: 0.007363647, z: -0.08860153}
-  m_LocalScale: {x: 0.61171204, y: 0.61171204, z: 0.61171204}
+  m_LocalPosition: {x: 0.0007442236, y: 0.007854462, z: -0.09450829}
+  m_LocalScale: {x: 0.6524929, y: 0.6524929, z: 0.6524929}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 326789050611633114}
@@ -648,6 +648,9 @@ Animation:
   - {fileID: -5181486892397411127, guid: 6e70742c2277717449af8db865ed493e, type: 3}
   - {fileID: 3922875575015971284, guid: 6e70742c2277717449af8db865ed493e, type: 3}
   - {fileID: -7264356326966739861, guid: 6e70742c2277717449af8db865ed493e, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
   m_WrapMode: 2

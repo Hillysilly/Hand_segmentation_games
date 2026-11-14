@@ -119,6 +119,16 @@ namespace Repulsor
             return ball;
         }
 
+        /// <summary>A copy of the hand laser's beam (ribbon, glow, burst), tinted, for enemy lasers and strikes.</summary>
+        public LaserBeamView MakeLaserBeam(Transform parent, Color color)
+        {
+            LaserBeamView beam = Instantiate(leftHand.Beam, parent);
+            beam.transform.localPosition = Vector3.zero;
+            beam.Silence();
+            Tint.Apply(beam.gameObject, color);
+            return beam;
+        }
+
         /// <summary>Any shot built on the comet: size and speed multiply the repulsor's, damage and blast radius are set.</summary>
         public Blast FireBlast(Vector3 position, Vector3 direction, float charge, float size, float speed, float damage, float aoe)
             => FireBlast(position, direction, charge, size, speed, damage, aoe, WeaponColor);
@@ -149,7 +159,7 @@ namespace Repulsor
                     continue;
                 IHittable target = all[i];
                 if (target.Alive && target.Team == Team.Enemies && !already.Contains(target)
-                    && GameMath.SegmentHitsSphere(from, to, target.Center, target.Radius + blastRadius))
+                    && HitTest.Segment(target, from, to, blastRadius))
                 {
                     already.Add(target);
                     Strike(target, damage, from, "Arrow");
@@ -174,7 +184,7 @@ namespace Repulsor
                     continue;
                 IHittable target = all[i];
                 if (target.Alive && target.Team == Team.Enemies
-                    && Vector3.Distance(target.Center, center) < radius + target.Radius)
+                    && HitTest.Within(target, center, radius))
                     Strike(target, damage, center, "Explosion");
             }
         }
@@ -475,7 +485,7 @@ namespace Repulsor
             {
                 IHittable target = all[i];
                 if (target.Alive && target.Team == Team.Enemies
-                    && GameMath.SegmentHitsSphere(from, to, target.Center, target.Radius + blastRadius))
+                    && HitTest.Segment(target, from, to, blastRadius))
                 {
                     Strike(target, damage, from, "Repulsor");
                     return true;
@@ -495,7 +505,7 @@ namespace Repulsor
                 IHittable target = all[i];
                 if (target.Alive && target.Team == Team.Enemies && !alreadyHit.Contains(target)
                     && GameMath.ConeReaches(origin, direction, Shockwave.StartRadius, Shockwave.HalfAngleDegrees,
-                        travelled, target.Center, target.Radius))
+                        travelled, HitTest.Nearest(target, origin + direction * travelled), target.Radius))
                 {
                     alreadyHit.Add(target);
                     Strike(target, Damage.Shockwave, origin, "Shockwave");
@@ -514,7 +524,7 @@ namespace Repulsor
             {
                 IHittable target = all[i];
                 if (target.Alive && target.Team == Team.Enemies
-                    && GameMath.RayHitsSphere(start, direction, target.Center, target.Radius + LaserRadius, out float distance)
+                    && HitTest.Ray(target, start, direction, reach, LaserRadius, out float distance)
                     && distance < length)
                 {
                     nearest = target;

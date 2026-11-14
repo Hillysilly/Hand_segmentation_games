@@ -225,10 +225,10 @@ namespace Repulsor.Tests
         }
 
         [Test]
-        public void BreaksAfterThreeSecondsOfHolding()
+        public void BreaksAfterAFullGaugeOfHolding()
         {
             var shield = new ShieldGauge();
-            Run(shield, true, 2.9f);
+            Run(shield, true, ShieldGauge.HoldSeconds - 0.1f);
             Assert.That(shield.Up, Is.True);
             Run(shield, true, 0.2f);
             Assert.That(shield.Up, Is.False);
@@ -239,7 +239,7 @@ namespace Repulsor.Tests
         public void StaysDownForTheCooldownThenComesBackFull()
         {
             var shield = new ShieldGauge();
-            Run(shield, true, 3.1f);
+            Run(shield, true, ShieldGauge.HoldSeconds + 0.1f);
             Run(shield, true, ShieldGauge.BreakCooldown - 0.2f);
             Assert.That(shield.Up, Is.False);
             Run(shield, false, 0.3f);
@@ -261,7 +261,7 @@ namespace Repulsor.Tests
         public void NeedsSomeGaugeToGoUpAgain()
         {
             var shield = new ShieldGauge();
-            Run(shield, true, 2.85f);
+            Run(shield, true, ShieldGauge.HoldSeconds - 0.15f);
             Run(shield, false, 0.1f);
             Run(shield, true, Frame);
             Assert.That(shield.Up, Is.False);
@@ -324,7 +324,53 @@ namespace Repulsor.Tests
             var waves = new WaveDirector(2);
             Run(waves, 120f, true);
             Assert.That(waves.State, Is.EqualTo(WaveState.Won));
-            Assert.That(waves.Kills, Is.EqualTo(WaveDirector.EnemiesInWave(1) + WaveDirector.EnemiesInWave(2)));
+            // The second (last) wave is the boss on its own.
+            Assert.That(waves.Kills, Is.EqualTo(WaveDirector.EnemiesInWave(1) + 1));
+        }
+
+        [Test]
+        public void TheLastWaveIsTheBoss()
+        {
+            var waves = new WaveDirector(3, 3);
+            Assert.That(waves.BossWave, Is.False, "not during the countdown");
+            Run(waves, WaveDirector.CountdownSeconds + 0.1f, false);
+            Assert.That(waves.Wave, Is.EqualTo(3));
+            Assert.That(waves.BossWave, Is.True);
+            Assert.That(waves.ToSpawn + waves.Alive, Is.EqualTo(1));
+            // Its helpers count toward the wave, so it isn't won while they're up.
+            waves.AddExtra();
+            waves.AddExtra();
+            waves.EnemyKilled();
+            waves.Tick(0.1f);
+            Assert.That(waves.State, Is.EqualTo(WaveState.Fighting));
+        }
+
+        [Test]
+        public void EarlyWavesOnlySendTheSimpleRobots()
+        {
+            for (double roll = 0; roll < 1; roll += 0.01)
+            {
+                EnemyKind kind = WavePlan.KindFor(1, roll);
+                Assert.That(kind == EnemyKind.Robot || kind == EnemyKind.Drone, $"{kind} in wave 1");
+                Assert.That(WavePlan.KindFor(5, roll), Is.Not.EqualTo(EnemyKind.Boss));
+            }
+            var seen = new System.Collections.Generic.HashSet<EnemyKind>();
+            for (double roll = 0; roll < 1; roll += 0.005)
+                seen.Add(WavePlan.KindFor(4, roll));
+            Assert.That(seen, Is.EquivalentTo(new[] { EnemyKind.Robot, EnemyKind.Drone, EnemyKind.Brawler, EnemyKind.Dasher,
+                EnemyKind.Rocketeer, EnemyKind.Sniper, EnemyKind.Tank }));
+        }
+
+        [Test]
+        public void EveryEnemyKindHasASpecInOrder()
+        {
+            Assert.That(EnemySpec.All.Length, Is.EqualTo(System.Enum.GetValues(typeof(EnemyKind)).Length));
+            for (int i = 0; i < EnemySpec.All.Length; i++)
+            {
+                Assert.That((int)EnemySpec.All[i].Kind, Is.EqualTo(i));
+                Assert.That(EnemySpec.All[i].Radius * 2f, Is.LessThanOrEqualTo(EnemySpec.All[i].Height + 0.01f), EnemySpec.All[i].Name);
+            }
+            Assert.That(EnemySpec.Of(EnemyKind.Boss).Height, Is.InRange(2.1f, 2.45f), "7 to 8 feet");
         }
 
         [Test]

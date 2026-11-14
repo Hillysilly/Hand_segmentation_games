@@ -49,7 +49,7 @@ namespace Repulsor
     /// <summary>Your shield: a bubble around your upper body that pops up while you hold the X.</summary>
     public sealed class ShieldView
     {
-        const float Radius = 0.62f;
+        public const float Radius = 0.62f;
         const float GrowSpeed = 8f;
         const float HitFade = 4f;
 
@@ -64,6 +64,15 @@ namespace Repulsor
 
         public void Flash() => hit = 1f;
 
+        float shatter;
+
+        /// <summary>Breaking: a bright flash as it bursts outward and vanishes.</summary>
+        public void Shatter()
+        {
+            shatter = 1f;
+            hit = 1f;
+        }
+
         public void Tick(bool up, Vector3 head, Color color, BubbleStyle style, float dt) =>
             Tick(up, head, Vector3.zero, color, style, dt);
 
@@ -75,7 +84,15 @@ namespace Repulsor
         {
             shown = Mathf.MoveTowards(shown, up ? 1f : 0f, GrowSpeed * dt);
             hit = Mathf.Max(0f, hit - HitFade * dt);
+            shatter = Mathf.Max(0f, shatter - 2.5f * dt);
             float eased = 1f - (1f - shown) * (1f - shown);
+            if (shatter > 0f)
+            {
+                // Bursts outward and fades instead of shrinking away.
+                Place(bubble.transform, head, facing, 1f + (1f - shatter) * 0.6f);
+                bubble.Show(Color.Lerp(color, Color.white, 0.5f), style, shatter, 1f, Occlude);
+                return;
+            }
             Place(bubble.transform, head, facing, Mathf.Lerp(0.6f, 1f, eased));
             bubble.Show(color, style, eased, hit, Occlude);
         }

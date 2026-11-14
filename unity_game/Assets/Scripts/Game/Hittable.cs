@@ -20,6 +20,47 @@ namespace Repulsor
         Vector3 BarPoint { get; }
     }
 
+    /// <summary>
+    /// A hittable shaped like a standing capsule (robots, the boss) rather than a ball: <see cref="IHittable.Radius"/> is
+    /// the capsule's radius and these are the ends of its axis. Hit tests go through <see cref="HitTest"/>.
+    /// </summary>
+    public interface ITallHittable : IHittable
+    {
+        Vector3 Bottom { get; }
+        Vector3 Top { get; }
+    }
+
+    /// <summary>Hit tests against a hittable's real shape: a ball, or a capsule for tall ones.</summary>
+    public static class HitTest
+    {
+        /// <summary>A sphere of radius <paramref name="extra"/> moving from one point to another touches it.</summary>
+        public static bool Segment(IHittable target, Vector3 from, Vector3 to, float extra) =>
+            target is ITallHittable tall
+                ? GameMath.SegmentHitsCapsule(from, to, tall.Bottom, tall.Top, target.Radius + extra)
+                : GameMath.SegmentHitsSphere(from, to, target.Center, target.Radius + extra);
+
+        /// <summary>Where a ray (normalized direction) of thickness <paramref name="extra"/> first touches it.</summary>
+        public static bool Ray(IHittable target, Vector3 start, Vector3 direction, float reach, float extra, out float distance) =>
+            target is ITallHittable tall
+                ? GameMath.RayHitsCapsule(start, direction, reach, tall.Bottom, tall.Top, target.Radius + extra, out distance)
+                : GameMath.RayHitsSphere(start, direction, target.Center, target.Radius + extra, out distance);
+
+        /// <summary>The point of its body (centre line) nearest to a point: for blasts, aim and cones.</summary>
+        public static Vector3 Nearest(IHittable target, Vector3 point)
+        {
+            if (!(target is ITallHittable tall))
+                return target.Center;
+            Vector3 axis = tall.Top - tall.Bottom;
+            float lengthSquared = axis.sqrMagnitude;
+            float t = lengthSquared > 1e-6f ? Mathf.Clamp01(Vector3.Dot(point - tall.Bottom, axis) / lengthSquared) : 0f;
+            return tall.Bottom + axis * t;
+        }
+
+        /// <summary>Its body comes within <paramref name="radius"/> of a point.</summary>
+        public static bool Within(IHittable target, Vector3 point, float radius) =>
+            Vector3.Distance(Nearest(target, point), point) < radius + target.Radius;
+    }
+
     /// <summary>Everything that can currently be hit. Hittables add themselves while enabled.</summary>
     public static class Hittables
     {

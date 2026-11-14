@@ -15,6 +15,18 @@ Assets/Enemies/ClassicRobot (Robot)
   Animated LowPoly Robot by Quaternius, CC0 1.0.
   https://opengameart.org/content/animated-lowpoly-robot
 
-Assets/Enemies/SciFiKit (Enemy_QuadShell, Enemy_EyeDrone and their textures)
+Assets/Enemies/SciFiKit (Enemy_QuadShell, Enemy_EyeDrone, Enemy_Trilobite (the boss) and their textures)
   Sci-Fi Essentials Kit (free version) by Quaternius, CC0 1.0.
   https://opengameart.org/content/sci-fi-essentials-kit
+
+Assets/Props/Weapons/Quaternius (bows, arrow, heater shields)
+  LowPoly Medieval Weapons by Quaternius, CC0 1.0.
+  https://opengameart.org/node/88080
+
+Assets/Props/Weapons/KayKit (crossbows, arrow, rogue_texture.png)
+  KayKit Character Pack: Adventurers by Kay Lousberg (www.kaylousberg.com), CC0 1.0.
+  https://kaylousberg.itch.io/kaykit-adventurers
+
+Assets/Props/Rocks (rocks and stones)
+  Nature Kit by Kenney (www.kenney.nl), CC0 1.0.
+  https://opengameart.org/content/nature-kit

@@ -8,9 +8,9 @@ namespace Repulsor
     /// </summary>
     public sealed class ShieldGauge
     {
-        public const float HoldSeconds = 3f;          // a full gauge lasts this long
-        public const float BreakCooldown = 6f;
-        public const float RechargePerSecond = 0.5f;  // seconds of hold regained per second
+        public const float HoldSeconds = 5f;          // a full gauge lasts this long
+        public const float BreakCooldown = 4f;
+        public const float RechargePerSecond = 0.8f;  // seconds of hold regained per second
         public const float MinToRaise = 0.3f;         // seconds of hold needed to put it up again
 
         bool wanted;

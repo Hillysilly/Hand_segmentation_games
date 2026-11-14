@@ -90,7 +90,7 @@ Transform:
   m_GameObject: {fileID: 223978095406375099}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.0022091721, y: 0.0039173826, z: 0.0053424337}
+  m_LocalPosition: {x: 0.0022091712, y: 0.0039173877, z: 0.0053424337}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -108,7 +108,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0dc0805a08bd6a746aa28c3f03b142b3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Repulsor.Game::Repulsor.EnemyEye
-  Size: 0.085
+  Size: 0.08826923
 --- !u!1 &238368897959818611
 GameObject:
   m_ObjectHideFlags: 0
@@ -1070,7 +1070,7 @@ Transform:
   m_GameObject: {fileID: 3949567172911744249}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.0025197235, y: 0.003590883, z: 0.0046810354}
+  m_LocalPosition: {x: -0.0025197244, y: 0.0035908893, z: 0.004681035}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1088,7 +1088,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0dc0805a08bd6a746aa28c3f03b142b3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Repulsor.Game::Repulsor.EnemyEye
-  Size: 0.085
+  Size: 0.08826923
 --- !u!1 &4007916372861623266
 GameObject:
   m_ObjectHideFlags: 0
@@ -1210,8 +1210,8 @@ Transform:
   m_GameObject: {fileID: 5015394109522952143}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.00025758147, y: -0.01247865, z: -0.02042386}
-  m_LocalScale: {x: 0.24445927, y: 0.24445927, z: 0.24445927}
+  m_LocalPosition: {x: 0.00026750565, y: -0.012958586, z: -0.021209478}
+  m_LocalScale: {x: 0.25386155, y: 0.25386155, z: 0.25386155}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 5232487022692498663}
@@ -1265,6 +1265,9 @@ Animation:
   - {fileID: 3124539885581274750, guid: c2ad17d674e1193428c1f3ca1d6ecd36, type: 3}
   - {fileID: 2974835886356173238, guid: c2ad17d674e1193428c1f3ca1d6ecd36, type: 3}
   - {fileID: 3085827095450492783, guid: c2ad17d674e1193428c1f3ca1d6ecd36, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}

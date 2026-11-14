@@ -34,9 +34,13 @@ namespace Repulsor.EditorTools
             /// <summary>Where the glowing eyes go, in metres in the finished prefab (it faces +Z, feet or middle at 0).</summary>
             public Vector3[] Eyes = new Vector3[0];
             public float EyeSize = 0.07f;
-            /// <summary>Robots: how tall it stands.</summary>
-            public float Height = 1.3f;
+            /// <summary>Robots: how tall it stands. Taken from the enemy kind that uses this model.</summary>
+            public float Height => EnemySpecFor(Key)?.Height ?? 1.3f;
+            /// <summary>The height the eye positions were measured at; they scale with the real height.</summary>
+            public float EyeHeight = 1.3f;
         }
+
+        static EnemySpec EnemySpecFor(string key) => System.Array.Find(EnemySpec.All, spec => spec.Model == key);
 
         static readonly Entry[] Entries =
         {
@@ -51,12 +55,15 @@ namespace Repulsor.EditorTools
                 Eyes = new[] { new Vector3(0.047f, 1.223f, 0.085f), new Vector3(-0.067f, 1.223f, 0.085f) }, EyeSize = 0.09f },
             new Entry { Key = "Classic", Model = "Assets/Enemies/ClassicRobot/Robot.fbx",
                 Eyes = new[] { new Vector3(0.215f, 1.047f, 0.36f), new Vector3(-0.203f, 1.04f, 0.36f) }, EyeSize = 0.26f },
-            new Entry { Key = "QuadShell", Model = Kit + "Enemy_QuadShell.fbx", Height = 0.75f, Texture = Kit + "Textures/T_Enemies_Large_BaseColor.png",
+            new Entry { Key = "QuadShell", Model = Kit + "Enemy_QuadShell.fbx", EyeHeight = 0.75f, Texture = Kit + "Textures/T_Enemies_Large_BaseColor.png",
                 Emissive = Kit + "Textures/T_Enemies_Large_Emissive.png",
                 Eyes = new[] { new Vector3(0.087f, 0.533f, 0.17f), new Vector3(-0.2f, 0.533f, 0.17f) }, EyeSize = 0.11f },
             new Entry { Key = "EyeDrone", Model = Kit + "Enemy_EyeDrone.fbx", Drone = true, Texture = Kit + "Textures/T_Enemies_BaseColor.png",
                 Emissive = Kit + "Textures/T_Enemies_Emissive.png",
-                Eyes = new[] { new Vector3(0f, 0f, 0.2f) }, EyeSize = 0.17f },
+                Eyes = new[] { new Vector3(0f, 0f, 0.2f) }, EyeSize = 0.17f, EyeHeight = 0.4f },
+            // The boss: the sci-fi kit's four-legged walker with twin cannons, scaled up to 2.3 m.
+            new Entry { Key = "Trilobite", Model = Kit + "Enemy_Trilobite.fbx", Texture = Kit + "Textures/T_Enemies_Large_BaseColor.png",
+                Emissive = Kit + "Textures/T_Enemies_Large_Emissive.png", EyeHeight = 2.3f },
         };
 
         /// <summary>Drones are this wide.</summary>
@@ -87,7 +94,7 @@ namespace Repulsor.EditorTools
             var eye = new GameObject("Viewer").transform;
             FxSpin.Eye = eye;
 
-            float spacing = 1.1f;
+            float spacing = 1.6f;
             for (int i = 0; i < Entries.Length; i++)
             {
                 Entry entry = Entries[i];
@@ -110,7 +117,7 @@ namespace Repulsor.EditorTools
             for (int i = 0; i < count; i++)
             {
                 float x = (i - (count - 1) * 0.5f) * spacing;
-                float y = Entries[i].Drone ? 0.9f : Entries[i].Height - 0.25f;
+                float y = Entries[i].Drone ? 0.9f : Entries[i].Height - 0.25f * Entries[i].Height / 1.3f;
                 Vector3 at = new Vector3(x, y, 0f);
                 foreach (FxSpin spin in Object.FindObjectsByType<FxSpin>())
                     spin.Tick(0f);
@@ -188,7 +195,10 @@ namespace Repulsor.EditorTools
                 .Where(c => !c.name.StartsWith("__preview")).ToArray();
             AnimationClip walk = Clip(clips, "Walk", "Robot_Walking");
             AnimationClip idle = Clip(clips, "Idle", "Robot_Idle");
-            AnimationClip shoot = Clip(clips, "Shoot", "Robot_Punch");
+            AnimationClip shoot = Clip(clips, "Shoot", "Robot_Punch", "Attack");
+            AnimationClip run = Clip(clips, "Run", "Robot_Running");
+            AnimationClip attack = Clip(clips, "AttackAuto", "Kick");
+            AnimationClip hit = Clip(clips, "Hit", "HitRecieve_1");
 
             var root = new GameObject("Enemy " + entry.Key);
             var model = (GameObject)PrefabUtility.InstantiatePrefab(source);
@@ -231,6 +241,12 @@ namespace Repulsor.EditorTools
                     animation.AddClip(idle, "idle");
                 if (shoot != null)
                     animation.AddClip(shoot, "shoot");
+                if (run != null)
+                    animation.AddClip(run, "run");
+                if (attack != null)
+                    animation.AddClip(attack, "attack");
+                if (hit != null)
+                    animation.AddClip(hit, "hit");
                 animation.clip = walk != null ? walk : idle;
                 animation.playAutomatically = true;
                 animation.wrapMode = WrapMode.Loop;
@@ -243,8 +259,9 @@ namespace Repulsor.EditorTools
             {
                 var marker = new GameObject("Eye " + i).transform;
                 marker.SetParent(head != null ? head : root.transform, false);
-                marker.position = root.transform.TransformPoint(entry.Eyes[i]);
-                marker.gameObject.AddComponent<EnemyEye>().Size = entry.EyeSize;
+                float eyeScale = entry.Drone ? 1f : entry.Height / entry.EyeHeight;
+                marker.position = root.transform.TransformPoint(entry.Eyes[i] * eyeScale);
+                marker.gameObject.AddComponent<EnemyEye>().Size = entry.EyeSize * eyeScale;
             }
 
             PrefabUtility.SaveAsPrefabAsset(root, $"{OutFolder}/{entry.Key}.prefab");
@@ -362,11 +379,19 @@ namespace Repulsor.EditorTools
         public static void Inspect()
         {
             var log = new StringBuilder();
-            foreach (string path in AssetDatabase.FindAssets("t:Model", new[] { "Assets/Enemies" }).Select(AssetDatabase.GUIDToAssetPath))
+            foreach (string path in AssetDatabase.FindAssets("t:Model", new[] { "Assets/Enemies", "Assets/Props" }).Select(AssetDatabase.GUIDToAssetPath))
             {
                 MakeLegacy(path);
                 var go = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(path));
                 log.AppendLine($"== {path}");
+                var size = new Bounds();
+                bool first = true;
+                foreach (Renderer r in go.GetComponentsInChildren<Renderer>(true))
+                {
+                    if (first) size = r.bounds; else size.Encapsulate(r.bounds);
+                    first = false;
+                }
+                log.AppendLine($"  bounds centre {size.center} size {size.size} (renderer bounds, rough for skinned)");
                 foreach (Renderer r in go.GetComponentsInChildren<Renderer>(true))
                     foreach (Material m in r.sharedMaterials)
                         log.AppendLine($"  {r.name}: material {(m != null ? m.name : "null")}");

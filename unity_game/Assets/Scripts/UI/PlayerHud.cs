@@ -22,6 +22,7 @@ namespace Repulsor
         /// <summary>Where the panel sits: 0 low right, 1 low centre, 2 top centre (like a fighting game).</summary>
         public int Layout { get; set; } = Mathf.Clamp(PlayerPrefs.GetInt("variant.hud", 0), 0, 2);
         static readonly Vector3 MessageOffset = new Vector3(0f, 0.06f, 1.3f);
+        static readonly Vector3 BossOffset = new Vector3(0f, 0.27f, 0.95f);
         const float FollowSpeed = 4f;
         const int MaxLifeIcons = 5;
 
@@ -56,6 +57,23 @@ namespace Repulsor
 
         Text partnerText;
         Bar partnerBar;
+        readonly RectTransform bossPanel;
+        readonly Text bossText;
+        readonly Bar bossBar;
+
+        public bool BossShown => bossPanel.gameObject.activeSelf;
+
+        /// <summary>The boss's health across the top of your view; null hides it.</summary>
+        public void Boss(string name, float fraction)
+        {
+            bool show = name != null;
+            if (bossPanel.gameObject.activeSelf != show)
+                bossPanel.gameObject.SetActive(show);
+            if (!show)
+                return;
+            bossText.text = name;
+            bossBar.Fraction = fraction;
+        }
 
         /// <summary>Co-op: the other player's name and health under your own bars. Null hides it.</summary>
         public void Partner(string name, float fraction)
@@ -100,6 +118,14 @@ namespace Repulsor
             bigText = Ui.Label(message, "", new Vector2(0f, 30f), new Vector2(700f, 120f), 90, TextAnchor.MiddleCenter, FontStyle.Bold);
             smallText = Ui.Label(message, "", new Vector2(0f, -70f), new Vector2(700f, 80f), 30, TextAnchor.MiddleCenter);
             bigText.color = Ui.Accent;
+
+            bossPanel = Ui.Canvas("Boss Bar", parent, new Vector2(520f, 54f));
+            Ui.Box(bossPanel, Vector2.zero, new Vector2(520f, 54f), new Color(0.06f, 0.01f, 0.01f, 0.55f));
+            bossText = Ui.Label(bossPanel, "", new Vector2(0f, 14f), new Vector2(500f, 22f), 16, TextAnchor.MiddleCenter, FontStyle.Bold);
+            bossText.color = new Color(1f, 0.5f, 0.4f);
+            bossBar = Ui.Bar(bossPanel, new Vector2(0f, -10f), new Vector2(500f, 16f), new Color(0.08f, 0.05f, 0.05f, 0.95f), new Color(0.95f, 0.15f, 0.12f));
+            bossBar.Trail = true;
+            bossPanel.gameObject.SetActive(false);
         }
 
         public bool Visible
@@ -189,6 +215,11 @@ namespace Repulsor
         {
             Place(panel, PanelOffsets[Mathf.Clamp(Layout, 0, PanelOffsets.Length - 1)], dt);
             Place(message, MessageOffset, dt);
+            if (bossPanel.gameObject.activeSelf)
+            {
+                Place(bossPanel, BossOffset, dt);
+                bossBar.Tick(dt);
+            }
             placed = true;
         }
 

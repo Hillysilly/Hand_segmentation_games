@@ -149,7 +149,7 @@ namespace Repulsor
                 IHittable other = all[i];
                 if (ReferenceEquals(other, webbed.Enemy) || !other.Alive || other.Team != Team.Enemies || webbed.Hit.Contains(other))
                     continue;
-                if (!GameMath.SegmentHitsSphere(from, to, other.Center, other.Radius + webbed.Enemy.Radius))
+                if (!HitTest.Segment(other, from, to, webbed.Enemy.Radius))
                     continue;
                 webbed.Hit.Add(other);
                 game.Strike(other, damage, to, "Webbed enemy");

@@ -260,6 +260,45 @@ They wil have the current aura which has the star underneath at level 2 and leve
 Transformations:
 Circular, fire shockwave on both transformations
 
+### elementalist
+Name: ???
+Defense: Making an x will make a wind shield
+
+Attacks:
+Level 1:
+Pushing out with a palm will shoot a gust of wind, which pushes enemies back and deals damage
+Level 2:
+Holding hands out flat (like palpatine from star wars) will shoot lighting that chains to enemies, Its a hold attack like the lasers, but after 5 seconds it does away
+Level 3:
+using both hands to make a swirling motion charges a tornado, when the user pushes out with both hands, this shoots the tornado which does damage and sucks enemies together
+
+Visuals:
+pull from online as usual, the idea is to be similar to minecraft's breeze/wind charges, btd6's druid, so pull those images as reference, but obviously fit the theme
+
+
+Transformations:
+at level 2, they get a white aura around them that swirls like a tornado. At level 3, the tornado swirls faster and is denser. 
+
+### Earth inspired
+Name: ???
+Defense: Making an x will make a rock shield
+
+Attacks:
+Level 1:
+Similar charge up attack as the ki blasts, but these will shoot rock orbs. Make them brown with orange/red cracks. Pull a 3d model from online
+Level 2:
+making a fist at around waist level, then quickly raising it above elbow level will make rock spikes pop up from out of the ground, with 3 total, each with a radius of about 1 ft, getting slightly larger and taller as they go
+Level 3:
+Make it so that the rocks stick to enemies it hits, having visible rocks on them. THen, when the player snaps, the rocks explode dealing damage.
+
+
+Visuals:
+try and make similar rock models around the hands, similar to the MCU's thing
+
+Transformations:
+At level 2 the player has a crater aura following them on the ground. At level 3, they get a swirling rock aura made of small rock particles with hints of gold and silver  
+
+
 
 
 ### Summoner

@@ -53,9 +53,10 @@ namespace Repulsor
     /// <summary>Shield: wrists crossed in an X in front of the chest.</summary>
     public sealed class XArmsDetector
     {
-        public static float MaxWristGap = 0.3f;
-        public static float MinCross = 0.02f;
-        readonly HoldTimer hold = new HoldTimer(0.12f, 0.2f);
+        public static float MaxWristGap = 0.36f;
+        public static float MinCross = 0f;
+        // Long dropout grace: tracking often loses one of two crossed hands for a moment.
+        readonly HoldTimer hold = new HoldTimer(0.1f, 0.4f);
 
         public bool Held => hold.On;
 
@@ -68,12 +69,12 @@ namespace Repulsor
                 return false;
             Vector3 l = body.Local(left.Wrist);
             Vector3 r = body.Local(right.Wrist);
-            bool inFront = l.z > 0.05f && r.z > 0.05f && l.z < 0.75f && r.z < 0.75f;
-            bool chestHigh = l.y < 0.1f && r.y < 0.1f && l.y > -0.8f && r.y > -0.8f;
+            bool inFront = l.z > 0f && r.z > 0f && l.z < 0.8f && r.z < 0.8f;
+            bool chestHigh = l.y < 0.2f && r.y < 0.2f && l.y > -0.85f && r.y > -0.85f;
             // The left hand's knuckles end up right of the right hand's.
             float cross = body.Local(left[Joint.MiddleProximal]).x - body.Local(right[Joint.MiddleProximal]).x;
             bool close = Vector3.Distance(left.Wrist, right.Wrist) < MaxWristGap;
-            bool upward = left.Forward.y > -0.3f && right.Forward.y > -0.3f;
+            bool upward = left.Forward.y > -0.45f && right.Forward.y > -0.45f;
             return inFront && chestHigh && close && upward && cross > MinCross;
         }
 

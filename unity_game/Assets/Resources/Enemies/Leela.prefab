@@ -58,7 +58,7 @@ Transform:
   m_GameObject: {fileID: 758896318200642983}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.00008199927, y: -0.0005597577, z: 0.011608901}
+  m_LocalPosition: {x: -0.00008199884, y: -0.00055975374, z: 0.011608902}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -76,7 +76,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0dc0805a08bd6a746aa28c3f03b142b3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Repulsor.Game::Repulsor.EnemyEye
-  Size: 0.16
+  Size: 0.14769231
 --- !u!1 &822081785103446935
 GameObject:
   m_ObjectHideFlags: 0
@@ -679,8 +679,8 @@ Transform:
   m_GameObject: {fileID: 6378357528114809509}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.0007929206, y: 0.0085760355, z: -0.033257067}
-  m_LocalScale: {x: 0.21684925, y: 0.21684925, z: 0.21684925}
+  m_LocalPosition: {x: 0.00073191524, y: 0.007916331, z: -0.030698866}
+  m_LocalScale: {x: 0.20016855, y: 0.20016855, z: 0.20016855}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 7078077720933021481}
@@ -734,6 +734,9 @@ Animation:
   - {fileID: 3124539885581274750, guid: f62d76b83df46514daf4e4652b4c491e, type: 3}
   - {fileID: 4478053178252851585, guid: f62d76b83df46514daf4e4652b4c491e, type: 3}
   - {fileID: 3085827095450492783, guid: f62d76b83df46514daf4e4652b4c491e, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}

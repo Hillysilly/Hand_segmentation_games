@@ -1,0 +1,4 @@
+LowPoly Medieval Weapons (Medieval Weapons Pack - Sept 2018) by Quaternius
+License: CC0 1.0 Universal (public domain)
+Source: https://opengameart.org/node/88080 (also https://quaternius.itch.io/lowpoly-medieval-weapons)
+Used: Bow_Wooden, Bow_Golden, Bow_Evil, Arrow, Shield_Heater, Shield_Heater_2

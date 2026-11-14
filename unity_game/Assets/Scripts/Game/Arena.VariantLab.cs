@@ -175,18 +175,22 @@ namespace Repulsor
             }, 18);
         }
 
-        readonly Enemy[] labEnemies = new Enemy[2];
+        readonly Enemy[] labEnemies = new Enemy[EnemySpec.All.Length];
 
-        /// <summary>Enemy bodies: a row of robot models and a row of drone models, with one of each standing ahead.</summary>
+        /// <summary>Enemy gallery: every kind standing in a row ahead of you, with what each one does.</summary>
         void ShowEnemyLab()
         {
             StopPractice();
             RectTransform s = OpenScreen(new Vector2(580f, 330f), "VARIANT LAB");
             LabTabs(s);
-            Ui.Label(s, "Poke a model; it's saved straight away and the one ahead of you changes.",
+            Ui.Label(s, "Every enemy, left to right. Each kind has its own model now.",
                 new Vector2(0f, 72f), new Vector2(540f, 20f), 12).color = Ui.Muted;
-            EnemyRow(s, "ROBOT", EnemyKind.Robot, EnemyLook.RobotNames, EnemyLook.RobotPickKey, 30f);
-            EnemyRow(s, "DRONE", EnemyKind.Drone, EnemyLook.DroneNames, EnemyLook.DronePickKey, -25f);
+            for (int i = 0; i < EnemySpec.All.Length; i++)
+            {
+                EnemySpec spec = EnemySpec.All[i];
+                Ui.Label(s, $"<b>{spec.Name}</b>  {spec.Blurb}", new Vector2(i < 4 ? -140f : 140f, 45f - (i % 4) * 24f),
+                    new Vector2(270f, 22f), 10, TextAnchor.MiddleLeft).color = Ui.Ink;
+            }
             Ui.Button(s, "BACK", new Vector2(0f, -85f), new Vector2(150f, 44f), () =>
             {
                 HideLabEnemies();
@@ -195,41 +199,25 @@ namespace Repulsor
             ShowLabEnemies();
         }
 
-        void EnemyRow(RectTransform s, string label, EnemyKind kind, string[] names, string key, float y)
-        {
-            Ui.Label(s, label, new Vector2(-250f, y), new Vector2(70f, 20f), 12, TextAnchor.MiddleLeft, FontStyle.Bold).color = Ui.Ink;
-            int picked = EnemyLook.Picked(kind);
-            for (int i = 0; i < names.Length; i++)
-            {
-                int style = i;
-                PokeButton b = Ui.Button(s, names[i], new Vector2(-170f + i * 68f, y), new Vector2(64f, 40f), () =>
-                {
-                    PlayerPrefs.SetInt(key, style);
-                    PlayerPrefs.Save();
-                    Debug.Log($"[Variant] {label}: {names[style]}");
-                    ShowVariantLab();
-                }, 10);
-                b.Selected = i == picked;
-            }
-        }
-
-        /// <summary>A robot and a drone standing still ahead, in the picked looks.</summary>
+        /// <summary>The whole roster standing still in an arc ahead, the boss at the back.</summary>
         void ShowLabEnemies()
         {
             HideLabEnemies();
             Vector3 forward = Ahead(head.forward);
-            Vector3 right = Vector3.Cross(Vector3.up, forward);
-            float distance = 2.2f;
+            float distance = 2.6f;
             if (game.Room.TryDistance(head.position + forward * 0.5f, forward, out float wall))
-                distance = Mathf.Clamp(wall + 0.1f, 1.3f, 2.2f);
-            Vector3 robot = head.position + forward * distance - right * 0.5f;
-            robot.y = FloorY + 0.65f;
-            Vector3 drone = head.position + forward * distance + right * 0.6f;
-            drone.y = head.position.y;
-            labEnemies[0] = Enemy.Spawn(EnemyKind.Robot, robot, this, head, foes);
-            labEnemies[1] = Enemy.Spawn(EnemyKind.Drone, drone, this, head, foes);
-            foreach (Enemy enemy in labEnemies)
-                enemy.Practice = true;
+                distance = Mathf.Clamp(wall + 0.1f, 1.6f, 2.6f);
+            int count = EnemySpec.All.Length - 1;
+            for (int i = 0; i < EnemySpec.All.Length; i++)
+            {
+                EnemySpec spec = EnemySpec.All[i];
+                bool isBoss = spec.Kind == EnemyKind.Boss;
+                float angle = isBoss ? 0f : Mathf.Lerp(-55f, 55f, i / (count - 1f));
+                Vector3 point = head.position + Quaternion.AngleAxis(angle, Vector3.up) * forward * (isBoss ? distance + 1.8f : distance);
+                point.y = spec.Flies ? head.position.y : FloorY + Enemy.MiddleHeight(spec.Kind);
+                labEnemies[i] = Enemy.Spawn(spec.Kind, point, this, head, foes);
+                labEnemies[i].Practice = true;
+            }
         }
 
         void HideLabEnemies()
@@ -350,7 +338,7 @@ namespace Repulsor
             if (game.Room.TryDistance(head.position + forward * 0.5f, forward, out float wall))
                 distance = Mathf.Clamp(wall + 0.1f, 1.5f, 3f);
             Vector3 point = head.position + forward * distance;
-            point.y = FloorY + 0.65f;
+            point.y = FloorY + Enemy.MiddleHeight(EnemyKind.Robot);
             practiceDummy = Enemy.Spawn(EnemyKind.Robot, point, this, head, foes);
             practiceDummy.Practice = true;
             OverheadBar.Attach(practiceDummy, head, foes, false);

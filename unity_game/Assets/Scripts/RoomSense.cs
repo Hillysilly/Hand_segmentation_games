@@ -25,6 +25,8 @@ namespace Repulsor
 
         /// <summary>Furniture boxes from the headset's Space Setup, once the room permission is granted.</summary>
         public ARBoundingBoxManager Boxes { get; private set; }
+        /// <summary>Floor, walls and tables from Space Setup, once the room permission is granted.</summary>
+        public ARPlaneManager Planes { get; private set; }
 
         void Start()
         {
@@ -48,6 +50,8 @@ namespace Repulsor
             occlusion.enabled = true;
             shaderOcclusion.enabled = true;
             Boxes = raycaster.gameObject.AddComponent<ARBoundingBoxManager>();
+            Planes = raycaster.gameObject.AddComponent<ARPlaneManager>();
+            Planes.requestedDetectionMode = PlaneDetectionMode.Horizontal | PlaneDetectionMode.Vertical;
             Debug.Log("[Repulsor] Room sensing on");
         }
 

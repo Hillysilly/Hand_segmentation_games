@@ -4,20 +4,12 @@ namespace Repulsor
 {
     /// <summary>
     /// An enemy's body: one of the CC0 models built into Resources/Enemies (Quaternius mechs, robot and sci-fi kit),
-    /// walking or idling, with glowing red eyes and a white flash when hit. Which model each enemy kind uses is picked
-    /// in the Variant Lab; the last choice is the old placeholder shape.
+    /// walking, running or idling, with glowing red eyes and a white flash when hit. Each enemy kind has its own
+    /// model (<see cref="EnemySpec.Model"/>).
     /// </summary>
     public sealed class EnemyLook : MonoBehaviour
     {
-        public static readonly string[] RobotKeys = { "George", "Leela", "Mike", "Stan", "Classic", "QuadShell", null };
-        public static readonly string[] RobotNames = { "A  GEORGE", "B  LEELA", "C  MIKE", "D  STAN", "E  CLASSIC", "F  SHELL", "G  PILL" };
-        public static readonly string[] DroneKeys = { "EyeDrone", null };
-        public static readonly string[] DroneNames = { "A  EYE DRONE", "B  DISC" };
-        public const string RobotPickKey = "variant.robot";
-        public const string DronePickKey = "variant.drone";
         static readonly Color EyeRed = new Color(1.5f, 0.12f, 0.06f);
-        /// <summary>The robot used until one is picked: Stan, the mech with two big eyes.</summary>
-        const int DefaultRobot = 3;
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
         Renderer[] renderers;
@@ -27,14 +19,6 @@ namespace Repulsor
         bool flashing;
         string playing;
         float shootFor;
-
-        public static int Picked(EnemyKind kind) =>
-            Mathf.Clamp(kind == EnemyKind.Robot ? PlayerPrefs.GetInt(RobotPickKey, DefaultRobot) : PlayerPrefs.GetInt(DronePickKey, 0), 0,
-                (kind == EnemyKind.Robot ? RobotKeys : DroneKeys).Length - 1);
-
-        /// <summary>The model key for an enemy kind's picked look; null for the placeholder shape.</summary>
-        public static string KeyFor(EnemyKind kind, int style) =>
-            (kind == EnemyKind.Robot ? RobotKeys : DroneKeys)[style];
 
         /// <summary>Makes a model's body under <paramref name="parent"/>; null if the key is the placeholder or missing.</summary>
         public static EnemyLook Create(string key, Transform parent)
@@ -64,8 +48,8 @@ namespace Repulsor
             return look;
         }
 
-        /// <summary>Walks while moving, idles when stopped, and shows the hit flash.</summary>
-        public void Tick(float dt, bool walking, float flash)
+        /// <summary>Walks (or runs) while moving, idles when stopped, and shows the hit flash.</summary>
+        public void Tick(float dt, bool walking, bool running, float flash)
         {
             bool flashNow = flash > 0f;
             if (flashNow != flashing)
@@ -79,7 +63,9 @@ namespace Repulsor
             shootFor -= dt;
             if (shootFor > 0f)
                 return;
-            string clip = walking && animation.GetClip("walk") != null ? "walk" : animation.GetClip("idle") != null ? "idle" : "walk";
+            string clip = running && animation.GetClip("run") != null ? "run"
+                : walking && animation.GetClip("walk") != null ? "walk"
+                : animation.GetClip("idle") != null ? "idle" : "walk";
             AnimationState state = animation[clip];
             if (clip != playing && state != null)
             {
@@ -97,15 +83,19 @@ namespace Repulsor
                 clip.SampleAnimation(animation.gameObject, seconds);
         }
 
-        /// <summary>Plays the shooting move, if the model has one.</summary>
-        public void Shoot()
+        /// <summary>Plays the shooting (or punching) move, if the model has one.</summary>
+        public void Shoot() => PlayOnce("shoot");
+
+        /// <summary>Plays one of the model's clips once (shoot, attack, hit), then goes back to walking or idling.</summary>
+        public void PlayOnce(string clip, float speed = 1f)
         {
-            if (animation == null || animation["shoot"] == null)
+            if (animation == null || animation[clip] == null)
                 return;
-            animation["shoot"].wrapMode = WrapMode.Once;
-            animation.CrossFade("shoot", 0.1f);
-            shootFor = animation["shoot"].length * 0.9f;
-            playing = "shoot";
+            animation[clip].wrapMode = WrapMode.Once;
+            animation[clip].speed = speed;
+            animation.CrossFade(clip, 0.1f);
+            shootFor = animation[clip].length / Mathf.Max(0.1f, speed) * 0.9f;
+            playing = clip;
         }
     }
 }

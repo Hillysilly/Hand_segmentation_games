@@ -121,7 +121,8 @@ namespace Repulsor
             RectTransform s = OpenScreen(new Vector2(360f, 230f), null);
             Ui.Label(s, GameTitle, new Vector2(0f, 62f), new Vector2(340f, 60f), 46, TextAnchor.MiddleCenter, FontStyle.Bold).color = Ui.Accent;
             Ui.Label(s, "Superpowers in your own room", new Vector2(0f, 22f), new Vector2(340f, 24f), 16).color = Ui.Muted;
-            Ui.Button(s, "START", new Vector2(0f, -35f), new Vector2(170f, 52f), ShowModes, 22);
+            Ui.Button(s, "START", new Vector2(-85f, -35f), new Vector2(160f, 52f), ShowModes, 22);
+            Ui.Button(s, "SCAN ROOM", new Vector2(85f, -35f), new Vector2(160f, 52f), ShowScan, 18);
             Ui.Label(s, "Poke buttons with your index finger. Put the controllers down.", new Vector2(0f, -90f),
                 new Vector2(340f, 20f), 11).color = Ui.Muted;
             Text roomStatus = Ui.Label(s, RoomStatus(), new Vector2(0f, -106f), new Vector2(340f, 16f), 10);
@@ -131,18 +132,33 @@ namespace Repulsor
         void ShowModes()
         {
             phase = Phase.Modes;
-            RectTransform s = OpenScreen(new Vector2(400f, 320f), "CHOOSE A MODE");
-            Ui.Button(s, "SOLO  vs  ROBOTS", new Vector2(0f, 85f), new Vector2(300f, 48f), () =>
+            RectTransform s = OpenScreen(new Vector2(400f, 360f), "CHOOSE A MODE");
+            Ui.Button(s, "SOLO  vs  ROBOTS", new Vector2(0f, 105f), new Vector2(300f, 46f), () =>
             {
                 mode = GameMode.PveSolo;
+                bossFight = false;
                 ShowCharacters();
             }, 20);
-            Ui.Button(s, "CO-OP  (2 players)", new Vector2(0f, 30f), new Vector2(300f, 48f), ShowCoop, 20);
-            Ui.Button(s, "PVP  (2 players)", new Vector2(0f, -25f), new Vector2(300f, 48f), () => ShowRooms(GameMode.Pvp), 20);
-            Ui.Label(s, "Two-player modes are early tests: both headsets on the same Wi-Fi.", new Vector2(0f, -62f),
+            Ui.Button(s, "BOSS FIGHT  (solo)", new Vector2(0f, 53f), new Vector2(300f, 46f), () =>
+            {
+                mode = GameMode.PveSolo;
+                bossFight = true;
+                ShowCharacters();
+            }, 20);
+            Ui.Button(s, "CO-OP  (2 players)", new Vector2(0f, 1f), new Vector2(300f, 46f), () =>
+            {
+                bossFight = false;
+                ShowCoop();
+            }, 20);
+            Ui.Button(s, "PVP  (2 players)", new Vector2(0f, -51f), new Vector2(300f, 46f), () =>
+            {
+                bossFight = false;
+                ShowRooms(GameMode.Pvp);
+            }, 20);
+            Ui.Label(s, "Two-player modes are early tests: both headsets on the same Wi-Fi.", new Vector2(0f, -86f),
                 new Vector2(360f, 20f), 12).color = Ui.Muted;
-            Ui.Button(s, "DEBUG", new Vector2(-80f, -115f), new Vector2(140f, 40f), () => ShowDebug(ShowModes), 16);
-            Ui.Button(s, "BACK", new Vector2(80f, -115f), new Vector2(140f, 40f), ShowTitle, 16);
+            Ui.Button(s, "DEBUG", new Vector2(-80f, -132f), new Vector2(140f, 40f), () => ShowDebug(ShowModes), 16);
+            Ui.Button(s, "BACK", new Vector2(80f, -132f), new Vector2(140f, 40f), ShowTitle, 16);
         }
 
         void ShowCharacters()
@@ -362,8 +378,8 @@ namespace Repulsor
             {
                 Ui.Button(s, "SPAWN ENEMY", new Vector2(x[0], Row(1)), size, () =>
                 {
-                    SpawnEnemy(Random.value < 0.5f ? EnemyKind.Robot : EnemyKind.Drone);
                     waves.AddExtra();
+                    SpawnEnemy(WavePlan.KindFor(5, Random.value));
                 }, 14),
                 Ui.Button(s, "HIT ME 10", new Vector2(x[1], Row(1)), size, () => HurtPlayer(10f, "debug"), 14),
                 Ui.Button(s, "KNOCK ME OUT", new Vector2(x[2], Row(1)), size, () => HurtPlayer(10000f, "debug"), 14),

@@ -31,6 +31,9 @@ namespace Repulsor
         [SerializeField] ParticleSystem sparks;
         [SerializeField] AudioSource sizzle;
 
+        /// <summary>Beam thickness, as a multiple of the hand laser's.</summary>
+        public float Width { get; set; } = 1f;
+
         Vector3 start;
         Vector3 end;
         Vector3 surfaceNormal = Vector3.up;
@@ -93,10 +96,10 @@ namespace Repulsor
             float size = power * flicker * (1f + kick * IgniteKick);
 
             beam.SetPositionAndRotation(start, Quaternion.LookRotation(direction));
-            beam.localScale = new Vector3(HalfWidth * size, 1f, length);
+            beam.localScale = new Vector3(HalfWidth * size * Width, 1f, length);
 
             muzzleGlow.position = start;
-            muzzleGlow.localScale = Vector3.one * (MuzzleSize * size);
+            muzzleGlow.localScale = Vector3.one * (MuzzleSize * size * Mathf.Sqrt(Width));
 
             if (impact.activeSelf != hitting)
                 impact.SetActive(hitting);
@@ -110,6 +113,9 @@ namespace Repulsor
                 sparks.transform.SetPositionAndRotation(onSurface, Quaternion.LookRotation(surfaceNormal));
             }
         }
+
+        /// <summary>No burning sound (for beams that only flash for a moment).</summary>
+        public void Silence() => sizzle.clip = null;
 
         void UpdateSizzle(bool burning)
         {

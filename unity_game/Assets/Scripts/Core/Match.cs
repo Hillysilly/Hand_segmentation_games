@@ -28,24 +28,30 @@ namespace Repulsor
     /// <summary>
     /// PVE: a countdown, then waves that each bring more enemies, then a win. The game spawns what
     /// <see cref="TakeSpawn"/> hands out and reports kills; this class decides when the next wave starts.
+    /// The last wave is the boss (one spawn; it calls in its own helpers, added with <see cref="AddExtra"/>).
     /// </summary>
     public sealed class WaveDirector
     {
         public const float CountdownSeconds = 3f;
         public const float BetweenWavesSeconds = 6f;
         public const float SpawnGapSeconds = 1.6f;
-        public const int MaxAlive = 4;
+        public const int MaxAlive = 5;
 
         readonly int waveCount;
         float timer;
         float spawnTimer;
 
-        public WaveDirector(int waves)
+        public WaveDirector(int waves, int firstWave = 1)
         {
             waveCount = Math.Max(1, waves);
             State = WaveState.Countdown;
             timer = CountdownSeconds;
+            // Starting later (the boss fight on its own): the countdown leads into that wave.
+            Wave = Math.Max(0, Math.Min(waveCount, firstWave) - 1);
         }
+
+        /// <summary>The last wave, with waves of two or more, is the boss.</summary>
+        public bool BossWave => waveCount >= 2 && Wave == waveCount && State != WaveState.Countdown;
 
         public WaveState State { get; private set; }
         /// <summary>1-based wave number; 0 during the first countdown.</summary>
@@ -137,7 +143,7 @@ namespace Repulsor
         void StartWave(int wave)
         {
             Wave = wave;
-            ToSpawn = EnemiesInWave(wave);
+            ToSpawn = waveCount >= 2 && wave == waveCount ? 1 : EnemiesInWave(wave);
             spawnTimer = 0f;
             State = WaveState.Fighting;
         }

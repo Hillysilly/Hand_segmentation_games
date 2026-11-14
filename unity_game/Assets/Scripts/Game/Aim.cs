@@ -36,7 +36,7 @@ namespace Repulsor
         public static Vector3 Assist(Vector3 from, Vector3 direction)
         {
             IHittable target = Target(from, direction, AssistDegrees, AssistRange);
-            return target != null ? (target.Center - from).normalized : direction;
+            return target != null ? (HitTest.Nearest(target, from + direction * Vector3.Distance(from, target.Center)) - from).normalized : direction;
         }
 
         /// <summary>
@@ -53,7 +53,8 @@ namespace Repulsor
             {
                 if (!target.Alive || target.Team != Team.Enemies)
                     continue;
-                Vector3 to = target.Center - from;
+                // Tall bodies: aim at the part of them nearest the line, not only their middle.
+                Vector3 to = HitTest.Nearest(target, from + direction * Vector3.Distance(from, target.Center)) - from;
                 float distance = to.magnitude;
                 if (distance < 0.3f || distance > range)
                     continue;

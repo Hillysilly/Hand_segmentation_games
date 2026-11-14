@@ -97,7 +97,7 @@ namespace Repulsor
         {
             if (!target.Alive || target.Team != Team.Enemies)
                 return false;
-            Vector3 to = target.Center - from;
+            Vector3 to = HitTest.Nearest(target, from + direction * Vector3.Distance(from, target.Center)) - from;
             float distance = to.magnitude;
             if (distance > reach + target.Radius)
                 return false;

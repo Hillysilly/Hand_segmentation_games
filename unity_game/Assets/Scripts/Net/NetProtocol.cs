@@ -199,14 +199,17 @@ namespace Repulsor
             damage = r.ReadSingle();
         }
 
-        public static byte[] EnemyBolt(Vector3 origin, Vector3 direction) => Write(NetMessage.EnemyBolt, w =>
+        /// <summary>An enemy attack starting: which kind of shot, and two points or a point and a direction.</summary>
+        public static byte[] EnemyBolt(byte shot, Vector3 origin, Vector3 direction) => Write(NetMessage.EnemyBolt, w =>
         {
+            w.Write(shot);
             WriteVector(w, origin);
             WriteVector(w, direction);
         });
 
-        public static void ReadEnemyBolt(BinaryReader r, out Vector3 origin, out Vector3 direction)
+        public static void ReadEnemyBolt(BinaryReader r, out byte shot, out Vector3 origin, out Vector3 direction)
         {
+            shot = r.ReadByte();
             origin = ReadVector(r);
             direction = ReadVector(r);
         }
