@@ -73,7 +73,10 @@ namespace Repulsor
             playRing.loop = true;
             spiderSense = new SpiderSense(transform, head);
             room = new RoomObjects(transform);
+            archerGear = new ArcherGear(transform);
         }
+
+        ArcherGear archerGear;
 
         void TickAbilities(bool canFight, float dt)
         {
@@ -112,9 +115,18 @@ namespace Repulsor
                     case CharacterId.Spider:
                         TickSpider(dt);
                         break;
+                    case CharacterId.Elementalist:
+                        TickElementalist(dt);
+                        break;
+                    case CharacterId.Earth:
+                        TickEarth(dt);
+                        break;
                 }
             }
+            TickElementLooks(canFight, dt);
             spiderSense.Tick(canFight && character == CharacterId.Spider, dt);
+            if (!canFight || character != CharacterId.Archer)
+                archerGear.Hide();
             if (swinging != null && (!canFight || character != CharacterId.Spider))
             {
                 ReleaseWebbed(swinging);
@@ -229,12 +241,17 @@ namespace Repulsor
             {
                 Blast arrow = game.FireBlast(from + aim * 0.1f, aim, 0.3f, 0.4f, Mathf.Lerp(1.2f, 2.2f, draw), player.Outgoing(6f + 10f * draw), 0f);
                 arrow.Pierce = player.Level >= 3;
+                ArcherGear.Dress(arrow, "Arrow", AttackColor);
                 Log($"Arrow, draw {draw:0.00}{(arrow.Pierce ? ", piercing" : "")}");
             }
+            // The longbow in the front fist, its string to the drawing hand.
+            archerGear.Bow(player.Level >= 2 && bow.Formed, bow.BowPosition, bow.StringPosition, bow.Direction, bow.Draw, AttackColor);
             if (bow.Formed)
             {
                 // Where the arrow will go.
                 ShowAim(2, bow.BowPosition, bow.BowPosition + bow.Direction * (1.5f + 3f * bow.Draw));
+                archerGear.Crossbow(0, false, default, Vector3.forward, 0f, AttackColor);
+                archerGear.Crossbow(1, false, default, Vector3.forward, 0f, AttackColor);
                 return;
             }
 
@@ -259,8 +276,11 @@ namespace Repulsor
                 if (TickGun(i, hand, dt, out Vector3 origin, out Vector3 direction) && reload[i] <= 0f)
                 {
                     reload[i] = CrossbowReload;
-                    game.FireBlast(origin, direction, 0.4f, 0.5f, 2f, player.Outgoing(7f), 0f);
+                    Blast bolt = game.FireBlast(origin, direction, 0.4f, 0.5f, 2f, player.Outgoing(7f), 0f);
+                    ArcherGear.Dress(bolt, "Bolt", AttackColor);
                 }
+                // A crossbow in the finger-gun hand, reloading as it charges.
+                archerGear.Crossbow(i, gun[i].Aiming, hand.Palm, gun[i].Direction, 1f - reload[i] / CrossbowReload, AttackColor);
             }
         }
 

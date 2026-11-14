@@ -96,6 +96,26 @@ namespace Repulsor.Tests
         }
 
         [UnityTest]
+        public IEnumerator ElementalAndArcherEffectsRunWithoutCrashing()
+        {
+            SceneManager.LoadScene("Main");
+            yield return Frames(30);
+            var arena = Object.FindAnyObjectByType<Arena>();
+            arena.TestStart(CharacterId.Earth);
+            arena.TestGod(true);
+            yield return Frames(5);
+            arena.TestSkipTime(WaveDirector.CountdownSeconds + 0.1f);
+            arena.TestSpawn(EnemyKind.Tank);
+            arena.TestSpawn(EnemyKind.Robot);
+            yield return new WaitForSecondsRealtime(Enemy.SpawnSeconds + 0.4f);
+            Assert.That(arena.TestElementEffects(), Is.EqualTo(1), "no enemy to aim at");
+            yield return new WaitForSecondsRealtime(1f);
+            arena.TestSnap();
+            yield return new WaitForSecondsRealtime(5f);
+            Assert.That(crashes, Is.Empty, string.Join("\n\n", crashes));
+        }
+
+        [UnityTest]
         public IEnumerator TheBossRunsItsWholeRoutine()
         {
             SceneManager.LoadScene("Main");

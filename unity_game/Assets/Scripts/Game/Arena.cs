@@ -84,6 +84,7 @@ namespace Repulsor
             CreateMenu();
             CreateGestureLab();
             CreateAbilityViews();
+            CreateElementViews();
             CreateNet();
             CreatePvp();
 
@@ -155,6 +156,7 @@ namespace Repulsor
             // The HUD lab shows the real panel outside a match too.
             hud.Tick(playing || HudLabOpen ? player : null, Character, dt);
             Vector3 shieldFacing = character == CharacterId.Archer ? head.forward : Vector3.zero;
+            shield.UseModel(character == CharacterId.Archer ? "KnightShield" : null);
             shield.Tick((playing || practicing) && player.Shield.Up, head.position, shieldFacing, PlayerColor, PickedShield(character), dt);
             TickVariantLab(dt);
             death.Tick(playing && player.IsDead, dt);
@@ -582,9 +584,13 @@ namespace Repulsor
                 case CharacterId.Mage:
                     // Fireballs from level 1; the flamethrower (palm out and hold) joins them at level 2.
                     return level >= 2 ? Weapon.LaserRepulsor : Weapon.Repulsor;
+                case CharacterId.Earth:
+                    // Rock orbs: the repulsor's fist-then-open, dressed as rocks (Arena.Elements).
+                    return Weapon.Repulsor;
                 case CharacterId.Saber:
                 case CharacterId.Archer:
                 case CharacterId.Spider:
+                case CharacterId.Elementalist:
                     // Their attacks are all gestures in Arena.Abilities.
                     return Weapon.None;
                 default:
@@ -601,6 +607,8 @@ namespace Repulsor
                 case CharacterId.Saber: return BubbleStyle.Glass;
                 case CharacterId.Mage: return BubbleStyle.Thin;
                 case CharacterId.Spider: return BubbleStyle.Web;
+                case CharacterId.Elementalist: return BubbleStyle.Wind;
+                case CharacterId.Earth: return BubbleStyle.Rock;
                 case CharacterId.Archer: return BubbleStyle.Glass;   // a clear shield, since it sits right in front of you
                 default: return BubbleStyle.Hex;
             }

@@ -54,7 +54,7 @@ namespace Repulsor
             laser.aimLine.useWorldSpace = true;
             laser.aimLine.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             laser.aimLine.receiveShadows = false;
-            laser.aimLine.startColor = laser.aimLine.endColor = Red;
+            Tint.Line(laser.aimLine, Red);
             laser.glow = BallLook.Sprite("Charge Glow", go.transform, "FxGlow", 0.05f, Red * 1.5f).Set(billboard: true, flicker: 0.25f);
             laser.Update();
             return laser;
@@ -87,7 +87,7 @@ namespace Repulsor
                 // Thin and flickering at first, steadier and brighter as it's about to fire.
                 float pulse = 0.5f + 0.5f * Mathf.Sin(age * Mathf.Lerp(18f, 50f, t));
                 aimLine.widthMultiplier = Mathf.Lerp(0.004f, 0.012f, t) * (0.7f + 0.3f * pulse) * Mathf.Max(1f, width);
-                aimLine.startColor = aimLine.endColor = Red * Mathf.Lerp(0.6f, 1.6f, t);
+                Tint.Line(aimLine, Red * Mathf.Lerp(0.6f, 1.6f, t));
                 glow.transform.position = start;
                 glow.transform.localScale = Vector3.one * Mathf.Lerp(0.04f, 0.16f, t) * Mathf.Max(1f, width * 0.8f);
                 return;

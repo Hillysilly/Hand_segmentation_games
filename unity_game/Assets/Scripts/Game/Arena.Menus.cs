@@ -172,7 +172,7 @@ namespace Repulsor
             {
                 CharacterDef def = CharacterDef.All[i];
                 PokeButton b = Ui.Button(s, def.Name.ToUpperInvariant() + (def.Ready ? "" : " *"),
-                    new Vector2(-200f, 110f - i * 42f), new Vector2(150f, 36f), () =>
+                    new Vector2(-200f, 122f - i * 34f), new Vector2(150f, 30f), () =>
                     {
                         character = def.Id;
                         customColor = false;

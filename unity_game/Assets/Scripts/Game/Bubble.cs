@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Repulsor
 {
-    public enum BubbleStyle { Hex, Flame, Glass, Thin, Web, Energy, Smoke }
+    public enum BubbleStyle { Hex, Flame, Glass, Thin, Web, Energy, Smoke, Wind, Rock }
 
     /// <summary>A sphere drawn with the Bubble shader: shields and the transformation shockwave.</summary>
     public sealed class Bubble : MonoBehaviour
@@ -57,7 +57,35 @@ namespace Repulsor
         float shown;
         float hit;
 
-        public ShieldView(Transform parent) => bubble = Bubble.Create("Shield", parent);
+        readonly Transform parent;
+        Transform model;
+        string modelKey;
+
+        public ShieldView(Transform parent)
+        {
+            this.parent = parent;
+            bubble = Bubble.Create("Shield", parent);
+        }
+
+        /// <summary>
+        /// A solid shield model (Resources/Props) held in front instead of only the flat glass, for a shield with a
+        /// facing (the Valkyr's knight shield). Null for none.
+        /// </summary>
+        public void UseModel(string key)
+        {
+            if (key == modelKey)
+                return;
+            modelKey = key;
+            if (model != null)
+                Object.Destroy(model.gameObject);
+            model = null;
+            var prefab = key != null ? Resources.Load<GameObject>("Props/" + key) : null;
+            if (prefab != null)
+            {
+                model = Object.Instantiate(prefab, parent, false).transform;
+                model.gameObject.SetActive(false);
+            }
+        }
 
         /// <summary>Whether real things hide it (true for other players' shields, false for your own).</summary>
         public bool Occlude { get; set; } = true;
@@ -94,7 +122,18 @@ namespace Repulsor
                 return;
             }
             Place(bubble.transform, head, facing, Mathf.Lerp(0.6f, 1f, eased));
-            bubble.Show(color, style, eased, hit, Occlude);
+            bool solid = model != null && Vector3.ProjectOnPlane(facing, Vector3.up).sqrMagnitude > 1e-4f;
+            if (model != null)
+            {
+                model.gameObject.SetActive(solid && eased > 0.01f);
+                if (solid)
+                {
+                    // The knight shield, with a faint glow of your colour around it; it flashes on hits.
+                    model.SetPositionAndRotation(bubble.transform.position, bubble.transform.rotation);
+                    model.localScale = Vector3.one * (1.35f * Mathf.Lerp(0.6f, 1f, eased));
+                }
+            }
+            bubble.Show(color, style, solid ? eased * (0.3f + 0.7f * hit) : eased, hit, Occlude);
         }
 
         /// <summary>Where a shield goes for a player whose head is here.</summary>

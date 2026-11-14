@@ -1,5 +1,5 @@
 // Shield bubbles and the transformation shockwave sphere. One shader with a style number, so the Variant Lab can
-// flip between looks: 0 hex, 1 flame, 2 glass, 3 thin, 4 web, 5 energy shell. Drawn from both sides, since the
+// flip between looks: 0 hex, 1 flame, 2 glass, 3 thin, 4 web, 5 energy shell, 6 smoke, 7 wind, 8 rock. Drawn from both sides, since the
 // player usually sees their own shield from inside, and hidden behind real things by live depth.
 Shader "Repulsor/Bubble"
 {
@@ -164,6 +164,26 @@ Shader "Repulsor/Bubble"
                     float churn = Noise(p * 3.0 + float3(t * 0.3, t * 0.5, 0)) * 0.6 + Noise(p * 7.0 - t * 0.4) * 0.4;
                     glow = pow(facing, 1.6) * (0.5 + 0.7 * churn) * 1.1;
                     color = _Color.rgb;
+                }
+                else if (style == 7)
+                {
+                    // Wind: pale streaks whirling sideways around the bubble, faster near the top, with gaps.
+                    float angle = atan2(p.z, p.x);
+                    float swirl = angle * 3.0 + p.y * 4.0 - t * (5.0 + p.y * 2.0);
+                    float streaks = pow(saturate(sin(swirl) * 0.5 + 0.5), 6.0);
+                    float gusts = Noise(float3(angle * 2.0 - t * 2.0, p.y * 5.0, t * 0.5));
+                    glow = streaks * (0.4 + 0.8 * gusts) + rim * 0.45 + 0.01;
+                    color = lerp(_Color.rgb, float3(0.95, 0.98, 1.0), 0.6);
+                }
+                else if (style == 8)
+                {
+                    // Rock: a wall of brown stone plates with glowing orange cracks between them; nearly solid.
+                    float3 q = p * 5.0;
+                    float plates = Noise(q) * 0.6 + Noise(q * 2.3 + 4.1) * 0.4;
+                    float crack = 1.0 - smoothstep(0.0, 0.05, abs(plates - 0.5));
+                    float3 stone = float3(0.42, 0.29, 0.19) * (0.6 + 0.6 * Noise(q * 4.0));
+                    color = lerp(stone, float3(1.0, 0.4, 0.1) * 1.6, crack);
+                    glow = 0.75 + crack * 0.8 + rim * 0.2;
                 }
                 else
                 {

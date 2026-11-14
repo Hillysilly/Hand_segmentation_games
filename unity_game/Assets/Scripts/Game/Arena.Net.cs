@@ -127,7 +127,11 @@ namespace Repulsor
                 proxy = Enemy.SpawnProxy(e.Id, (EnemyKind)e.Kind, position, e.Hp, e.MaxHp, this, head, foes);
                 proxies[e.Id] = proxy;
                 enemies.Add(proxy);
-                OverheadBar.Attach(proxy, head, foes, false);
+                // The boss's health shows across the top of the view instead of over it.
+                if (proxy.IsBoss)
+                    boss = proxy;
+                else
+                    OverheadBar.Attach(proxy, head, foes, false);
             }
             // Ones the host no longer has were destroyed there.
             foreach (ushort id in gone)

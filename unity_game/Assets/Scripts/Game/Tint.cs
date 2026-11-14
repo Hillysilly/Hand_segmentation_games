@@ -13,6 +13,17 @@ namespace Repulsor
         static readonly int Glow = Shader.PropertyToID("_GlowColor");
         static readonly MaterialPropertyBlock block = new MaterialPropertyBlock();
 
+        static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
+        static readonly MaterialPropertyBlock lineBlock = new MaterialPropertyBlock();
+
+        /// <summary>Colours a line drawn with the plain unlit aim-line material (it ignores the line's own colours).</summary>
+        public static void Line(LineRenderer line, Color color)
+        {
+            line.GetPropertyBlock(lineBlock);
+            lineBlock.SetColor(BaseColor, color);
+            line.SetPropertyBlock(lineBlock);
+        }
+
         public static void Apply(GameObject root, Color color)
         {
             Color core = Color.Lerp(color, Color.white, 0.55f);

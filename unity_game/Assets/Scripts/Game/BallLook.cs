@@ -47,7 +47,7 @@ namespace Repulsor
         }
 
         /// <summary>Turns off the crackling ball: its arcs, its glow sphere, and on a fired shot the embers (and, for fire, the tail).</summary>
-        static void HideCrackle(Transform head, bool fire)
+        internal static void HideCrackle(Transform head, bool fire)
         {
             if (head.TryGetComponent(out ElectricBall crackle))
                 crackle.enabled = false;

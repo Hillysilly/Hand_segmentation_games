@@ -220,7 +220,7 @@ namespace Repulsor
                 ringLine.loop = true;
                 ringLine.useWorldSpace = true;
                 ringLine.widthMultiplier = 0.025f;
-                ringLine.startColor = ringLine.endColor = new Color(1f, 0.15f, 0.08f) * 1.5f;
+                Tint.Line(ringLine, new Color(1f, 0.15f, 0.08f));
                 ringLine.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             }
             ringLine.enabled = on;
@@ -287,7 +287,7 @@ namespace Repulsor
             {
                 float t = age / Warning;
                 float radius = Mathf.Lerp(Radius * 1.6f, Radius, t);
-                ring.startColor = ring.endColor = Red * Mathf.Lerp(0.8f, 2f, t) * (0.7f + 0.3f * Mathf.Sin(age * 40f));
+                Tint.Line(ring, Color.Lerp(Red * 0.6f, new Color(1f, 0.6f, 0.4f), t * (0.7f + 0.3f * Mathf.Sin(age * 40f))));
                 for (int i = 0; i < 33; i++)
                 {
                     float angle = i / 32f * Mathf.PI * 2f;

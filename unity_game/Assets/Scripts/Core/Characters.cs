@@ -1,6 +1,6 @@
 namespace Repulsor
 {
-    public enum CharacterId { Technoman, KiFighter, Mage, Saber, Archer, Spider }
+    public enum CharacterId { Technoman, KiFighter, Mage, Saber, Archer, Spider, Elementalist, Earth }
 
     /// <summary>
     /// What a character is: name, colour, and how each level plays. Names are placeholders until the
@@ -98,6 +98,28 @@ namespace Repulsor
                     new[] { "Spider sign (index and little finger out): webs, hold it to keep firing", "Spider sense warns of unseen enemies" },
                     new[] { "Web an enemy or an object, then swing your arm to smash and fling it", "Webbed gloves" },
                     new[] { "Black webs, more damage", "Black gloves" },
+                },
+            },
+            new CharacterDef
+            {
+                Id = CharacterId.Elementalist, Name = "Tempest", Tagline = "Storm caller",
+                Color = "#BFF4FF", AuraStyle = new[] { 0, 0, 0 }, Shield = "Wind bubble",
+                Controls = new[]
+                {
+                    new[] { "Push an open palm forward: gust of wind (knocks enemies back)" },
+                    new[] { "Both hands out flat: chain lightning, up to 5 s at a time", "Swirling wind aura" },
+                    new[] { "Circle both hands to charge, push both forward: tornado that pulls enemies in", "Faster, thicker wind" },
+                },
+            },
+            new CharacterDef
+            {
+                Id = CharacterId.Earth, Name = "Terra", Tagline = "Stone shaper",
+                Color = "#E07A2E", AuraStyle = new[] { 0, 0, 0 }, Shield = "Rock wall",
+                Controls = new[]
+                {
+                    new[] { "Fist, then snap open: rock orb", "Stone on your hands" },
+                    new[] { "Fist low at your waist, raise it fast: rock spikes burst from the floor", "Crater around your feet" },
+                    new[] { "Rock orbs stick to enemies. Snap your fingers: they explode", "Rocks orbit you, flecked with gold" },
                 },
             },
         };

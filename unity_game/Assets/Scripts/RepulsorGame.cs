@@ -97,6 +97,8 @@ namespace Repulsor
         public float RepulsorAoe { get; set; }
         /// <summary>The look of fist-and-release shots: 0 comet, 1 streak (small, long tail), 2 orb (big, short tail, shell).</summary>
         public int CometStyle { get; set; }
+        /// <summary>Restyles each fist-then-open shot as it's fired (the Earth character's rock orbs), if set.</summary>
+        public System.Action<Blast> Dress { get; set; }
         public static readonly string[] CometStyleNames = { "A  COMET", "B  STREAK", "C  ORB", "D  TECH" };
         public static readonly Color DefaultWeaponColor = new Color(0.1f, 0.4f, 1f);
         public Color WeaponColor { get; private set; } = DefaultWeaponColor;
@@ -458,6 +460,8 @@ namespace Repulsor
             // Walls and furniture stop shots.
             if (room.TryDistance(position, direction.normalized, out float wall))
                 blast.WallDistance = wall;
+            if (!Legacy)
+                Dress?.Invoke(blast);
             PlayAt(position, zap);
             BlastFired?.Invoke(position, direction, 1f, 1f, WeaponColor);
             shots++;
@@ -478,7 +482,11 @@ namespace Repulsor
         }
 
         /// <summary>Hits the first thing the moving blast touches. Returns whether something was hit.</summary>
-        public bool TryHit(Vector3 from, Vector3 to, float blastRadius, float damage = Damage.Repulsor)
+        public bool TryHit(Vector3 from, Vector3 to, float blastRadius, float damage = Damage.Repulsor) =>
+            TryHit(from, to, blastRadius, damage, out _);
+
+        /// <summary>As <see cref="TryHit(Vector3, Vector3, float, float)"/>, and which thing it hit.</summary>
+        public bool TryHit(Vector3 from, Vector3 to, float blastRadius, float damage, out IHittable struck)
         {
             List<IHittable> all = Hittables.All;
             for (int i = 0; i < all.Count; i++)
@@ -487,10 +495,12 @@ namespace Repulsor
                 if (target.Alive && target.Team == Team.Enemies
                     && HitTest.Segment(target, from, to, blastRadius))
                 {
+                    struck = target;
                     Strike(target, damage, from, "Repulsor");
                     return true;
                 }
             }
+            struck = null;
             return false;
         }
 

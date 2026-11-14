@@ -36,6 +36,8 @@ namespace Repulsor
         public bool Pierce { get; set; }
         /// <summary>An enemy this shot steers toward while it lives (the dragon fist's lock-on).</summary>
         public IHittable Homing { get; set; }
+        /// <summary>Called when it hits something (not for piercing shots): what, and where.</summary>
+        public System.Action<IHittable, Vector3> OnHit { get; set; }
         readonly System.Collections.Generic.HashSet<IHittable> pierced = new System.Collections.Generic.HashSet<IHittable>();
 
         RepulsorGame game;
@@ -99,7 +101,9 @@ namespace Repulsor
             }
             else
             {
-                hit = game.TryHit(from, to, radius, damage);
+                hit = game.TryHit(from, to, radius, damage, out IHittable struck);
+                if (hit)
+                    OnHit?.Invoke(struck, to);
             }
             // The wall was measured along the first heading, so a shot that has turned toward its target ignores it.
             bool wall = flown >= wallAt && !homing;

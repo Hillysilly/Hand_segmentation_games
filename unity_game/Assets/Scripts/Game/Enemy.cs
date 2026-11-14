@@ -46,6 +46,18 @@ namespace Repulsor
         bool running;
         EnemyLaser charging;
         FxSpin fistGlow;
+        Vector3 push;
+
+        /// <summary>
+        /// Knocks it along (wind, tornado pull), sliding round furniture; the push fades over a moment. The boss
+        /// barely moves.
+        /// </summary>
+        public void Push(Vector3 velocity)
+        {
+            if (IsProxy || Webbed)
+                return;
+            push += IsBoss ? velocity * 0.1f : velocity;
+        }
 
         public EnemyKind Kind { get; private set; }
         public EnemySpec Spec => spec;
@@ -164,6 +176,13 @@ namespace Repulsor
             if (step.sqrMagnitude > 0.25f && !IsBoss)
                 Debug.Log($"[Enemy] {Kind} {Id} jumped {step.magnitude:0.00} m, {lastPosition} to {transform.position}, age {age:0.00}{(IsProxy ? " (copy)" : "")}");
             lastPosition = transform.position;
+            if (push.sqrMagnitude > 1e-4f && !IsProxy)
+            {
+                Vector3 flatPush = Vector3.ProjectOnPlane(push, Vector3.up);
+                if (flatPush.sqrMagnitude > 1e-6f)
+                    transform.position += arena.Steer(transform.position, flatPush.normalized, flatPush.magnitude * dt);
+                push *= Mathf.Exp(-5f * dt);
+            }
             if (IsProxy)
             {
                 transform.position = Vector3.Lerp(transform.position, netPosition, 1f - Mathf.Exp(-12f * dt));
