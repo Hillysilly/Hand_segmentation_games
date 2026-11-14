@@ -98,6 +98,22 @@ namespace Repulsor
         /// <summary>Where the crop was and how it was turned, for checking it.</summary>
         public string CropDescription => $"centre {cropCentre}, radius {cropRadius:0}, sin {cropSin:0.00}, cos {cropCos:0.00}";
 
+        /// <summary>Also read the model's body mask on each run that finds someone (for the tight aura).</summary>
+        public bool WantMask { get; set; }
+
+        /// <summary>The body mask from the last run that read one, 0 to 1, rows from the crop's top.</summary>
+        public readonly float[] Mask = new float[MaskSize * MaskSize];
+
+        /// <summary>
+        /// Where the mask's corners sit in the image, in pixels: its top left, top right, bottom right, bottom left.
+        /// </summary>
+        public readonly Vector2[] MaskCorners = new Vector2[4];
+
+        /// <summary>Goes up each time a new mask is read.</summary>
+        public int MaskVersion { get; private set; }
+
+        public const int MaskSize = LandmarkSize;
+
         /// <summary>Milliseconds spent in the last run on the detector, or 0 if it wasn't needed.</summary>
         public float DetectorMilliseconds { get; private set; }
 
@@ -162,7 +178,15 @@ namespace Repulsor
             using Tensor<float> presence = (landmarker.PeekOutput("Identity_1") as Tensor<float>).ReadbackAndClone();
             using Tensor<float> world = (landmarker.PeekOutput("Identity_4") as Tensor<float>).ReadbackAndClone();
             LandmarkMilliseconds = (Time.realtimeSinceStartup - started) * 1000f;
-            return ReadJoints(joints, world, presence, frame);
+            NoteCropCorners();
+            if (!ReadJoints(joints, world, presence, frame))
+                return false;
+            if (WantMask)
+            {
+                using Tensor<float> mask = (landmarker.PeekOutput("Identity_2") as Tensor<float>).ReadbackAndClone();
+                ReadMask(mask);
+            }
+            return true;
         }
 
         /// <summary>Runs on the image without stalling the game.</summary>
@@ -190,7 +214,15 @@ namespace Repulsor
             using Tensor<float> presence = await (landmarker.PeekOutput("Identity_1") as Tensor<float>).ReadbackAndCloneAsync();
             using Tensor<float> world = await (landmarker.PeekOutput("Identity_4") as Tensor<float>).ReadbackAndCloneAsync();
             LandmarkMilliseconds = (Time.realtimeSinceStartup - started) * 1000f;
-            return ReadJoints(joints, world, presence, frame);
+            NoteCropCorners();
+            if (!ReadJoints(joints, world, presence, frame))
+                return false;
+            if (WantMask)
+            {
+                using Tensor<float> mask = await (landmarker.PeekOutput("Identity_2") as Tensor<float>).ReadbackAndCloneAsync();
+                ReadMask(mask);
+            }
+            return true;
         }
 
         /// <summary>Shrinks this turn's search window into the detector's square. Anything outside the image is black.</summary>
@@ -290,6 +322,28 @@ namespace Repulsor
                     landmarkPixels[to + 2] = rgba[from + 2] / 255f;
                 }
             }
+        }
+
+        // Reading the joints moves the crop on for the next run, so note where this run's crop was first.
+        readonly Vector2[] cropCorners = new Vector2[4];
+
+        void NoteCropCorners()
+        {
+            cropCorners[0] = CropToImage(0f, 0f);
+            cropCorners[1] = CropToImage(LandmarkSize, 0f);
+            cropCorners[2] = CropToImage(LandmarkSize, LandmarkSize);
+            cropCorners[3] = CropToImage(0f, LandmarkSize);
+        }
+
+        /// <summary>The mask comes out as logits; keep it as 0 to 1.</summary>
+        void ReadMask(Tensor<float> mask)
+        {
+            float[] values = mask.DownloadToArray();
+            int count = Mathf.Min(values.Length, Mask.Length);
+            for (int i = 0; i < count; i++)
+                Mask[i] = 1f / (1f + Mathf.Exp(-values[i]));
+            Array.Copy(cropCorners, MaskCorners, 4);
+            MaskVersion++;
         }
 
         bool ReadJoints(Tensor<float> joints, Tensor<float> world, Tensor<float> presence, BodyFrame frame)

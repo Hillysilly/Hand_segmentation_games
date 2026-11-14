@@ -57,6 +57,8 @@ namespace Repulsor
         public bool Dead;
         public bool Invincible;
         public bool Boosted;
+        /// <summary>Their tight aura is up.</summary>
+        public bool Glow;
         public Color32 Color;
         public byte Character;
         public byte Lives;
@@ -129,7 +131,7 @@ namespace Repulsor
                 WriteVector(w, s.LeftPalm);
                 WriteVector(w, s.RightPalm);
                 byte flags = (byte)((s.LeftTracked ? 1 : 0) | (s.RightTracked ? 2 : 0) | (s.ShieldUp ? 4 : 0) | (s.Dead ? 8 : 0)
-                    | (s.Invincible ? 16 : 0) | (s.Boosted ? 32 : 0));
+                    | (s.Invincible ? 16 : 0) | (s.Boosted ? 32 : 0) | (s.Glow ? 64 : 0));
                 w.Write(flags);
                 w.Write(s.Hp);
                 w.Write(s.MaxHp);
@@ -290,6 +292,7 @@ namespace Repulsor
             s.Dead = (flags & 8) != 0;
             s.Invincible = (flags & 16) != 0;
             s.Boosted = (flags & 32) != 0;
+            s.Glow = (flags & 64) != 0;
             s.Hp = r.ReadSingle();
             s.MaxHp = r.ReadSingle();
             s.Level = r.ReadByte();

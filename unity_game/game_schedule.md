@@ -23,6 +23,10 @@ New since 11/8 (details in `logs/2026-11-14-robots-boss-elements.md`):
 - **Valkyr**: crossbow and longbow models that charge up, arrow and bolt shots, knight shield.
 - **Tempest** (Elementalist) and **Terra** (Earth), the two new classes from the plan.
 - **Shield**: 5 s instead of 3, quicker to come back, looser X, a clear SHIELD BROKEN.
+- **Tight aura**: a glow hugging the body, for 6 s after a transformation, for a powerup's length, and for good
+  on Technoman at level 3 (as the plan says). On yourself: a glowing outline on your hands and forearms with
+  afterimages. On the person the camera sees (the other player, or you in a mirror): the pose model's body mask,
+  grown and glowing, leaving afterimages as it updates.
 
 The APK is built; install it with `build_and_run.ps1 -NoBuild` when the headset is plugged in.
 
@@ -37,6 +41,9 @@ The APK is built; install it with `build_and_run.ps1 -NoBuild` when the headset 
 6. **BOSS FIGHT**: is it readable, too hard or too easy? 700 HP is a guess.
 7. **Valkyr**: do the crossbow and bow sit in your hands right? (orientation is guessed from renders)
 8. **Tempest and Terra**: try each gesture; tell me which miss or misfire.
+9. **Tight aura** (added 11/14 morning): DEBUG > INVINCIBLE 8s (or transform). Do your hands and forearms get a
+   glowing outline, with afterimages when you swing them? Stand in front of a mirror: does your reflection get
+   the glowing body outline? Is it too strong to see your hands through? Does the frame rate hold?
 
 ## Status, end of 11/8 session
 

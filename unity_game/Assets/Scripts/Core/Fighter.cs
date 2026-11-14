@@ -64,6 +64,8 @@ namespace Repulsor
         public event Action Died;
         public event Action Respawned;
         public event Action<int> Transformed;
+        /// <summary>A powerup was taken.</summary>
+        public event Action<PowerupKind> PoweredUp;
 
         public void Reset()
         {
@@ -140,6 +142,7 @@ namespace Repulsor
                     BoostFor = DamageBoostSeconds;
                     break;
             }
+            PoweredUp?.Invoke(kind);
         }
 
         public void Tick(float dt)

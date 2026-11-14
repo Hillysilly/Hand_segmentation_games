@@ -33,7 +33,7 @@ namespace Repulsor.Tests
             {
                 Slot = 1, Head = new Vector3(1f, 1.6f, -2f), HeadRotation = Quaternion.Euler(10f, 20f, 0f),
                 LeftPalm = new Vector3(0.1f, 1.2f, 0.3f), RightPalm = new Vector3(-0.1f, 1.1f, 0.4f),
-                LeftTracked = true, ShieldUp = true, Hp = 87.5f, MaxHp = 150f, Level = 2,
+                LeftTracked = true, ShieldUp = true, Glow = true, Hp = 87.5f, MaxHp = 150f, Level = 2,
                 Color = new Color32(10, 20, 30, 255), Character = 3,
             };
             byte[] packet = NetProtocol.Player(sent);
@@ -41,7 +41,7 @@ namespace Repulsor.Tests
             Assert.That(type, Is.EqualTo(NetMessage.Player));
             PlayerSnapshot got = NetProtocol.ReadPlayer(reader);
             Assert.That(got.Head, Is.EqualTo(sent.Head));
-            Assert.That(got.LeftTracked && !got.RightTracked && got.ShieldUp && !got.Dead, Is.True);
+            Assert.That(got.LeftTracked && !got.RightTracked && got.ShieldUp && !got.Dead && got.Glow && !got.Boosted, Is.True);
             Assert.That(got.Hp, Is.EqualTo(87.5f));
             Assert.That(got.Level, Is.EqualTo(2));
             Assert.That(got.Color.g, Is.EqualTo(20));

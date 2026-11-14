@@ -97,6 +97,7 @@ namespace Repulsor
             };
             player.Respawned += OnRespawned;
             player.Transformed += OnTransformed;
+            player.PoweredUp += kind => glow.PoweredUp(kind);
             player.Shield.Shattered += () =>
             {
                 Log("Shield broke");
@@ -166,34 +167,40 @@ namespace Repulsor
             TickGestureLab(dt);
             UpdateArms();
             LogPerformance(dt);
-            ShowHandAura();
+            ShowTightAura(dt);
         }
 
         readonly GameObject[] fistGlow = new GameObject[2];
-        readonly Bubble[] handAura = new Bubble[2];
+        readonly GlowTimer glow = new GlowTimer();
+        HandGlow handGlow;
+        BodyGlow bodyGlow;
 
-        /// <summary>Technoman level 3's glow outline, as you see it: your own hands glow (your body is out of view).</summary>
-        void ShowHandAura()
+        /// <summary>Whether your tight aura is up (for the other headset).</summary>
+        bool GlowOn => phase == Phase.Playing && !player.IsDead && glow.On;
+
+        /// <summary>
+        /// The tight aura: after a transformation, during a powerup, and for good on Technoman at level 3. You see it
+        /// hugging your hands and forearms. The camera draws it on the person it sees: the other player when theirs
+        /// is up, or (playing alone) you in a mirror.
+        /// </summary>
+        void ShowTightAura(float dt)
         {
-            bool on = phase == Phase.Playing && !player.IsDead && character == CharacterId.Technoman && player.Level >= 3;
-            for (int i = 0; i < 2; i++)
-            {
-                HandPose hand = i == 0 ? input.Left : input.Right;
-                if (handAura[i] == null)
-                {
-                    if (!on)
-                        continue;
-                    handAura[i] = Bubble.Create("Hand Aura", transform);
-                }
-                bool show = on && hand.Tracked;
-                if (show)
-                {
-                    handAura[i].transform.position = (hand.Palm + hand[Joint.MiddleProximal]) * 0.5f;
-                    handAura[i].transform.rotation = Quaternion.LookRotation(hand.Forward, -hand.PalmNormal);
-                    handAura[i].transform.localScale = new Vector3(0.14f, 0.07f, 0.2f);
-                }
-                handAura[i].Show(AttackColor, BubbleStyle.Energy, show ? 0.55f + 0.1f * Mathf.Sin(Time.time * 6f + i) : 0f);
-            }
+            bool playing = phase == Phase.Playing && !player.IsDead;
+            if (phase != Phase.Playing)
+                glow.Clear();
+            glow.Permanent = playing && GlowTimer.PermanentFor(character, player.Level);
+            glow.Tick(dt);
+            handGlow ??= new HandGlow();
+            handGlow.Tick(input.Left, input.Right, playing ? glow.Strength : 0f, AttackColor, dt);
+
+            bool together = net != null && net.Connected && remote != null;
+            bool theirs = together && remote.Latest.Glow && !remote.Latest.Dead;
+            float strength = theirs ? 1f : !together && playing ? glow.Strength : 0f;
+            game.PersonWanted = strength > 0f;
+            bodyGlow ??= new BodyGlow(transform);
+            bodyGlow.Tick(game.Person, strength, theirs ? remote.GlowColor : AttackColor, dt);
+            if (remote != null)
+                remote.SilhouetteShown = theirs && bodyGlow.Showing;
         }
 
         /// <summary>While posing to transform: energy gathering in both fists, growing until it goes off.</summary>
@@ -529,6 +536,7 @@ namespace Repulsor
             // Tell the player what the new level unlocked.
             hud.Message($"LEVEL {level}", Character.Controls[Mathf.Clamp(level - 1, 0, Character.Controls.Length - 1)][0], 2.5f);
             UpdateAura();
+            glow.Transformed();
             Log($"Transformed to level {level}, HP {player.Hp:0}/{player.MaxHp:0}");
         }
 

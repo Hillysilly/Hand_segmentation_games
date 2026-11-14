@@ -77,3 +77,23 @@ faster, a looser X with a longer dropout grace, a burst and a SHIELD BROKEN mess
   every elemental and archer effect, every character through a wave).
 - PC renders: `Logs/play_roster.png`, `Logs/play_boss_*.png`, `Logs/play_effects_*.png` (from
   `Tests/PlayMode/CaptureTests.cs`), `Logs/preview_enemies.png`, `Logs/preview_prop*.png`.
+
+## Tight aura (morning, user back)
+
+The user asked for the plan's "tight aura": the segmentation mask, slightly larger, glowing, and fine if it lags
+(afterimages). It shows after a powerup and right after a transformation; when to make it permanent is open
+(for now Technoman at level 3, as the plan says). `Core/GlowTimer.cs`, `Game/TightAura.cs`.
+
+- **The mask was already there**: the BlazePose landmark model has a 256x256 body mask output (`Identity_2`)
+  that was never read. `BodyTracker` reads it when asked; `PersonDetector` places it as a square at the hips'
+  distance, facing the camera as it was. `BodyGlow` draws it grown and glowing (`BodyGlow.shader`); each new
+  mask stays where it was seen and the old ones fade, which makes the afterimages.
+- It's drawn on whoever the camera sees: the other player while their glow is up (a new flag in the player
+  message), or, playing alone, you in a mirror. The person tracker only runs while it's needed.
+- **On yourself** the headset can't see your body, so `HandGlow` outlines your hands and forearms from the hand
+  joints. The first try (a glowing shell per bone) showed every bone's outline; now each pixel finds how close
+  its line of sight passes to the bones (`TightGlow.shader`), so the hand gets one outline. Moving hands leave
+  afterimages. This replaces Technoman level 3's blob on each hand.
+- Checked on the PC with the saved mirror pictures in `Logs/frames` (`TightAuraCaptureTests`, pictures in
+  `Logs/play_tight_*.png`): the person was found in all six pictures and the glow lines up with them.
+- EditMode 169/169, PlayMode 12/12, APK built (not installed, no headset).
