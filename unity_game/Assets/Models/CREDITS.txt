@@ -40,3 +40,6 @@ Assets/Resources/Icons (character select symbols)
   laser-blast (Technoman), punch-blast (Ryuu), fireball (Emberwitch), energy-sword (Lumen), high-shot (Valkyr),
   spider-web (Webline), tornado (Tempest), earth-spit (Terra). Recoloured white; tinted in the game.
   https://game-icons.net
+
+Assets/Props/Web (Cobweb.glb: the Spider's web shots and splats)
+  Cobweb by Quaternius, CC0 1.0. Via Poly Pizza: https://poly.pizza/m/EHYNWew6JK

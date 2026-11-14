@@ -148,5 +148,12 @@ namespace Repulsor
         public void TestShowcaseLevel(int level) => showcase?.SetLevel(level);
 
         public Transform TestCharacterScreen => characterScreen;
+
+        /// <summary>For tests: fires a web shot the way the Spider's spider sign does.</summary>
+        public void TestFireWeb(Vector3 origin, Vector3 direction, bool black)
+        {
+            Blast shot = game.FireBlast(origin, direction.normalized, 0.3f, 0.35f, 1.6f, 5f, 0f, PlayerColor);
+            WebStrand.Attach(shot, origin, black ? new Color(0.25f, 0.2f, 0.3f) : Color.white, foes);
+        }
     }
 }

@@ -778,17 +778,22 @@ namespace Repulsor
                     Color strand = move.Fx == Fx.BlackWeb ? new Color(0.12f, 0.12f, 0.14f) : new Color(0.92f, 0.92f, 0.95f);
                     GameObject go = Holder("Web");
                     LineRenderer line = Line(go.transform, 0.03f, strand, 2);
-                    FxSpin splat = BallLook.Sprite("Splat", go.transform, "FxStar", 0.01f, strand * 1.3f).Set(billboard: true);
+                    // The web itself (as in the game): flies out spinning and opening, then sticks on the robot.
+                    Transform web = WebStrand.Web(go.transform, strand);
+                    Renderer[] silk = web.GetComponentsInChildren<Renderer>();
                     bool stuck = false;
-                    Add(go, 0.9f, (e, dt) =>
+                    Add(go, 1.1f, (e, dt) =>
                     {
-                        float t = Mathf.Clamp01(e.Age / 0.15f);
+                        float t = Mathf.Clamp01(e.Age / 0.25f);
                         Vector3 from = Hand(side) + Vector3.forward * 0.05f;
-                        Vector3 end = Vector3.Lerp(from, Target, t);
+                        Vector3 end = Vector3.Lerp(from, Target - Vector3.forward * 0.3f, t);
                         line.SetPosition(0, from);
                         line.SetPosition(1, end);
-                        splat.transform.localPosition = end;
-                        splat.Size = Vector3.one * (t >= 1f ? 0.6f : 0.01f);
+                        float size = t < 1f ? Mathf.Lerp(0.15f, 0.7f, t) : Mathf.Lerp(0.7f, 0.95f, Mathf.Clamp01((e.Age - 0.25f) * 10f));
+                        web.localPosition = end;
+                        web.localRotation = Quaternion.Euler(0f, 180f, t < 1f ? e.Age * 500f : 125f);
+                        web.localScale = new Vector3(size, size, size * 0.25f);
+                        WebStrand.Tint(silk, strand, Mathf.Clamp01((e.Life - e.Age) / 0.3f));
                         if (t >= 1f && !stuck)
                         {
                             stuck = true;

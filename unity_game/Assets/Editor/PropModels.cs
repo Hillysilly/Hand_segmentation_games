@@ -37,6 +37,10 @@ namespace Repulsor.EditorTools
             public Anchor Anchor;
             /// <summary>Glowing tint over the model's colours (rocks get orange cracks in game instead).</summary>
             public Color? Tint;
+            /// <summary>A flat model: turned so its thinnest side faces +Z.</summary>
+            public bool FlatToZ;
+            /// <summary>Drawn with this shader (unlit, tinted in game) instead of its own colours.</summary>
+            public string Shader;
         }
 
         static readonly Entry[] Entries =
@@ -58,6 +62,8 @@ namespace Repulsor.EditorTools
             new Entry { Key = "SpikeA", Model = Rocks + "rock_tallA.fbx", Axis = 1, Size = 1f, Anchor = Anchor.Base },
             new Entry { Key = "SpikeB", Model = Rocks + "rock_tallB.fbx", Axis = 1, Size = 1f, Anchor = Anchor.Base },
             new Entry { Key = "SpikeC", Model = Rocks + "rock_tallC.fbx", Axis = 1, Size = 1f, Anchor = Anchor.Base },
+            // Quaternius cobweb (CC0): flat, facing +Z, 1 m across, origin at its middle; tinted and faded in game.
+            new Entry { Key = "Web", Model = "Assets/Props/Web/Cobweb.glb", FlatToZ = true, Axis = 0, Size = 1f, Anchor = Anchor.Centre, Shader = "Repulsor/WebModel" },
         };
 
         public static string[] Keys => Entries.Select(e => e.Key).ToArray();
@@ -92,6 +98,16 @@ namespace Repulsor.EditorTools
             model.transform.localRotation = Quaternion.Euler(entry.Euler) * model.transform.localRotation;
 
             Bounds bounds = MeshBounds(model);
+            if (entry.FlatToZ)
+            {
+                Vector3 size = bounds.size;
+                if (size.x < size.y && size.x < size.z)
+                    model.transform.localRotation = Quaternion.Euler(0f, 90f, 0f) * model.transform.localRotation;
+                else if (size.y < size.x && size.y < size.z)
+                    model.transform.localRotation = Quaternion.Euler(90f, 0f, 0f) * model.transform.localRotation;
+                bounds = MeshBounds(model);
+                Debug.Log($"[PropModels] {entry.Key}: was {size.x:0.0000} x {size.y:0.0000} x {size.z:0.0000}, now {bounds.size.x:0.0000} x {bounds.size.y:0.0000} x {bounds.size.z:0.0000}");
+            }
             float scale = entry.Size / Mathf.Max(1e-5f, bounds.size[entry.Axis]);
             model.transform.localScale *= scale;
             bounds = MeshBounds(model);
@@ -105,7 +121,7 @@ namespace Repulsor.EditorTools
             }
             model.transform.localPosition -= anchor;
 
-            Material textured = entry.Texture != null ? TexturedMaterial(entry) : null;
+            Material textured = entry.Texture != null ? TexturedMaterial(entry) : entry.Shader != null ? ShaderMaterial(entry) : null;
             foreach (Renderer renderer in model.GetComponentsInChildren<Renderer>(true))
             {
                 renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -193,6 +209,20 @@ namespace Repulsor.EditorTools
             return material;
         }
 
+        static Material ShaderMaterial(Entry entry)
+        {
+            string path = $"{OutFolder}/Materials/{entry.Key}.mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null)
+            {
+                material = new Material(Shader.Find(entry.Shader));
+                AssetDatabase.CreateAsset(material, path);
+            }
+            material.shader = Shader.Find(entry.Shader);
+            EditorUtility.SetDirty(material);
+            return material;
+        }
+
         static Material ColourMaterial(string key, Material original)
         {
             string path = $"{OutFolder}/Materials/{key}_{(original != null ? original.name : "Plain")}.mat";
@@ -207,6 +237,25 @@ namespace Repulsor.EditorTools
             material.SetFloat("_Smoothness", 0.35f);
             AssetDatabase.CreateAsset(material, path);
             return material;
+        }
+
+        /// <summary>Batch (with graphics): the web from the front (+Z), the side and at an angle, to Logs/preview_web_*.png.</summary>
+        public static void RenderWeb()
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var go = Object.Instantiate(Resources.Load<GameObject>("Props/Web"));
+            foreach (Renderer renderer in go.GetComponentsInChildren<Renderer>())
+            {
+                var block = new MaterialPropertyBlock();
+                block.SetColor("_Color", Color.white);
+                renderer.SetPropertyBlock(block);
+            }
+            Marker(Vector3.zero, Vector3.right, Color.red);
+            Marker(Vector3.zero, Vector3.up, Color.green);
+            Marker(Vector3.zero, Vector3.forward, Color.blue);
+            Snap(new Vector3(0f, 0f, 1.6f), Vector3.zero, 50f, "Logs/preview_web_front.png");
+            Snap(new Vector3(1.6f, 0f, 0f), Vector3.zero, 50f, "Logs/preview_web_side.png");
+            Snap(new Vector3(1f, 0.6f, 1.2f), Vector3.zero, 50f, "Logs/preview_web_angle.png");
         }
 
         /// <summary>Batch (with graphics): every prop, from the side (+X) and from above, to Logs/preview_props_*.png.</summary>

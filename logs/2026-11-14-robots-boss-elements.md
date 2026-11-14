@@ -115,3 +115,13 @@ the level 1/2/3 moves, cycling, with manual stepping; under it the name and the 
   short names given at runtime fixed it. The game's laser beam and the robot's eye glows are sized for the room,
   so the stage draws its own beam and shrinks the eyes.
 - PC renders: `Logs/play_select_*.png`. EditMode 169/169, PlayMode 13/13, APK built (no headset to install).
+
+## Real webs for Webline (midday)
+
+The user asked for the web shots to be actual webs, from a model found online. Candidates: Quaternius "Cobweb"
+(CC0, poly.pizza), Google Poly "Spider web" (CC BY, strung between plant stems), OpenGameArt web textures (2D).
+Used the Quaternius cobweb: it's a corner cobweb (curved), so it's squashed to a quarter of its depth and always
+shown front-on to the shooter. The shot hides its energy ball and flies the web, opening and spinning; on a hit
+the web sticks to the robot (through the shot's OnHit) and fades after 3 s. Black at level 3. The select screen's
+web moves use it too. `Game/WebStrand.cs`, `Shaders/WebModel.shader`, `Resources/Props/Web` (PropModels).
+PC renders `Logs/play_web_*.png`. EditMode 169/169, PlayMode 14/14, APK built.

@@ -47,6 +47,8 @@ The APK is built; install it with `build_and_run.ps1 -NoBuild` when the headset 
 10. **Character select** (redone 11/14): a symbol box per character on the left; top right a mannequin acting
     out each level's move against a robot, cycling L1-L3 (arrows pick one); name and a scrolling ability list
     under it. Is the figure big enough at arm's length? Do the effects read? Do the scroll buttons work?
+11. **Webline's webs** (11/14): web shots now fly as a real web (Quaternius cobweb) that opens and spins, and
+    stick on what they hit. Big enough? Readable against your room?
 
 ## Status, end of 11/8 session
 
