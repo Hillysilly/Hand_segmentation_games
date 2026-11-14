@@ -30,3 +30,13 @@ Assets/Props/Weapons/KayKit (crossbows, arrow, rogue_texture.png)
 Assets/Props/Rocks (rocks and stones)
   Nature Kit by Kenney (www.kenney.nl), CC0 1.0.
   https://opengameart.org/content/nature-kit
+
+Assets/Characters/Mannequin (the character select mannequin and its animations)
+  Universal Animation Library (Standard) by Quaternius, CC0 1.0.
+  https://opengameart.org/content/universal-animation-library
+
+Assets/Resources/Icons (character select symbols)
+  Icons by Lorc, from game-icons.net, CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/).
+  laser-blast (Technoman), punch-blast (Ryuu), fireball (Emberwitch), energy-sword (Lumen), high-shot (Valkyr),
+  spider-web (Webline), tornado (Tempest), earth-spit (Terra). Recoloured white; tinted in the game.
+  https://game-icons.net

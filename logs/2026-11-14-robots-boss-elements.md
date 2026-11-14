@@ -97,3 +97,21 @@ The user asked for the plan's "tight aura": the segmentation mask, slightly larg
 - Checked on the PC with the saved mirror pictures in `Logs/frames` (`TightAuraCaptureTests`, pictures in
   `Logs/play_tight_*.png`): the person was found in all six pictures and the glow lines up with them.
 - EditMode 169/169, PlayMode 12/12, APK built (not installed, no headset).
+
+## Character select redone (late morning)
+
+The user asked for: a symbol per character in boxes on the left; top right (quadrant 1) a default 3D model doing
+the level 1/2/3 moves, cycling, with manual stepping; under it the name and the ability list, scrolling.
+
+- Model: the user picked the Quaternius mannequin (Universal Animation Library, CC0) over the Library 2 female
+  mannequin and KayKit's Prototype Pete. Library 2 turned out to use a different skeleton (UE-style `pelvis`,
+  `hand_l` against Library 1's Rigify `DEF-` bones), so only Library 1's 46 clips are used.
+- Icons: game-icons.net by Lorc (CC BY 3.0, credited), chosen by the user "for now".
+- `CharacterShowcase`: a 12 cm mannequin in the player's colour in front of the screen, with a robot to hit and
+  a small version of each move's effect (24 moves, 3 per character). `Arena.Showcase.cs` places it, runs the
+  level arrows and scrolls the ability list to the level shown unless you've scrolled in the last 6 s.
+- Pitfalls hit: a saved Animation keeps clips but not the names given with AddClip (they come back as
+  `Rig|Punch_Cross`), and RemoveClip in the editor left null entries; `AnimationUtility.SetAnimationClips` and
+  short names given at runtime fixed it. The game's laser beam and the robot's eye glows are sized for the room,
+  so the stage draws its own beam and shrinks the eyes.
+- PC renders: `Logs/play_select_*.png`. EditMode 169/169, PlayMode 13/13, APK built (no headset to install).

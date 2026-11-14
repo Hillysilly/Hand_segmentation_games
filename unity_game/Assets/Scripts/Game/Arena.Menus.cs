@@ -166,69 +166,85 @@ namespace Repulsor
             phase = Phase.Characters;
             CleanUpMatch();
             CharacterDef current = Character;
-            RectTransform s = OpenScreen(new Vector2(580f, 360f), "CHOOSE YOUR FIGHTER");
+            RectTransform s = OpenScreen(SelectSize, null);
+            characterScreen = s;
+            Ui.Label(s, "CHOOSE YOUR FIGHTER", new Vector2(-150f, 176f), new Vector2(280f, 30f), 20,
+                TextAnchor.MiddleCenter, FontStyle.Bold).color = Ui.Accent;
 
+            // Left: a box per character with a symbol for its powers.
             for (int i = 0; i < CharacterDef.All.Length; i++)
             {
                 CharacterDef def = CharacterDef.All[i];
-                PokeButton b = Ui.Button(s, def.Name.ToUpperInvariant() + (def.Ready ? "" : " *"),
-                    new Vector2(-200f, 122f - i * 34f), new Vector2(150f, 30f), () =>
-                    {
-                        character = def.Id;
-                        customColor = false;
-                        ShowCharacters();
-                    }, 15);
+                var at = new Vector2(i % 2 == 0 ? -213f : -79f, 122f - (i / 2) * 72f);
+                PokeButton b = Ui.Button(s, def.Name.ToUpperInvariant() + (def.Ready ? "" : " *"), at, new Vector2(126f, 66f), () =>
+                {
+                    character = def.Id;
+                    customColor = false;
+                    ShowCharacters();
+                }, 12);
                 b.Selected = def.Id == character;
+                var face = (RectTransform)b.Label.transform.parent;
+                Sprite icon = Resources.Load<Sprite>("Icons/" + def.Id);
+                if (icon != null)
+                {
+                    Image image = Ui.Box(face, new Vector2(0f, 9f), new Vector2(38f, 38f), Hex(def.Color), false);
+                    image.sprite = icon;
+                    image.preserveAspect = true;
+                }
+                var label = (RectTransform)b.Label.transform;
+                label.anchoredPosition = new Vector2(0f, -22f);
+                label.sizeDelta = new Vector2(122f, 18f);
             }
-
-            Ui.Label(s, current.Name.ToUpperInvariant(), new Vector2(80f, 118f), new Vector2(380f, 30f), 24,
-                TextAnchor.MiddleLeft, FontStyle.Bold).color = PlayerColor;
-            Ui.Label(s, current.Tagline + "    Shield: " + current.Shield, new Vector2(80f, 94f), new Vector2(380f, 20f), 13,
-                TextAnchor.MiddleLeft).color = Ui.Muted;
-            Text controls = Ui.Label(s, current.ControlsUpTo(3), new Vector2(80f, 30f), new Vector2(380f, 100f), 13,
-                TextAnchor.UpperLeft);
-            controls.lineSpacing = 1.1f;
-            Ui.Label(s, "Everyone: cross wrists in an X for a shield. Fill the meter, then clench both fists at your sides to power up. "
-                + "Both hands OK sign for 2 s to pause.", new Vector2(80f, -45f), new Vector2(380f, 34f), 11,
-                TextAnchor.UpperLeft).color = Ui.Muted;
-            if (!current.Ready)
-                Ui.Label(s, "* Work in progress: some of this character's attacks aren't built yet.",
-                    new Vector2(80f, -78f), new Vector2(380f, 18f), 11, TextAnchor.MiddleLeft).color = Ui.Warning;
 
             for (int i = 0; i < Swatches.Length; i++)
             {
                 string html = Swatches[i];
                 Color swatch = Hex(html);
-                PokeButton b = Ui.Button(s, "", new Vector2(-10f + i * 38f, -108f), new Vector2(30f, 30f), () =>
+                PokeButton b = Ui.Button(s, "", new Vector2(-268f + i * 32f, -150f), new Vector2(27f, 27f), () =>
                 {
                     chosenColor = swatch;
                     customColor = true;
                     ShowCharacters();
                 });
-                Ui.Box((RectTransform)b.Label.transform.parent, Vector2.zero, new Vector2(22f, 22f), swatch);
+                Ui.Box((RectTransform)b.Label.transform.parent, Vector2.zero, new Vector2(19f, 19f), swatch);
                 b.Selected = customColor && chosenColor == swatch;
             }
-            Ui.Label(s, "COLOUR", new Vector2(-75f, -108f), new Vector2(100f, 20f), 13, TextAnchor.MiddleRight).color = Ui.Muted;
 
-            Ui.Button(s, "BACK", new Vector2(-215f, -160f), new Vector2(110f, 34f), Multiplayer ? ShowLobby : (System.Action)ShowModes, 14);
+            // Top right: the stage the mannequin stands on (the figure itself is drawn in front, see TickShowcase).
+            Ui.Box(s, WellCentre, WellSize, Ui.Well);
+            Ui.Button(s, "<", new Vector2(36f, 4f), new Vector2(36f, 28f), () => StepShowcase(-1), 16);
+            Ui.Button(s, ">", new Vector2(264f, 4f), new Vector2(36f, 28f), () => StepShowcase(1), 16);
+            showcaseLevel = Ui.Label(s, "", new Vector2(150f, 4f), new Vector2(188f, 24f), 13, TextAnchor.MiddleCenter, FontStyle.Bold);
+
+            // Under it: the name and every ability, scrolled with the arrows (it follows the level being shown).
+            Ui.Label(s, current.Name.ToUpperInvariant(), new Vector2(150f, -22f), new Vector2(276f, 26f), 22,
+                TextAnchor.MiddleCenter, FontStyle.Bold).color = PlayerColor;
+            Ui.Label(s, current.Tagline + "    Shield: " + current.Shield, new Vector2(150f, -42f), new Vector2(276f, 16f), 11,
+                TextAnchor.MiddleCenter).color = Ui.Muted;
+            BuildAbilityList(s, current);
+            Ui.Button(s, "^", new Vector2(285f, -76f), new Vector2(24f, 40f), () => ScrollAbilities(-1), 14);
+            Ui.Button(s, "v", new Vector2(285f, -124f), new Vector2(24f, 40f), () => ScrollAbilities(1), 14);
+            shownShowcaseLevel = -1;
+
+            Ui.Button(s, "BACK", new Vector2(-235f, -180f), new Vector2(100f, 30f), Multiplayer ? ShowLobby : (System.Action)ShowModes, 14);
             if (!Multiplayer)
             {
-                Ui.Button(s, "READY", new Vector2(215f, -152f), new Vector2(130f, 44f), StartMatch, 22);
+                Ui.Button(s, "READY", new Vector2(225f, -178f), new Vector2(130f, 36f), StartMatch, 20);
                 return;
             }
-            PokeButton ready = Ui.Button(s, localReady ? "WAITING" : "READY", new Vector2(215f, -152f), new Vector2(130f, 44f), () =>
+            PokeButton ready = Ui.Button(s, localReady ? "WAITING" : "READY", new Vector2(225f, -178f), new Vector2(130f, 36f), () =>
             {
                 localReady = !localReady;
                 SendLobby();
                 TryStartTogether();
                 if (phase == Phase.Characters)
                     ShowCharacters();
-            }, 20);
+            }, 18);
             ready.Selected = localReady;
             string partner = !net.Connected ? "Player 2: not connected"
                 : $"Player 2: {CharacterDef.Get((CharacterId)Mathf.Clamp(remoteLobby.Character, 0, CharacterDef.All.Length - 1)).Name}"
                   + (remoteReady ? "  <color=#80FF80>READY</color>" : "  choosing...");
-            Ui.Label(s, partner + (frame.Calibrated ? "" : "   (not lined up)"), new Vector2(60f, -150f), new Vector2(200f, 40f), 12,
+            Ui.Label(s, partner + (frame.Calibrated ? "" : "   (not lined up)"), new Vector2(60f, -178f), new Vector2(180f, 36f), 11,
                 TextAnchor.MiddleLeft);
         }
 

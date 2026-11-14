@@ -168,6 +168,7 @@ namespace Repulsor
             UpdateArms();
             LogPerformance(dt);
             ShowTightAura(dt);
+            TickShowcase(Time.unscaledDeltaTime);
         }
 
         readonly GameObject[] fistGlow = new GameObject[2];

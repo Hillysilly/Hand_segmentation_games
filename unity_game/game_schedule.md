@@ -44,6 +44,9 @@ The APK is built; install it with `build_and_run.ps1 -NoBuild` when the headset 
 9. **Tight aura** (added 11/14 morning): DEBUG > INVINCIBLE 8s (or transform). Do your hands and forearms get a
    glowing outline, with afterimages when you swing them? Stand in front of a mirror: does your reflection get
    the glowing body outline? Is it too strong to see your hands through? Does the frame rate hold?
+10. **Character select** (redone 11/14): a symbol box per character on the left; top right a mannequin acting
+    out each level's move against a robot, cycling L1-L3 (arrows pick one); name and a scrolling ability list
+    under it. Is the figure big enough at arm's length? Do the effects read? Do the scroll buttons work?
 
 ## Status, end of 11/8 session
 
