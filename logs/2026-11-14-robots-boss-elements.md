@@ -285,3 +285,7 @@ EditMode 175/175, PlayMode 23/23. Installed.
   silhouette outline and rising value-noise flicker; fades out past the wrist via _WristPos/_WristFwd), tinted
   AttackColor. Technoman's old ellipsoid hand glow is gone. Capture test `HandAuraCaptureTests` (Logs/play_aura_*).
   Select screen hint label widened (its ">" wrapped). EditMode 175/175, PlayMode 23/23. Installed.
+- Join by IP: the user's headsets were 172.96.99.x and 172.96.116.x, and the room code only carries the last
+  number (the joiner fills in its own first three). The host's lobby shows its IP big; the join keypad has a "."
+  key and takes an address (`NetProtocol.TryParseAddress`) or a code; the last address is offered again
+  (PlayerPrefs LastHostAddress). Installed on 2G97C5ZH9300P6 (headsets also seen: 2G0YC5ZG8V05SS, 2G97C5ZH920328).

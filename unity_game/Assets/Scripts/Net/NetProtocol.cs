@@ -363,6 +363,29 @@ namespace Repulsor
         /// </summary>
         public static int RoomCode(byte lastOctet) => lastOctet * 10 + CheckDigit(lastOctet);
 
+        /// <summary>
+        /// A host's address typed on the join keypad: four numbers 0-255 with dots between (11/15: networks bigger
+        /// than one "x.y.z.*" block, where the room code's guess at the first three numbers is wrong).
+        /// </summary>
+        public static bool TryParseAddress(string typed, out System.Net.IPAddress address)
+        {
+            address = null;
+            if (string.IsNullOrEmpty(typed))
+                return false;
+            string[] parts = typed.Split('.');
+            if (parts.Length != 4)
+                return false;
+            var bytes = new byte[4];
+            for (int i = 0; i < 4; i++)
+            {
+                if (parts[i].Length == 0 || parts[i].Length > 3 || !int.TryParse(parts[i], out int value) || value > 255)
+                    return false;
+                bytes[i] = (byte)value;
+            }
+            address = new System.Net.IPAddress(bytes);
+            return true;
+        }
+
         public static bool TryParseRoomCode(int code, out byte lastOctet)
         {
             lastOctet = 0;

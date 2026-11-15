@@ -365,40 +365,75 @@ namespace Repulsor
             Ui.Button(s, "BACK", new Vector2(0f, -90f), new Vector2(160f, 40f), ShowModes, 16);
         }
 
+        /// <summary>The last host address typed here, offered again next time.</summary>
+        const string LastHostKey = "LastHostAddress";
+
+        /// <summary>
+        /// The join keypad: the host's IP address (shown on its room screen) or its 4-digit room code. The code only
+        /// works when both headsets' addresses share their first three numbers; the address always works on one network.
+        /// </summary>
         void ShowJoin()
         {
             phase = Phase.Modes;
-            RectTransform s = OpenScreen(new Vector2(320f, 380f), "ENTER ROOM CODE");
-            Text display = Ui.Label(s, joinCode.Length > 0 ? joinCode : "_ _ _ _", new Vector2(0f, 120f), new Vector2(280f, 44f), 36,
-                TextAnchor.MiddleCenter, FontStyle.Bold);
+            RectTransform s = OpenScreen(new Vector2(330f, 440f), "JOIN A ROOM");
+            Ui.Label(s, "Type the host's IP address (on its screen), or its room code.", new Vector2(0f, 168f), new Vector2(310f, 30f), 12,
+                TextAnchor.MiddleCenter).color = Ui.Muted;
+            Text display = Ui.Label(s, joinCode.Length > 0 ? joinCode : "_ _ _ _", new Vector2(0f, 128f), new Vector2(310f, 40f),
+                joinCode.Length > 8 ? 26 : 34, TextAnchor.MiddleCenter, FontStyle.Bold);
             display.color = Ui.Accent;
-            string[] keys = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "DEL", "0", "JOIN" };
+            string[] keys = { "1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "DEL" };
             for (int i = 0; i < keys.Length; i++)
             {
                 string key = keys[i];
-                Vector2 at = new Vector2(-90f + (i % 3) * 90f, 65f - (i / 3) * 52f);
+                Vector2 at = new Vector2(-90f + (i % 3) * 90f, 78f - (i / 3) * 52f);
                 Ui.Button(s, key, at, new Vector2(80f, 46f), () =>
                 {
                     if (key == "DEL")
                         joinCode = joinCode.Length > 0 ? joinCode.Substring(0, joinCode.Length - 1) : "";
-                    else if (key == "JOIN")
-                    {
-                        if (int.TryParse(joinCode, out int code) && net.Join(code))
-                        {
-                            mode = roomMode;
-                            phase = Phase.Lobby;
-                            Log($"Joining room {joinCode}: {net.Status}");
-                            ShowLobby();
-                            return;
-                        }
-                        hud.Message("CAN'T JOIN", net.Status, 2f);
-                    }
-                    else if (joinCode.Length < 4)
+                    else if (joinCode.Length < 15)
                         joinCode += key;
                     ShowJoin();
                 }, key.Length > 1 ? 15 : 24);
             }
-            Ui.Button(s, "BACK", new Vector2(0f, -160f), new Vector2(140f, 36f), () => ShowRooms(roomMode), 15);
+            Ui.Button(s, "JOIN", new Vector2(0f, -132f), new Vector2(260f, 46f), TryJoin, 20);
+            string last = PlayerPrefs.GetString(LastHostKey, "");
+            if (last.Length > 0 && last != joinCode)
+                Ui.Button(s, "LAST: " + last, new Vector2(-62f, -186f), new Vector2(190f, 36f), () =>
+                {
+                    joinCode = last;
+                    ShowJoin();
+                }, 13);
+            Ui.Button(s, "BACK", new Vector2(last.Length > 0 && last != joinCode ? 100f : 0f, -186f), new Vector2(110f, 36f), () => ShowRooms(roomMode), 15);
+        }
+
+        void TryJoin()
+        {
+            bool joined;
+            if (joinCode.Contains("."))
+            {
+                if (!NetProtocol.TryParseAddress(joinCode, out System.Net.IPAddress host))
+                {
+                    hud.Message("CAN'T JOIN", "That address isn't right (four numbers with dots)", 2.5f);
+                    ShowJoin();
+                    return;
+                }
+                joined = net.Join(-1, NetProtocol.Port, host);
+                if (joined)
+                    PlayerPrefs.SetString(LastHostKey, joinCode);
+            }
+            else
+                joined = int.TryParse(joinCode, out int code) && net.Join(code);
+            if (!joined)
+                hud.Message("CAN'T JOIN", net.Status ?? "That code isn't right", 2.5f);
+            if (!joined)
+            {
+                ShowJoin();
+                return;
+            }
+            mode = roomMode;
+            phase = Phase.Lobby;
+            Log($"Joining {joinCode}: {net.Status}");
+            ShowLobby();
         }
 
         void ShowLobby()
@@ -407,9 +442,13 @@ namespace Repulsor
             RectTransform s = OpenScreen(new Vector2(400f, 320f), net.Role == NetRole.Host ? "YOUR ROOM" : "JOINING");
             if (net.Role == NetRole.Host)
             {
-                Ui.Label(s, "ROOM CODE", new Vector2(0f, 92f), new Vector2(360f, 20f), 14).color = Ui.Muted;
-                Ui.Label(s, net.RoomCode >= 0 ? net.RoomCode.ToString("0000") : "----", new Vector2(0f, 58f), new Vector2(360f, 56f), 50,
+                // The address is what always works; the code is a shortcut on small (home) networks.
+                System.Net.IPAddress local = NetSession.LocalAddress();
+                Ui.Label(s, "YOUR IP ADDRESS", new Vector2(0f, 112f), new Vector2(360f, 18f), 13).color = Ui.Muted;
+                Ui.Label(s, local != null ? local.ToString() : "no Wi-Fi", new Vector2(0f, 84f), new Vector2(380f, 40f), 34,
                     TextAnchor.MiddleCenter, FontStyle.Bold).color = Ui.Accent;
+                Ui.Label(s, "or room code  " + (net.RoomCode >= 0 ? net.RoomCode.ToString("0000") : "----"), new Vector2(0f, 52f),
+                    new Vector2(360f, 20f), 15, TextAnchor.MiddleCenter).color = Ui.Muted;
             }
             lobbyStatus = Ui.Label(s, net.Status, new Vector2(0f, 18f), new Vector2(360f, 22f), 15);
             if (net.Connected)
@@ -426,7 +465,7 @@ namespace Repulsor
             }
             else
             {
-                Ui.Label(s, net.Role == NetRole.Host ? "Waiting for player 2 to enter the code..." : "Waiting for the host...",
+                Ui.Label(s, net.Role == NetRole.Host ? "Waiting for player 2 to type your IP address..." : "Waiting for the host...",
                     new Vector2(0f, -30f), new Vector2(360f, 22f), 14).color = Ui.Muted;
             }
             Ui.Button(s, "LEAVE", new Vector2(0f, -125f), new Vector2(140f, 38f), () =>

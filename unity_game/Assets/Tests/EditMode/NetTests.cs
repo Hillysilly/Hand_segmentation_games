@@ -172,5 +172,15 @@ namespace Repulsor.Tests
             for (int i = 0; i < 300; i++)
                 Assert.That(still.Step(true, new Vector3(i * 0.003f, 0.8f, 0.3f), 1f / 72f), Is.False);
         }
+
+        [Test]
+        public void ATypedHostAddressIsFourNumbersWithDots()
+        {
+            Assert.That(NetProtocol.TryParseAddress("172.96.99.23", out IPAddress a), Is.True);
+            Assert.That(a.ToString(), Is.EqualTo("172.96.99.23"));
+            Assert.That(NetProtocol.TryParseAddress("172.96.116.5", out _), Is.True);
+            foreach (string bad in new[] { "", "172.96.99", "172.96.99.", "172.96.99.256", "1.2.3.4.5", "1..2.3", "1234.1.1.1" })
+                Assert.That(NetProtocol.TryParseAddress(bad, out _), Is.False, bad);
+        }
     }
 }
