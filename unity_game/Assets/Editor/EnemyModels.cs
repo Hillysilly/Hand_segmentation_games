@@ -64,6 +64,9 @@ namespace Repulsor.EditorTools
             // The boss: the sci-fi kit's four-legged walker with twin cannons, scaled up to 2.3 m.
             new Entry { Key = "Trilobite", Model = Kit + "Enemy_Trilobite.fbx", Texture = Kit + "Textures/T_Enemies_Large_BaseColor.png",
                 Emissive = Kit + "Textures/T_Enemies_Large_Emissive.png", EyeHeight = 2.3f },
+            // GOLIATH, the mech boss: a stand-in (Mike, scaled to 2.7 m) until its own model is picked.
+            new Entry { Key = "MechBoss", Model = Mechs + "Mike.fbx", Texture = Mechs + "Textures/Mike_Texture.png",
+                Eyes = new[] { new Vector3(0.067f, 1.21f, 0.15f), new Vector3(-0.05f, 1.21f, 0.15f) }, EyeSize = 0.085f },
         };
 
         /// <summary>Drones are this wide.</summary>

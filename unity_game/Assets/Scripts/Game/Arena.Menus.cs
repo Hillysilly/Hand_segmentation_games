@@ -367,7 +367,7 @@ namespace Repulsor
                     new Vector2(0f, 64f), new Vector2(380f, 24f), 18, TextAnchor.MiddleCenter, FontStyle.Bold).color = Ui.Accent;
                 Log($"Score {score}{(record ? " (new best)" : "")}");
             }
-            Ui.Label(s, first + $"Waves cleared  {(won ? waves.Wave : Mathf.Max(0, waves.Wave - 1))} / {waves.WaveCount}\n"
+            Ui.Label(s, first + $"Rounds cleared  {(won ? waves.Wave : Mathf.Max(0, waves.Wave - 1))} / {waves.WaveCount}\n"
                 + $"Enemies destroyed  {waves.Kills}\n"
                 + $"Damage dealt  {player.DamageDealt:0}     taken  {player.DamageTaken:0}\n"
                 + $"Time  {minutes}:{matchTime - minutes * 60f:00}", new Vector2(0f, 8f), new Vector2(360f, 90f), 15);

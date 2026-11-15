@@ -1,0 +1,499 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace Repulsor
+{
+    /// <summary>
+    /// GOLIATH, the story's round 10 boss: a big mech with a readable routine.
+    /// - SWING (when you're close): it winds up for most of a second while the reach of the swing shows red on the
+    ///   floor, then sweeps it. Step back out of the red, or hold up your shield. Two swings, three when enraged.
+    /// - ARM LASERS: volleys from each arm in turn, with the usual aim lines to step out of.
+    /// - SHOULDER ROCKETS: a salvo of missiles that arc in (shoot them down; they also hurt its friends).
+    /// - JUMP SLAM: it crouches, leaps at where you're standing (a red ring marks the landing; your view tints red
+    ///   while you're in it), lands hard there, and a shockwave races out across the floor. Get out of the ring
+    ///   before it lands; jump (for real) as the wave passes, or block it with your shield.
+    /// Below 40% health it's enraged: shorter rests, more swings and rockets. Below 60% it calls in two helpers once.
+    /// Lines tagged [Mech] go to the headset log.
+    /// </summary>
+    public sealed class MechBrain : IBossBrain
+    {
+        enum Move { Approach, Swing, Lasers, Rockets, Jump, Summon, Rest }
+
+        public const float SwingReach = 2.6f;
+        public const float SwingDegrees = 130f;
+        public const float SwingWindUp = 0.8f;
+        public const float SwingDamage = 16f;
+        public const float SlamRadius = 1.3f;
+        public const float SlamDamage = 20f;
+        public const float WaveRange = 4.5f;
+        public const float WaveSpeed = 5f;
+        public const float WaveDamage = 9f;
+        /// <summary>Your head this much above where it usually is counts as jumping over the shockwave.</summary>
+        public const float JumpClearance = 0.1f;
+        const float CrouchSeconds = 0.55f;
+        const float AirSeconds = 1.1f;
+        const float JumpHeight = 1.8f;
+        static readonly Color Red = new Color(1f, 0.15f, 0.08f);
+
+        readonly Enemy body;
+        readonly Arena arena;
+        Move move = Move.Approach;
+        Move next = Move.Approach;
+        float timer = 2.5f;
+        int count;
+        int rotation;
+        bool summoned;
+        bool justSwung;
+        Vector3 jumpFrom, jumpTo;
+        LineRenderer marker;
+        readonly List<Shock> waves = new List<Shock>();
+
+        sealed class Shock
+        {
+            public Vector3 Centre;
+            public float Radius;
+            public bool Done;
+            public LineRenderer Line;
+            public Bubble Disc;
+        }
+
+        /// <summary>For tests: what it's doing.</summary>
+        public string MoveName => move.ToString();
+
+        public MechBrain(Enemy body)
+        {
+            this.body = body;
+            arena = body.Arena;
+        }
+
+        bool Enraged => body.Hp < body.MaxHp * 0.4f;
+        float RestSeconds => Enraged ? 0.7f : 1.3f;
+        float FloorY => arena.FloorY;
+        Vector3 Floor(Vector3 p) => new Vector3(p.x, FloorY + 0.02f, p.z);
+
+        /// <summary>Its arm cannons (side -1 left, +1 right) and shoulder pods.</summary>
+        Vector3 Arm(float side) => body.Center + Vector3.up * (body.Spec.Height * 0.08f) + body.transform.right * (side * 0.62f) + body.transform.forward * 0.45f;
+        Vector3 Shoulder(float side) => body.Center + Vector3.up * (body.Spec.Height * 0.36f) + body.transform.right * (side * 0.4f) - body.transform.forward * 0.1f;
+
+        public void Tick(float dt, Vector3 target, Vector3 toward, float distance)
+        {
+            timer -= dt;
+            TickWaves(dt);
+            switch (move)
+            {
+                case Move.Approach:
+                    body.Walk(dt, distance > body.Spec.Range ? toward : Vector3.zero, body.Spec.Speed * (Enraged ? 1.3f : 1f));
+                    body.Face(target, dt, 2.5f);
+                    if (timer <= 0f || distance < SwingReach * 0.85f)
+                        Choose(distance);
+                    break;
+                case Move.Rest:
+                    body.Walk(dt, distance > body.Spec.Range + 0.6f ? toward : Vector3.zero, body.Spec.Speed * 0.6f);
+                    body.Face(target, dt, 2.5f);
+                    if (timer <= 0f)
+                    {
+                        if (next == Move.Approach)
+                            Choose(distance);
+                        else
+                            Begin(next);
+                    }
+                    break;
+                case Move.Swing:
+                    TickSwing(dt, target);
+                    break;
+                case Move.Lasers:
+                    body.Walk(dt, Vector3.zero, 0f);
+                    body.Face(target, dt, 3f);
+                    TickLasers(target);
+                    break;
+                case Move.Rockets:
+                    body.Walk(dt, Vector3.zero, 0f);
+                    body.Face(target, dt, 3f);
+                    TickRockets(target);
+                    break;
+                case Move.Jump:
+                    TickJump(dt, target);
+                    break;
+                case Move.Summon:
+                    body.Walk(dt, Vector3.zero, 0f);
+                    if (timer <= 0f)
+                    {
+                        arena.SpawnBossHelpers(body, 2);
+                        RestThen(Move.Approach);
+                    }
+                    break;
+            }
+        }
+
+        /// <summary>Close: swing (then something else). Otherwise lasers, a jump and rockets in turn.</summary>
+        void Choose(float distance)
+        {
+            if (!summoned && body.Hp < body.MaxHp * 0.6f)
+            {
+                summoned = true;
+                Begin(Move.Summon);
+                return;
+            }
+            // Swings when you're close, but never twice in a row: standing your ground still sees everything.
+            if (distance < SwingReach && !justSwung)
+            {
+                justSwung = true;
+                Begin(Move.Swing);
+                return;
+            }
+            justSwung = false;
+            Move[] cycle = { Move.Lasers, Move.Jump, Move.Rockets };
+            Begin(cycle[rotation++ % cycle.Length]);
+        }
+
+        void Begin(Move what)
+        {
+            move = what;
+            count = 0;
+            switch (what)
+            {
+                case Move.Swing:
+                    StartSwing();
+                    break;
+                case Move.Lasers:
+                    timer = 0.3f;
+                    break;
+                case Move.Rockets:
+                    timer = 0.5f;
+                    body.Look?.PlayOnce("shoot");
+                    break;
+                case Move.Jump:
+                    timer = CrouchSeconds;
+                    jumpFrom = body.transform.position;
+                    jumpTo = LandingSpot();
+                    body.Look?.PlayOnce("hit", 0.7f);
+                    break;
+                case Move.Summon:
+                    timer = 1.2f;
+                    body.Look?.PlayOnce("hit");
+                    break;
+                case Move.Approach:
+                    timer = 2.5f;
+                    break;
+            }
+            Debug.Log($"[Mech] {what}, HP {body.Hp:0}/{body.MaxHp:0}{(Enraged ? " (enraged)" : "")}");
+        }
+
+        void RestThen(Move after)
+        {
+            move = Move.Rest;
+            timer = RestSeconds;
+            next = after;
+            ShowMarker(false);
+        }
+
+        // ------------------------------------------------------------------ swing
+
+        Vector3 swingFacing;
+
+        void StartSwing()
+        {
+            timer = SwingWindUp * (Enraged ? 0.8f : 1f);
+            Vector3 target = arena.NearestPlayerHead(body.Center);
+            swingFacing = Vector3.ProjectOnPlane(target - body.Center, Vector3.up).normalized;
+            if (swingFacing.sqrMagnitude < 0.5f)
+                swingFacing = body.transform.forward;
+            body.Look?.PlayOnce("attack", 0.8f);
+            arena.Game.PlayAt(body.Center, arena.Game.WhooshSound);
+        }
+
+        void TickSwing(float dt, Vector3 target)
+        {
+            body.Walk(dt, Vector3.zero, 0f);
+            // It turns with you a little during the wind-up, then commits.
+            Vector3 toYou = Vector3.ProjectOnPlane(target - body.Center, Vector3.up).normalized;
+            if (timer > 0.25f && toYou.sqrMagnitude > 0.5f)
+                swingFacing = Vector3.Slerp(swingFacing, toYou, 2f * dt).normalized;
+            body.Face(body.Center + swingFacing, dt, 6f);
+            if (timer > 0f)
+            {
+                float t = 1f - timer / SwingWindUp;
+                DrawSector(Floor(body.Center), swingFacing, SwingReach, SwingDegrees, 0.6f + 0.4f * Mathf.Sin(t * 40f) * t);
+                if (InSwing(target))
+                    arena.WarnPlayer(Mathf.Lerp(0.25f, 0.5f, t));
+                return;
+            }
+            // The sweep.
+            ShowMarker(false);
+            SweepTrail(swingFacing);
+            if (InSwing(target))
+            {
+                if (arena.PlayerShieldBlocks(body.Center))
+                    Debug.Log("[Mech] swing blocked by the shield");
+                else
+                    arena.HurtPlayer(SwingDamage, "mech swing");
+            }
+            count++;
+            int swings = Enraged ? 3 : 2;
+            float distance = Vector3.ProjectOnPlane(target - body.Center, Vector3.up).magnitude;
+            if (count < swings && distance < SwingReach + 0.5f)
+            {
+                StartSwing();
+                timer *= 0.75f;
+                return;
+            }
+            RestThen(Move.Approach);
+        }
+
+        bool InSwing(Vector3 head)
+        {
+            Vector3 flat = Vector3.ProjectOnPlane(head - body.Center, Vector3.up);
+            return flat.magnitude < SwingReach + 0.2f && Vector3.Angle(flat, swingFacing) < SwingDegrees * 0.5f + 8f;
+        }
+
+        /// <summary>A bright arc swept through the air at chest height: the arm going round.</summary>
+        void SweepTrail(Vector3 facing)
+        {
+            var go = new GameObject("Mech Swing", typeof(LineRenderer));
+            go.transform.SetParent(body.transform.parent, false);
+            var line = go.GetComponent<LineRenderer>();
+            line.sharedMaterial = Resources.Load<Material>("AimLine");
+            line.positionCount = 24;
+            line.useWorldSpace = true;
+            line.widthMultiplier = 0.18f;
+            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            Tint.Line(line, new Color(1f, 0.6f, 0.3f));
+            Vector3 centre = body.Center + Vector3.up * 0.2f;
+            for (int i = 0; i < 24; i++)
+            {
+                float a = Mathf.Lerp(-SwingDegrees * 0.5f, SwingDegrees * 0.5f, i / 23f);
+                line.SetPosition(i, centre + Quaternion.AngleAxis(a, Vector3.up) * facing * (SwingReach * 0.85f));
+            }
+            Object.Destroy(go, 0.18f);
+        }
+
+        // ------------------------------------------------------------------ arm lasers
+
+        void TickLasers(Vector3 target)
+        {
+            if (timer > 0f)
+                return;
+            int volleys = Enraged ? 5 : 4;
+            if (count >= volleys)
+            {
+                RestThen(Move.Approach);
+                return;
+            }
+            float side = count % 2 == 0 ? -1f : 1f;
+            Vector3 muzzle = Arm(side);
+            Vector3 aim = (target + Vector3.down * 0.3f - muzzle).normalized;
+            // Two beams a little apart, so a small step clears both.
+            arena.EnemyFires(EnemyShot.Laser, muzzle, Quaternion.AngleAxis(-5f, Vector3.up) * aim, body);
+            arena.EnemyFires(EnemyShot.Laser, muzzle, Quaternion.AngleAxis(5f, Vector3.up) * aim, body);
+            body.Look?.PlayOnce("shoot");
+            count++;
+            timer = Enraged ? 0.55f : 0.75f;
+        }
+
+        // ------------------------------------------------------------------ rockets
+
+        void TickRockets(Vector3 target)
+        {
+            if (timer > 0f)
+                return;
+            int rockets = Enraged ? 8 : 6;
+            if (count >= rockets)
+            {
+                RestThen(Move.Approach);
+                return;
+            }
+            float side = count % 2 == 0 ? -1f : 1f;
+            Vector3 spread = new Vector3(Random.Range(-0.9f, 0.9f), 0f, Random.Range(-0.9f, 0.9f));
+            arena.EnemyFires(EnemyShot.Missile, Shoulder(side) + Vector3.up * 0.15f, target + Vector3.down * 0.4f + spread, body);
+            count++;
+            timer = 0.28f;
+        }
+
+        // ------------------------------------------------------------------ jump slam
+
+        /// <summary>Where it lands: where you are now, but no more than a long leap from where it stands.</summary>
+        Vector3 LandingSpot()
+        {
+            Vector3 you = Floor(arena.NearestPlayerHead(body.Center));
+            Vector3 from = Floor(body.transform.position);
+            Vector3 leap = Vector3.ClampMagnitude(you - from, 5f);
+            Vector3 spot = from + leap;
+            Vector3 step = arena.Steer(from, leap.normalized, leap.magnitude);
+            if (step.sqrMagnitude < leap.sqrMagnitude * 0.5f)
+                spot = from + step;
+            return spot;
+        }
+
+        void TickJump(float dt, Vector3 target)
+        {
+            float middle = Enemy.MiddleHeight(body.Kind);
+            Vector3 land = Floor(jumpTo);
+            if (timer > 0f && count == 0)
+            {
+                // Crouching: it sinks a little and the landing ring appears.
+                body.Face(jumpTo, dt, 4f);
+                body.transform.position = new Vector3(jumpFrom.x, FloorY + middle - 0.25f * (1f - timer / CrouchSeconds), jumpFrom.z);
+                DrawRing(land, SlamRadius * 1.4f);
+                WarnIfInside(target, land, 0.25f);
+                return;
+            }
+            if (count == 0)
+            {
+                count = 1;
+                timer = AirSeconds;
+                arena.Game.PlayAt(body.Center, arena.Game.WhooshSound);
+            }
+            if (timer > 0f)
+            {
+                float t = 1f - timer / AirSeconds;
+                Vector3 flat = Vector3.Lerp(jumpFrom, jumpTo, t);
+                float height = 4f * JumpHeight * t * (1f - t);
+                body.transform.position = new Vector3(flat.x, FloorY + middle + height, flat.z);
+                body.Face(jumpTo + (jumpTo - jumpFrom), dt, 4f);
+                DrawRing(land, Mathf.Lerp(SlamRadius * 1.4f, SlamRadius, t));
+                WarnIfInside(target, land, Mathf.Lerp(0.3f, 0.55f, t));
+                return;
+            }
+            // Landing: a hard hit where it comes down, then the shockwave.
+            body.transform.position = new Vector3(jumpTo.x, FloorY + middle, jumpTo.z);
+            ShowMarker(false);
+            arena.Game.Explode(land + Vector3.up * 0.2f, 0f, 0f, new Color(1f, 0.5f, 0.2f));
+            arena.Game.PlayAt(land, arena.Game.BoomSound);
+            if (arena.PlayerStandsWithin(land, SlamRadius))
+            {
+                if (arena.PlayerShieldBlocks(land))
+                    Debug.Log("[Mech] slam blocked by the shield");
+                else
+                    arena.HurtPlayer(SlamDamage, "mech slam");
+            }
+            StartWave(land);
+            body.Look?.PlayOnce("hit", 1.4f);
+            RestThen(Move.Approach);
+        }
+
+        void WarnIfInside(Vector3 head, Vector3 centre, float amount)
+        {
+            if (arena.PlayerStandsWithin(centre, SlamRadius))
+                arena.WarnPlayer(amount);
+        }
+
+        void StartWave(Vector3 centre)
+        {
+            var shock = new Shock { Centre = centre, Radius = 0.3f };
+            var go = new GameObject("Mech Shockwave", typeof(LineRenderer));
+            go.transform.SetParent(body.transform.parent, false);
+            shock.Line = go.GetComponent<LineRenderer>();
+            shock.Line.sharedMaterial = Resources.Load<Material>("AimLine");
+            shock.Line.positionCount = 49;
+            shock.Line.loop = true;
+            shock.Line.useWorldSpace = true;
+            shock.Line.widthMultiplier = 0.14f;
+            shock.Line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            shock.Disc = Bubble.Create("Shockwave Disc", body.transform.parent);
+            shock.Disc.transform.position = centre;
+            waves.Add(shock);
+        }
+
+        /// <summary>Shockwaves race out along the floor; one that passes under you hurts unless you're in the air or shielded.</summary>
+        void TickWaves(float dt)
+        {
+            for (int i = waves.Count - 1; i >= 0; i--)
+            {
+                Shock w = waves[i];
+                float before = w.Radius;
+                w.Radius += WaveSpeed * dt;
+                float fade = Mathf.Clamp01((WaveRange - w.Radius) / 1.2f);
+                Tint.Line(w.Line, new Color(1f, 0.55f, 0.2f) * (0.5f + fade));
+                for (int k = 0; k < 49; k++)
+                {
+                    float a = k / 48f * Mathf.PI * 2f;
+                    w.Line.SetPosition(k, w.Centre + new Vector3(Mathf.Cos(a), 0.03f + 0.06f * Mathf.Sin(a * 6f + w.Radius * 8f), Mathf.Sin(a)) * w.Radius);
+                }
+                w.Disc.transform.localScale = new Vector3(w.Radius * 2f, 0.1f, w.Radius * 2f);
+                w.Disc.Show(new Color(1f, 0.45f, 0.15f), BubbleStyle.Energy, 0.5f * fade);
+                if (!w.Done)
+                {
+                    float distance = arena.PlayerFloorDistance(w.Centre);
+                    if (distance >= before && distance < w.Radius)
+                    {
+                        w.Done = true;
+                        if (arena.PlayerJumping(JumpClearance))
+                            Debug.Log("[Mech] shockwave jumped over");
+                        else if (arena.PlayerShieldBlocks(w.Centre))
+                            Debug.Log("[Mech] shockwave blocked by the shield");
+                        else
+                            arena.HurtPlayer(WaveDamage, "mech shockwave");
+                    }
+                }
+                if (w.Radius >= WaveRange)
+                {
+                    Object.Destroy(w.Line.gameObject);
+                    Object.Destroy(w.Disc.gameObject);
+                    waves.RemoveAt(i);
+                }
+            }
+        }
+
+        // ------------------------------------------------------------------ floor markers
+
+        void ShowMarker(bool on)
+        {
+            if (marker == null)
+            {
+                if (!on)
+                    return;
+                var go = new GameObject("Mech Marker", typeof(LineRenderer));
+                go.transform.SetParent(body.transform.parent, false);
+                marker = go.GetComponent<LineRenderer>();
+                marker.sharedMaterial = Resources.Load<Material>("AimLine");
+                marker.useWorldSpace = true;
+                marker.widthMultiplier = 0.035f;
+                marker.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                Tint.Line(marker, Red);
+            }
+            marker.enabled = on;
+        }
+
+        void DrawRing(Vector3 centre, float radius)
+        {
+            ShowMarker(true);
+            marker.loop = true;
+            marker.positionCount = 33;
+            for (int i = 0; i < 33; i++)
+            {
+                float a = i / 32f * Mathf.PI * 2f;
+                marker.SetPosition(i, centre + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * radius);
+            }
+        }
+
+        /// <summary>The swing's reach: a fan on the floor in front of it.</summary>
+        void DrawSector(Vector3 centre, Vector3 facing, float radius, float degrees, float brightness)
+        {
+            ShowMarker(true);
+            marker.loop = true;
+            const int Arc = 20;
+            marker.positionCount = Arc + 2;
+            marker.SetPosition(0, centre);
+            for (int i = 0; i <= Arc; i++)
+            {
+                float a = Mathf.Lerp(-degrees * 0.5f, degrees * 0.5f, i / (float)Arc);
+                marker.SetPosition(i + 1, centre + Quaternion.AngleAxis(a, Vector3.up) * facing * radius);
+            }
+            Tint.Line(marker, Red * brightness);
+        }
+
+        public void Stop()
+        {
+            if (marker != null)
+                Object.Destroy(marker.gameObject);
+            foreach (Shock w in waves)
+            {
+                if (w.Line != null)
+                    Object.Destroy(w.Line.gameObject);
+                if (w.Disc != null)
+                    Object.Destroy(w.Disc.gameObject);
+            }
+            waves.Clear();
+        }
+    }
+}

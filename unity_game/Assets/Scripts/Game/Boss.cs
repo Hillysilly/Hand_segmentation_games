@@ -15,7 +15,15 @@ namespace Repulsor
     /// Below a third of its health it rests less and its fans come in three waves.
     /// Lines tagged [Boss] go to the headset log.
     /// </summary>
-    public sealed class BossBrain
+    /// <summary>A boss's own routine, run in place of the usual enemy behaviour.</summary>
+    public interface IBossBrain
+    {
+        void Tick(float dt, Vector3 target, Vector3 toward, float distance);
+        /// <summary>It died or was cleared: take away anything it left in the room.</summary>
+        void Stop();
+    }
+
+    public sealed class BossBrain : IBossBrain
     {
         enum Move { Approach, Fan, Track, Missiles, Summon, Rest }
 

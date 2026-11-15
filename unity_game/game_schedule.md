@@ -67,6 +67,12 @@ The APK is built; install it with `build_and_run.ps1 -NoBuild` when the headset 
     your fingers, and stay out of the way of gestures? Frame rate with Tempest's (47k triangles a hand)?
 19. **Tempest tornado**: now a see-through white funnel model (also on the select screen).
 20. **Credits**: title screen > CREDITS, a page at a time.
+21. **Story mode is 10 rounds** (11/15): drones (1), dashers (2), brawlers (3), rocketeers (5), snipers (7), tanks (8),
+    each announced as NEW ENEMY in its first round; round 10 is GOLIATH. Too long? Pace right?
+22. **GOLIATH, the mech boss** (also BOSS FIGHT on the mode screen): swing combos with the reach shown red on the
+    floor (step back or shield), paired arm lasers, shoulder rockets, a jump slam at where you stand (red ring,
+    view tints red) and a shockwave across the floor (jump for real as it passes, shield it, or be 4.5 m away).
+    It's wearing a stand-in body (a Quaternius mech at 2.7 m) until you pick B1-B4 on the shortlist page.
 
 ## Status, end of 11/8 session
 

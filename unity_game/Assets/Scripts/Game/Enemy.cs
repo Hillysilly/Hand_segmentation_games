@@ -27,7 +27,7 @@ namespace Repulsor
         Transform head;
         Bubble spawnBubble;
         EnemyLook look;
-        BossBrain boss;
+        IBossBrain boss;
         EnemySpec spec;
         float age;
         float attackTimer;
@@ -102,7 +102,9 @@ namespace Repulsor
         public float MaxHp { get; private set; }
         public Vector3 BarPoint => Top + Vector3.up * (Radius + 0.15f);
         public bool Spawning => age < SpawnSeconds;
-        public bool IsBoss => Kind == EnemyKind.Boss;
+        public bool IsBoss => EnemySpec.IsBoss(Kind);
+        /// <summary>For tests: the mech boss's current move (empty for anything else).</summary>
+        public string BossMove => boss is MechBrain mech ? mech.MoveName : "";
         public Arena Arena => arena;
         public EnemyLook Look => look;
         /// <summary>Where its middle should be above the floor.</summary>
@@ -159,6 +161,8 @@ namespace Repulsor
             }
             if (kind == EnemyKind.Boss)
                 enemy.boss = new BossBrain(enemy);
+            else if (kind == EnemyKind.Mech)
+                enemy.boss = new MechBrain(enemy);
             return enemy;
         }
 

@@ -190,3 +190,20 @@ Rouker's "glove", M4, not RedRocket's "Leather Gloves", M1; used as is, asked ab
   spun and swayed in code; the select screen's tornado too. Render `Logs/play_web_tornado.png`.
 - Credits moved to `Assets/Resources/Credits.txt` and shown in the game (title screen > CREDITS).
 - EditMode 165/165, PlayMode 21/21. Installed on the headset.
+
+## 11/15: 10-round story and the mech boss
+
+- `WavePlan`: 10 rounds (`StoryRounds`), one new kind every round or two (`Introduced`: drone 1, dasher 2,
+  brawler 3, rocketeer 5, sniper 7, tank 8), a little rarer in its first round; announced on the HUD as NEW ENEMY
+  with its blurb. `EnemiesInWave` is now 3 + 1.6 per round (4 up to 17). Round 10 spawns `WavePlan.FinalBoss`.
+- `EnemyKind.Mech` (GOLIATH, 900 HP, 2.7 m) with `MechBrain` (Game/MechBoss.cs): swing (0.8 s wind-up, red fan
+  on the floor, 16 damage, 2-3 in a row, never twice running so standing close still sees everything), arm
+  lasers (paired beams per arm, 4-5 volleys), shoulder rockets (6-8), jump slam (crouch, 1.1 s leap of up to 5 m
+  to where you stood, 20 damage within 1.3 m, then a shockwave out to 4.5 m at 5 m/s doing 9). The shockwave is
+  dodged by a real jump (head 10 cm above the slowly learnt standing height), the shield facing it, or range.
+  Enraged below 40%; calls two helpers once below 60%. Bosses share `IBossBrain`; `EnemySpec.IsBoss` covers both.
+- Mech model candidates (Sketchfab, CC BY, animated) added to the shortlist page as B1-B4; a stand-in
+  (`Resources/Enemies/MechBoss`, Quaternius "Mike" scaled) is used until one is picked. Trilobite stays in the code
+  (debug spawns) but neither the story nor BOSS FIGHT uses it now.
+- Co-op: the mech's swing, slam and shockwave are worked out on the host only (lasers and rockets are sent).
+- EditMode 165/165, PlayMode 22/22 (`MechBossTests` runs the routine and pictures the warnings). Installed.

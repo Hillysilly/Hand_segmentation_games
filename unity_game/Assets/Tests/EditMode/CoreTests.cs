@@ -351,14 +351,26 @@ namespace Repulsor.Tests
             for (double roll = 0; roll < 1; roll += 0.01)
             {
                 EnemyKind kind = WavePlan.KindFor(1, roll);
-                Assert.That(kind == EnemyKind.Dasher || kind == EnemyKind.Drone, $"{kind} in wave 1");
+                Assert.That(kind, Is.EqualTo(EnemyKind.Drone), "wave 1 is drones");
+                Assert.That(WavePlan.KindFor(2, roll) == EnemyKind.Drone || WavePlan.KindFor(2, roll) == EnemyKind.Dasher, "wave 2 adds dashers");
                 Assert.That(WavePlan.KindFor(5, roll), Is.Not.EqualTo(EnemyKind.Boss));
             }
             var seen = new System.Collections.Generic.HashSet<EnemyKind>();
             for (double roll = 0; roll < 1; roll += 0.005)
-                seen.Add(WavePlan.KindFor(4, roll));
+                seen.Add(WavePlan.KindFor(9, roll));
             Assert.That(seen, Is.EquivalentTo(new[] { EnemyKind.Drone, EnemyKind.Brawler, EnemyKind.Dasher,
                 EnemyKind.Rocketeer, EnemyKind.Sniper, EnemyKind.Tank }));
+            // One new kind at a time, spread over the story, never in the boss round.
+            int newRounds = 0;
+            for (int wave = 1; wave <= WavePlan.StoryRounds; wave++)
+            {
+                Assert.That(WavePlan.NewIn(wave).Count, Is.LessThanOrEqualTo(1), $"round {wave}");
+                if (WavePlan.NewIn(wave).Count > 0)
+                    newRounds++;
+            }
+            Assert.That(newRounds, Is.EqualTo(6));
+            Assert.That(WavePlan.NewIn(WavePlan.StoryRounds), Is.Empty);
+            Assert.That(WavePlan.Introduced(EnemyKind.Tank), Is.LessThan(WavePlan.StoryRounds - 1), "every kind gets a round before the boss");
             // The yellow gunner isn't sent any more, nor called in by the boss.
             for (double roll = 0; roll < 1; roll += 0.01)
                 Assert.That(WavePlan.BossHelper(roll), Is.Not.EqualTo(EnemyKind.Robot));

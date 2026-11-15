@@ -7,7 +7,7 @@ namespace Repulsor
     /// Robot and Drone keep their old numbers. Robot (the yellow gunner) is no longer sent in waves (11/14: the
     /// user didn't like it); it stays so the numbers don't shift.
     /// </summary>
-    public enum EnemyKind : byte { Robot, Drone, Brawler, Rocketeer, Dasher, Sniper, Tank, Boss }
+    public enum EnemyKind : byte { Robot, Drone, Brawler, Rocketeer, Dasher, Sniper, Tank, Boss, Mech }
 
     /// <summary>What an enemy kind is: body, health, how it moves and how it fights. Plain data for tests.</summary>
     public sealed class EnemySpec
@@ -54,34 +54,70 @@ namespace Repulsor
             new EnemySpec { Kind = EnemyKind.Boss, Name = "TRILOBITE", Blurb = "The boss: laser fans, tracking strikes, missiles", Model = "Trilobite",
                 Hp = 700f, Height = 2.3f, Radius = 0.75f, Speed = 0.25f, Range = 3.2f, AttackMin = 1.5f, AttackMax = 2.5f,
                 HitLow = 1.0f, HitHigh = 1.7f },
+            new EnemySpec { Kind = EnemyKind.Mech, Name = "GOLIATH", Blurb = "The story's last boss: swings, arm lasers, shoulder rockets, a jump that sends a shockwave",
+                Model = "MechBoss", Hp = 900f, Height = 2.7f, Radius = 0.55f, Speed = 0.45f, Range = 2f, AttackMin = 1f, AttackMax = 2f },
         };
+
+        /// <summary>The bosses: one spawn each, a routine of their own, a bar across the top of the view.</summary>
+        public static bool IsBoss(EnemyKind kind) => kind == EnemyKind.Boss || kind == EnemyKind.Mech;
 
         public static EnemySpec Of(EnemyKind kind) => All[(int)kind];
     }
 
-    /// <summary>Which enemies a wave sends: new kinds join as the waves go on, and the last wave is the boss.</summary>
+    /// <summary>
+    /// Which enemies a wave sends. The story is 10 rounds; a new kind joins every round or two, so each gets a round
+    /// or so to learn before the next arrives, and round 10 is the mech boss.
+    /// </summary>
     public static class WavePlan
     {
+        /// <summary>The story's length, and its last boss.</summary>
+        public const int StoryRounds = 10;
+        public const EnemyKind FinalBoss = EnemyKind.Mech;
+
+        /// <summary>The round each kind first appears in.</summary>
+        public static int Introduced(EnemyKind kind)
+        {
+            switch (kind)
+            {
+                case EnemyKind.Drone: return 1;
+                case EnemyKind.Dasher: return 2;
+                case EnemyKind.Brawler: return 3;
+                case EnemyKind.Rocketeer: return 5;
+                case EnemyKind.Sniper: return 7;
+                case EnemyKind.Tank: return 8;
+                default: return int.MaxValue;
+            }
+        }
+
+        /// <summary>The kinds that first appear in this round (the game announces them).</summary>
+        public static System.Collections.Generic.List<EnemyKind> NewIn(int wave)
+        {
+            var list = new System.Collections.Generic.List<EnemyKind>();
+            foreach (EnemyKind kind in Enum.GetValues(typeof(EnemyKind)))
+                if (Introduced(kind) == wave)
+                    list.Add(kind);
+            return list;
+        }
+
         /// <summary>
-        /// The kind for one spawn of a wave, from a roll between 0 and 1. Wave 1 is dashers and drones; brawlers
-        /// join at 2, rocketeers at 3, snipers and tanks at 4.
+        /// The kind for one spawn of a wave, from a roll between 0 and 1: drones (1), dashers (2), brawlers (3),
+        /// rocketeers (5), snipers (7), tanks (8). A kind is rarer in its first round and common after.
         /// </summary>
         public static EnemyKind KindFor(int wave, double roll)
         {
-            var pool = new System.Collections.Generic.List<(EnemyKind kind, float weight)>
+            var pool = new System.Collections.Generic.List<(EnemyKind kind, float weight)>();
+            void Add(EnemyKind kind, float weight)
             {
-                (EnemyKind.Dasher, 3f),
-                (EnemyKind.Drone, Math.Min(2.5f, 0.6f + 0.6f * wave)),
-            };
-            if (wave >= 2)
-                pool.Add((EnemyKind.Brawler, 1.6f));
-            if (wave >= 3)
-                pool.Add((EnemyKind.Rocketeer, 1.2f));
-            if (wave >= 4)
-            {
-                pool.Add((EnemyKind.Sniper, 1f));
-                pool.Add((EnemyKind.Tank, 0.8f));
+                int since = wave - Introduced(kind);
+                if (since >= 0)
+                    pool.Add((kind, since == 0 ? weight * 0.7f : weight));
             }
+            Add(EnemyKind.Drone, wave == 1 ? 3f : 2f);
+            Add(EnemyKind.Dasher, 2.6f);
+            Add(EnemyKind.Brawler, 1.8f);
+            Add(EnemyKind.Rocketeer, 1.3f);
+            Add(EnemyKind.Sniper, 1.1f);
+            Add(EnemyKind.Tank, 0.9f);
             float total = 0f;
             foreach (var entry in pool)
                 total += entry.weight;

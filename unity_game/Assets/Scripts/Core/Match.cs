@@ -13,7 +13,7 @@ namespace Repulsor
         public bool FriendlyFire;
         public int Lives = 3;
         public float RespawnSeconds = 5f;
-        public int Waves = 5;
+        public int Waves = WavePlan.StoryRounds;
         public int RoundsToWin = 2; // best of 3
 
         public static MatchSettings For(GameMode mode) => new MatchSettings
@@ -63,7 +63,8 @@ namespace Repulsor
         /// <summary>Seconds left on the countdown or the break between waves.</summary>
         public float Timer => timer;
 
-        public static int EnemiesInWave(int wave) => 2 + wave * 2;
+        /// <summary>4 in the first round, up to 17 in the ninth.</summary>
+        public static int EnemiesInWave(int wave) => 3 + (int)(wave * 1.6f);
         /// <summary>Of a wave's enemies, how many are drones rather than robots.</summary>
         public static float DroneShare(int wave) => Math.Min(0.6f, 0.15f * wave);
 

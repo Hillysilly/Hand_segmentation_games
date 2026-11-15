@@ -161,6 +161,7 @@ namespace Repulsor
             TickVariantLab(dt);
             death.Tick(playing && player.IsDead, dt);
             ShowBossBar();
+            TrackStanding(dt);
             hurtFlash.Tick(dt);
             damageNumbers.Tick(dt);
             TickGestureLab(dt);
@@ -313,12 +314,19 @@ namespace Repulsor
                     if (announcedWave != waves.Wave)
                     {
                         announcedWave = waves.Wave;
-                        hud.Message($"WAVE {waves.Wave}", waves.Wave == 1 ? "FIGHT!" : $"of {waves.WaveCount}", 1.6f);
-                        Log($"Wave {waves.Wave} starts");
+                        // A kind's first round introduces it.
+                        List<EnemyKind> fresh = WavePlan.NewIn(waves.Wave);
+                        if (waves.BossWave)
+                            hud.Message("FINAL ROUND", "The boss is coming", 2f);
+                        else if (fresh.Count > 0 && !bossFight)
+                            hud.Message($"ROUND {waves.Wave}", $"NEW ENEMY: {EnemySpec.Of(fresh[0]).Name}. {EnemySpec.Of(fresh[0]).Blurb}", 3.5f);
+                        else
+                            hud.Message($"ROUND {waves.Wave}", waves.Wave == 1 ? "FIGHT!" : $"of {waves.WaveCount}", 1.6f);
+                        Log($"Round {waves.Wave} starts{(fresh.Count > 0 ? ", new: " + string.Join(", ", fresh) : "")}");
                     }
                     break;
                 case WaveState.Between:
-                    hud.Message($"WAVE {waves.Wave} CLEARED", $"Next wave in {Mathf.CeilToInt(waves.Timer)}", 0.2f);
+                    hud.Message($"ROUND {waves.Wave} CLEARED", $"Next round in {Mathf.CeilToInt(waves.Timer)}", 0.2f);
                     break;
             }
         }

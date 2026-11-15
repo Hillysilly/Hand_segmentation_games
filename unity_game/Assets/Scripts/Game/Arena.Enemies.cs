@@ -38,7 +38,7 @@ namespace Repulsor
         void SpawnEnemy()
         {
             EnemyKind kind = waves.BossWave
-                ? (BossAlive ? WavePlan.BossHelper(Random.value) : EnemyKind.Boss)
+                ? (BossAlive ? WavePlan.BossHelper(Random.value) : WavePlan.FinalBoss)
                 : WavePlan.KindFor(Mathf.Max(1, waves.Wave), Random.value);
             SpawnEnemy(kind);
         }
@@ -51,7 +51,7 @@ namespace Repulsor
             point.y = EnemySpec.Of(kind).Flies ? head.position.y + 0.2f : FloorY + Enemy.MiddleHeight(kind);
             Enemy enemy = Enemy.Spawn(kind, point, this, head, foes, ++nextEnemyId);
             enemies.Add(enemy);
-            if (kind == EnemyKind.Boss)
+            if (EnemySpec.IsBoss(kind))
             {
                 boss = enemy;
                 hud.Message("BOSS", EnemySpec.Of(kind).Name, 2.5f);
@@ -96,7 +96,7 @@ namespace Repulsor
             foreach (IHittable foe in enemies)
                 if (Hittables.IsLive(foe))
                     enemySpots.Add(foe.Center);
-            float min = kind == EnemyKind.Boss ? 2.6f : SpawnMinDistance;
+            float min = EnemySpec.IsBoss(kind) ? 2.6f : SpawnMinDistance;
             if (roomMap.TryPick(playerSpots, enemySpots, min, SpawnMaxDistance, InsideFurniture, out Vector3 point, out where))
                 return point;
             Vector3 direction = SpawnDirection(out float distance, out bool atWall);
@@ -204,6 +204,39 @@ namespace Repulsor
         public bool PlayerStandsWithin(Vector3 floorPoint, float radius) =>
             CanBeHit && Vector3.Distance(Flat(head.position), Flat(floorPoint)) < radius + BodyRadius;
 
+        float standingHeadY = float.NaN;
+
+        /// <summary>Your usual head height, learnt slowly, so a quick jump stands out above it.</summary>
+        void TrackStanding(float dt)
+        {
+            float y = head.position.y;
+            if (float.IsNaN(standingHeadY))
+                standingHeadY = y;
+            // Follows slowly (a jump is over long before it catches up), and drops quickly if you crouch or sit.
+            float rate = y < standingHeadY ? 3f : 0.4f;
+            standingHeadY = Mathf.Lerp(standingHeadY, y, 1f - Mathf.Exp(-rate * dt));
+        }
+
+        /// <summary>Your head is this much above where it usually is: you're in the air.</summary>
+        public bool PlayerJumping(float clearance) => !float.IsNaN(standingHeadY) && head.position.y - standingHeadY > clearance;
+
+        /// <summary>How far you stand from a floor point, along the floor.</summary>
+        public float PlayerFloorDistance(Vector3 floorPoint) =>
+            CanBeHit ? Vector3.Distance(Flat(head.position), Flat(floorPoint)) : float.MaxValue;
+
+        /// <summary>Your shield is up and facing something coming from <paramref name="from"/>: it takes the hit (and flashes).</summary>
+        public bool PlayerShieldBlocks(Vector3 from)
+        {
+            if (!CanBeHit || !player.Shield.Up)
+                return false;
+            Vector3 toSource = Vector3.ProjectOnPlane(from - head.position, Vector3.up).normalized;
+            Vector3 facing = Vector3.ProjectOnPlane(head.forward, Vector3.up).normalized;
+            if (Vector3.Dot(toSource, facing) < 0.2f)
+                return false;
+            shield.Flash();
+            return true;
+        }
+
         /// <summary>You're standing where something is about to hit (the boss's strikes): the view goes slightly red.</summary>
         public void WarnPlayer(float amount)
         {
@@ -236,7 +269,7 @@ namespace Repulsor
         void ShowBossBar()
         {
             bool show = phase == Phase.Playing && boss != null && boss.Alive;
-            hud.Boss(show ? EnemySpec.Of(EnemyKind.Boss).Name : null, show ? boss.Hp / boss.MaxHp : 0f);
+            hud.Boss(show ? boss.Spec.Name : null, show ? boss.Hp / boss.MaxHp : 0f);
             if (boss != null && !boss.Alive)
                 boss = null;
         }

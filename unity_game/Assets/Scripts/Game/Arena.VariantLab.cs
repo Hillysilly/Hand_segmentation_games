@@ -211,7 +211,7 @@ namespace Repulsor
             for (int i = 0; i < EnemySpec.All.Length; i++)
             {
                 EnemySpec spec = EnemySpec.All[i];
-                bool isBoss = spec.Kind == EnemyKind.Boss;
+                bool isBoss = EnemySpec.IsBoss(spec.Kind);
                 float angle = isBoss ? 0f : Mathf.Lerp(-55f, 55f, i / (count - 1f));
                 Vector3 point = head.position + Quaternion.AngleAxis(angle, Vector3.up) * forward * (isBoss ? distance + 1.8f : distance);
                 point.y = spec.Flies ? head.position.y : FloorY + Enemy.MiddleHeight(spec.Kind);
