@@ -273,3 +273,8 @@ EditMode 175/175, PlayMode 22/22.
 - Grab test made robust to wave spawns (`TestCanGrab` sets other enemies aside).
 - Tornado shortlist TN1-TN6 added to the hand shortlist page.
 EditMode 175/175, PlayMode 23/23. Installed.
+- Tornado: TN3 ("Tornado 2", Jacob Quintana, CC BY 4.0) replaces N1. `TornadoModel` (editor) builds
+  Resources/Props/Tornado: drops the cloud deck (clouds_19) and floor swirls (Object_42/45), funnel 1 m tall, legacy
+  looping animation (93 s, started at a random time in game), `Repulsor/CloudModel` shader (its texture, unlit,
+  see-through, edges fade side-on), alpha 0.5, scaled (1, 1.9, 1) x size. Previews Logs/preview_tornado_*.png.
+  EditMode 175/175, PlayMode 23/23. Installed.

@@ -229,8 +229,8 @@ namespace Repulsor
         float floorY;
         readonly List<Transform> rings = new List<Transform>();
         Transform funnel;
-        /// <summary>How see-through the funnel is (white, this much opacity).</summary>
-        const float FunnelAlpha = 0.28f;
+        /// <summary>How see-through the funnel is (times its cloud texture's own alpha).</summary>
+        const float FunnelAlpha = 0.5f;
 
         public static void Launch(RepulsorGame game, Vector3 from, Vector3 direction, float power, float floorY, float dps, Transform parent)
         {
@@ -245,14 +245,22 @@ namespace Repulsor
             tornado.dps = dps;
             tornado.floorY = floorY;
             Color pale = new Color(0.85f, 0.95f, 1f);
-            // The funnel: a tornado model (spun here), see-through white. Rings stand in if it's missing.
+            // The funnel: the "Tornado 2" model (its own swirl animation, spun and swayed here too), see-through.
+            // Rings stand in if it's missing.
             var model = Resources.Load<GameObject>("Props/Tornado");
             if (model != null)
             {
                 tornado.funnel = Object.Instantiate(model, go.transform, false).transform;
-                // Taller than it is wide: the model's mouth is nearly as wide as it's tall.
-                tornado.funnel.localScale = new Vector3(1.25f, 2f, 1.25f) * tornado.size;
+                // The model is 1 m tall and about 1.2 m across its top: about 1.9 m tall here.
+                tornado.funnel.localScale = new Vector3(1f, 1.9f, 1f) * tornado.size;
                 WebStrand.Tint(tornado.funnel.GetComponentsInChildren<Renderer>(), Color.white, FunnelAlpha);
+                // Each one starts somewhere different in its 90-second animation.
+                var swirl = tornado.funnel.GetComponentInChildren<Animation>();
+                if (swirl != null && swirl.clip != null)
+                {
+                    swirl.Play(swirl.clip.name);
+                    swirl[swirl.clip.name].time = Random.Range(0f, swirl.clip.length);
+                }
             }
             for (int i = 0; i < (model != null ? 0 : 9); i++)
             {

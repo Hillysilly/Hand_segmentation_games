@@ -92,7 +92,8 @@ The APK is built; install it with `build_and_run.ps1 -NoBuild` when the headset 
     right of the menu; the panel's box is now just the big hand sign. Is it in a sensible spot in your room?
 30. **Saber slash** (11/15 pm): a swing through an enemy deals 9-20 damage by blade speed (once per 0.35 s per
     enemy); holding the blade inside only does 6 a second. Feels right?
-31. **Tornado options** TN1-TN6 on the shortlist page (the white N1 is still in until you pick one).
+31. **New tornado** (11/15 pm): TN3, "Tornado 2" by Jacob Quintana, with its own swirl animation, see-through, about
+    1.9 m tall and 1.2 m across (its cloud deck and floor swirls left out). Does it read as a tornado in your room?
 
 ## Status, end of 11/8 session
 

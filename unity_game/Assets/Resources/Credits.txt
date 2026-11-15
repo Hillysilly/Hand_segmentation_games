@@ -69,6 +69,9 @@ left hand; the Stormcaller Gauntlet is also simplified.
   Tempest: "The Stormcaller Gauntlet" by Balsamic_Vin
     https://sketchfab.com/models/3541582fbb3b4d32ae9c87605c8be95f
 
-Assets/Props/Tornado (Tempest's tornado)
-  "Animated Tornado" by Anthony Yanez (Yanez-Designs), CC BY 4.0, from Sketchfab. Drawn see-through white.
+Assets/Props/Tornado2 (Tempest's tornado)
+  "Tornado 2" by Jacob Quintana (jacobq1004), CC BY 4.0, from Sketchfab:
+  https://sketchfab.com/3d-models/tornado-2-fba2518b48564557a07d15bed8577e8d
+  The author asks for credit to STICK O' MEDIA Entertainment (youtube.com/@STICKOMEDIA).
+  Its cloud deck and floor swirls are left out; drawn see-through.
   https://sketchfab.com/models/dbc7e7176ce9435d9f04f2c88257fff6
