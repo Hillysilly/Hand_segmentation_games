@@ -6,18 +6,20 @@ namespace Repulsor
 {
     /// <summary>
     /// The character select screen's little stage: a mannequin (Quaternius, CC0) in the chosen colour acting out
-    /// each level's move against a small robot, with a small version of the effect. It goes level 1, 2, 3 and
-    /// round again; the screen's arrows pick a level. Everything is built in "human" metres under a stage that is
-    /// scaled down, so a 1.8 m mannequin stands about 12 cm tall in front of the menu.
+    /// each level's move with a small version of the effect, and beside it a big hand making the move's hand sign
+    /// (<see cref="ShowcaseSign"/>). The arms and hands follow <see cref="ShowcasePoses"/>, built from what the
+    /// gesture detectors look for; the idle animation (or the punch and sword clips) moves the rest. It goes level
+    /// 1, 2, 3 and round again; the screen's arrows pick a level. Everything is built in "human" metres under a
+    /// stage that is scaled down, so a 1.8 m mannequin stands about 12 cm tall in front of the menu.
     /// </summary>
     public sealed class CharacterShowcase
     {
         public const float FigureHeight = 0.12f;
         const float Human = 1.8f;
         const float Scale = FigureHeight / Human;
-        const float Reach = 2.3f;
+        const float Reach = 2f;
         const float Chest = 1.25f;
-        const float Pause = 0.7f;
+        const float Pause = 0.6f;
 
         enum Fx
         {
@@ -28,20 +30,30 @@ namespace Repulsor
         sealed class Move
         {
             public readonly string Name;
-            public readonly string Clip;
+            /// <summary>The hand sign's caption.</summary>
+            public readonly string Sign;
             public readonly Fx Fx;
             public readonly float FireAt;
             public readonly float Hold;
-            public readonly float Speed;
+            public readonly PoseKey[] Keys;
+            /// <summary>An animation clip for the whole body (the punch, the sword), or null for idle plus posed arms.</summary>
+            public readonly string Clip;
+            /// <summary>When a charge glows on the hand (or between both) before it fires; negative for none.</summary>
+            public readonly float ChargeFrom;
+            public readonly bool ChargeBoth;
 
-            public Move(string name, string clip, Fx fx, float fireAt, float hold = 0f, float speed = 1f)
+            public Move(string name, string sign, Fx fx, float fireAt, float hold, PoseKey[] keys, string clip = null,
+                float chargeFrom = -1f, bool chargeBoth = false)
             {
                 Name = name;
-                Clip = clip;
+                Sign = sign;
                 Fx = fx;
                 FireAt = fireAt;
                 Hold = hold;
-                Speed = speed;
+                Keys = keys;
+                Clip = clip;
+                ChargeFrom = chargeFrom;
+                ChargeBoth = chargeBoth;
             }
         }
 
@@ -50,56 +62,66 @@ namespace Repulsor
         {
             [CharacterId.Technoman] = new[]
             {
-                new Move("Hand laser", "Spell_Simple_Shoot", Fx.Laser, 0.3f, 1.1f),
-                new Move("Repulsor blast", "Punch_Cross", Fx.Repulsor, 0.25f),
-                new Move("Area repulsor", "Punch_Cross", Fx.AreaRepulsor, 0.25f),
+                new Move("Hand laser", "PALM OUT, HOLD", Fx.Laser, 0.35f, 1.2f, ShowcasePoses.PalmOutHold(1.6f)),
+                new Move("Repulsor blast", "FIST, THEN SNAP OPEN", Fx.Repulsor, 1f, 0f, ShowcasePoses.FistThenOpen(1f), chargeFrom: 0.35f),
+                new Move("Area repulsor", "FIST, THEN SNAP OPEN", Fx.AreaRepulsor, 1f, 0f, ShowcasePoses.FistThenOpen(1f), chargeFrom: 0.35f),
             },
             [CharacterId.KiFighter] = new[]
             {
-                new Move("Comet blast", "Punch_Jab", Fx.Comet, 0.18f),
-                new Move("Giant energy ball", "Push_Loop", Fx.SpiritBall, 1.1f, 0.4f),
-                new Move("Dragon fist", "Punch_Cross", Fx.DragonFist, 0.22f, 0f, 0.9f),
+                new Move("Comet blast", "FIST, THEN SNAP OPEN", Fx.Comet, 1f, 0f, ShowcasePoses.FistThenOpen(1f), chargeFrom: 0.35f),
+                new Move("Giant energy ball", "HANDS TOGETHER, THEN PUSH", Fx.SpiritBall, 0.4f, 1.15f, ShowcasePoses.HandsTogetherPush(1.55f)),
+                new Move("Dragon fist", "PUNCH FAST", Fx.DragonFist, 0.22f, 0f,
+                    ShowcasePoses.ShapeOnly(SignShape.Fist, ShowcasePoses.F, ShowcasePoses.D, 1.2f), "Punch_Cross"),
             },
             [CharacterId.Mage] = new[]
             {
-                new Move("Fireball", "Spell_Simple_Shoot", Fx.Fireball, 0.3f),
-                new Move("Flamethrower", "Spell_Simple_Shoot", Fx.Flame, 0.3f, 1.4f),
-                new Move("Fire pillar", "Push_Loop", Fx.Pillar, 0.6f, 1.2f),
+                new Move("Fireball", "FIST, THEN SNAP OPEN", Fx.Fireball, 1f, 0f, ShowcasePoses.FistThenOpen(1f), chargeFrom: 0.35f),
+                new Move("Flamethrower", "PALM OUT, HOLD", Fx.Flame, 0.35f, 1.4f, ShowcasePoses.PalmOutHold(1.8f)),
+                new Move("Fire pillar", "TRIANGLE TO AIM, THEN BOTH FISTS", Fx.Pillar, 0.5f, 1.45f, ShowcasePoses.TriangleThenFists(1.25f)),
             },
             [CharacterId.Saber] = new[]
             {
-                new Move("Blaster bolt", "Pistol_Shoot", Fx.Bolt, 0.1f),
-                new Move("Laser sword", "Sword_Attack", Fx.Saber, 0f),
-                new Move("Force lift and throw", "Spell_Simple_Shoot", Fx.ForceThrow, 0.75f),
+                new Move("Blaster bolt", "FINGER GUN, FLICK UP", Fx.Bolt, 0.75f, 0f, ShowcasePoses.FingerGunFlick(0.75f)),
+                new Move("Laser sword", "MAKE A FIST", Fx.Saber, 0f, 0f,
+                    ShowcasePoses.ShapeOnly(SignShape.Fist, ShowcasePoses.F, ShowcasePoses.In, 2f), "Sword_Attack"),
+                new Move("Force lift and throw", "CUPPED HAND: LIFT, THEN THROW", Fx.ForceThrow, 0.35f, 0f, ShowcasePoses.CupLiftThrow(1.25f)),
             },
             [CharacterId.Archer] = new[]
             {
-                new Move("Crossbow", "Pistol_Shoot", Fx.Crossbow, 0.1f),
-                new Move("Longbow", "Pistol_Aim_Neutral", Fx.Bow, 1.3f),
-                new Move("Smoke bomb", "Spell_Simple_Shoot", Fx.Smoke, 0.3f),
+                new Move("Crossbow", "FINGER GUN, FLICK UP", Fx.Crossbow, 0.75f, 0f, ShowcasePoses.FingerGunFlick(0.75f)),
+                new Move("Longbow", "FISTS TOGETHER, PULL ONE BACK, OPEN IT", Fx.Bow, 1.35f, 0f, ShowcasePoses.BowDraw(1.35f)),
+                new Move("Smoke bomb", "FIST, UNDERHAND THROW", Fx.Smoke, 0.55f, 0f, ShowcasePoses.UnderhandThrow(0.55f)),
             },
             [CharacterId.Spider] = new[]
             {
-                new Move("Web shot", "Spell_Simple_Shoot", Fx.Web, 0.3f),
-                new Move("Web and fling", "Sword_Attack", Fx.WebFling, 0.05f, 1.1f),
-                new Move("Black webs", "Spell_Simple_Shoot", Fx.BlackWeb, 0.3f),
+                new Move("Web shot", "SPIDER SIGN (HOLD TO KEEP FIRING)", Fx.Web, 0.32f, 0f, ShowcasePoses.SpiderSign(1.1f)),
+                new Move("Web and fling", "WEB IT, THEN SWING YOUR ARM", Fx.WebFling, 0.25f, 0.95f, ShowcasePoses.WebAndSwing()),
+                new Move("Black webs", "SPIDER SIGN (HOLD TO KEEP FIRING)", Fx.BlackWeb, 0.32f, 0f, ShowcasePoses.SpiderSign(1.1f)),
             },
             [CharacterId.Elementalist] = new[]
             {
-                new Move("Gust of wind", "Spell_Simple_Shoot", Fx.Gust, 0.3f),
-                new Move("Chain lightning", "Push_Loop", Fx.Lightning, 0.3f, 1.4f),
-                new Move("Tornado", "Push_Loop", Fx.Tornado, 0.5f, 1.6f),
+                new Move("Gust of wind", "OPEN PALM, PUSH FORWARD", Fx.Gust, 0.45f, 0f, ShowcasePoses.PalmShove(0.45f)),
+                new Move("Chain lightning", "BOTH HANDS OUT FLAT", Fx.Lightning, 0.4f, 1.4f, ShowcasePoses.FlatHands(1.85f)),
+                new Move("Tornado", "SWIRL BOTH HANDS, THEN PUSH", Fx.Tornado, 1.75f, 1.6f, ShowcasePoses.SwirlThenPush(1.75f),
+                    chargeFrom: 0.35f, chargeBoth: true),
             },
             [CharacterId.Earth] = new[]
             {
-                new Move("Rock orb", "Punch_Jab", Fx.Rock, 0.18f),
-                new Move("Rock spikes", "Punch_Cross", Fx.Spikes, 0.25f),
-                new Move("Sticky rocks, snap", "Punch_Jab", Fx.StickySnap, 0.18f, 1f),
+                new Move("Rock orb", "FIST, THEN SNAP OPEN", Fx.Rock, 1f, 0f, ShowcasePoses.FistThenOpen(1f), chargeFrom: 0.35f),
+                new Move("Rock spikes", "FIST LOW, RAISE IT FAST", Fx.Spikes, 0.5f, 0f, ShowcasePoses.Uppercut(0.5f)),
+                new Move("Sticky rocks, snap", "THROW A ROCK, THEN SNAP YOUR FINGERS", Fx.StickySnap, 0.85f, 0.65f,
+                    ShowcasePoses.ThrowThenSnap(0.85f, 1.85f), chargeFrom: 0.35f),
             },
         };
 
         /// <summary>The move's name at a level (1-3), for the screen.</summary>
         public static string MoveName(CharacterId id, int level) => Moves[id][Mathf.Clamp(level, 1, 3) - 1].Name;
+
+        /// <summary>The hand sign's caption at a level (1-3).</summary>
+        public static string SignName(CharacterId id, int level) => Moves[id][Mathf.Clamp(level, 1, 3) - 1].Sign;
+
+        /// <summary>For tests: every move's keys, by character and level (1-3).</summary>
+        public static PoseKey[] KeysFor(CharacterId id, int level) => Moves[id][Mathf.Clamp(level, 1, 3) - 1].Keys;
 
         sealed class Live
         {
@@ -108,6 +130,13 @@ namespace Repulsor
             public float Life;
             public Action<Live, float> Step;
             public Action End;
+        }
+
+        /// <summary>One arm of the mannequin, posed over the animation.</summary>
+        sealed class Arm
+        {
+            public Transform Upper, Fore, Hand;
+            public HandRig Rig;
         }
 
         readonly RepulsorGame game;
@@ -119,19 +148,18 @@ namespace Repulsor
         readonly Transform[] hands = new Transform[2];
         readonly Transform[] indexKnuckle = new Transform[2];
         readonly Transform[] pinkyKnuckle = new Transform[2];
+        readonly Arm[] arms = new Arm[2];
         readonly List<Live> live = new List<Live>();
         readonly List<Live> running = new List<Live>();
-        readonly EnemyLook dummy;
         readonly FxSpin aura;
-        float dummyFlash;
-        Vector3 dummyPush;
+        readonly FxSpin charge;
+        readonly ShowcaseSign sign;
 
         CharacterId character;
         Color color = Color.white;
         int level;
         float time;
         bool fired;
-        bool backToIdle;
 
         public int Level => level + 1;
 
@@ -142,7 +170,7 @@ namespace Repulsor
             {
                 if (animation == null)
                     return "no Animation";
-                var text = new System.Text.StringBuilder($"playing {animation.isPlaying}, enabled {animation.enabled}, hand {Hand(1):F2}:");
+                var text = new System.Text.StringBuilder($"t {time:0.00}, hand {Hand(1):F2}:");
                 foreach (AnimationState state in animation)
                     if (state.enabled || state.weight > 0f)
                         text.Append($" {state.name} t{state.time:0.00} w{state.weight:0.00}");
@@ -151,6 +179,8 @@ namespace Repulsor
         }
         public CharacterId Character => character;
         public bool Shown => stage.gameObject.activeSelf;
+        public ShowcaseSign Sign => sign;
+        public string SignCaption => Current.Sign;
 
         public CharacterShowcase(RepulsorGame game, Transform parent)
         {
@@ -192,20 +222,29 @@ namespace Repulsor
                         pinkyKnuckle[side] = bone;
                 }
             }
-
-            // The robot it practises on, facing it.
-            dummy = EnemyLook.Create(EnemySpec.Of(EnemyKind.Robot).Model, stage);
-            if (dummy != null)
+            for (int side = 0; side < 2; side++)
             {
-                dummy.transform.localPosition = new Vector3(0f, 0f, Reach);
-                dummy.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
-                // Its eye glows are sized for the room; bring them down to the stage.
-                foreach (FxSpin eye in dummy.GetComponentsInChildren<FxSpin>())
-                    eye.Size *= Scale;
+                string suffix = side == 0 ? ".L" : ".R";
+                Transform upper = null, fore = null;
+                foreach (Transform bone in figureRoot.GetComponentsInChildren<Transform>())
+                {
+                    if (bone.name == "DEF-upper_arm" + suffix)
+                        upper = bone;
+                    else if (bone.name == "DEF-forearm" + suffix)
+                        fore = bone;
+                }
+                if (upper != null && fore != null && hands[side] != null)
+                    arms[side] = new Arm { Upper = upper, Fore = fore, Hand = hands[side], Rig = HandRig.ForMannequin(figureRoot, side == 1) };
             }
+
             aura = BallLook.Sprite("Aura", stage, "FxGlow", 1f, Color.white).Set(billboard: true, flicker: 0.12f);
             aura.Place(new Vector3(0f, 0.95f, -0.15f), new Vector3(1.6f, 2.4f, 1f));
+            charge = BallLook.Sprite("Charge", stage, "FxGlow", 0.3f, Color.white).Set(billboard: true, flicker: 0.2f);
+            charge.gameObject.SetActive(false);
+            sign = new ShowcaseSign(parent);
+            stage.gameObject.AddComponent<ShowcasePoser>().Late = Pose;
             stage.gameObject.SetActive(false);
+            sign.Show(false);
         }
 
         /// <summary>Shows a character from level 1 (or keeps going if it's already the one shown).</summary>
@@ -215,8 +254,12 @@ namespace Repulsor
             character = id;
             color = tint;
             TintFigure();
+            sign.Tint(tint);
             if (!Shown)
+            {
                 stage.gameObject.SetActive(true);
+                sign.Show(true);
+            }
             if (changed)
             {
                 level = 0;
@@ -230,6 +273,7 @@ namespace Repulsor
                 return;
             ClearEffects();
             stage.gameObject.SetActive(false);
+            sign.Show(false);
         }
 
         /// <summary>Jumps to a level (1-3), from the screen's arrows.</summary>
@@ -241,6 +285,9 @@ namespace Repulsor
 
         /// <summary>Stands the stage with its feet at <paramref name="feet"/>, the moves heading along <paramref name="facing"/>.</summary>
         public void Place(Vector3 feet, Quaternion facing) => stage.SetPositionAndRotation(feet, facing);
+
+        /// <summary>Puts the hand sign's centre at <paramref name="centre"/>, its box facing as <paramref name="facing"/> (z into the screen).</summary>
+        public void PlaceSign(Vector3 centre, Quaternion facing) => sign.Place(centre, facing);
 
         void TintFigure()
         {
@@ -265,33 +312,34 @@ namespace Repulsor
             ClearEffects();
             time = 0f;
             fired = false;
-            backToIdle = false;
             Move move = Current;
-            if (animation != null && animation[move.Clip] != null)
+            if (animation != null)
             {
-                AnimationState state = animation[move.Clip];
-                state.speed = move.Speed;
-                state.wrapMode = move.Clip.EndsWith("_Loop") ? WrapMode.Loop : Held(move) ? WrapMode.ClampForever : WrapMode.Once;
-                state.time = 0f;
-                animation.CrossFade(move.Clip, 0.12f);
-                if (state.wrapMode == WrapMode.Once && animation["Idle_Loop"] != null)
+                string clip = move.Clip != null && animation[move.Clip] != null ? move.Clip : "Idle_Loop";
+                AnimationState state = animation[clip];
+                if (state != null)
                 {
-                    animation["Idle_Loop"].wrapMode = WrapMode.Loop;
-                    animation.CrossFadeQueued("Idle_Loop", 0.2f);
+                    state.speed = 1f;
+                    state.wrapMode = clip == "Idle_Loop" ? WrapMode.Loop : WrapMode.Once;
+                    state.time = 0f;
+                    animation.CrossFade(clip, 0.12f);
+                    if (clip != "Idle_Loop" && animation["Idle_Loop"] != null)
+                    {
+                        animation["Idle_Loop"].wrapMode = WrapMode.Loop;
+                        animation.CrossFadeQueued("Idle_Loop", 0.2f);
+                    }
                 }
             }
+            sign.Use(move.Keys);
             Equip(move);
             ShowAura();
         }
 
-        /// <summary>Moves that hold a pose (loops, and the aim that's a single pose) until they've fired and held.</summary>
-        static bool Held(Move move) => move.Clip.EndsWith("_Loop") || move.Hold > 0f || move.Clip == "Pistol_Aim_Neutral";
-
         float Duration(Move move)
         {
-            float clip = animation != null && animation[move.Clip] != null && !Held(move)
-                ? animation[move.Clip].length / move.Speed : 0f;
-            return Mathf.Max(clip, move.FireAt + move.Hold + 0.6f) + Pause;
+            float clip = move.Clip != null && animation != null && animation[move.Clip] != null ? animation[move.Clip].length : 0f;
+            float keys = move.Keys.Length > 0 ? move.Keys[move.Keys.Length - 1].T : 0f;
+            return Mathf.Max(clip, keys, move.FireAt + move.Hold + 0.6f) + Pause;
         }
 
         public void Tick(float dt)
@@ -305,13 +353,7 @@ namespace Repulsor
                 fired = true;
                 Fire(move);
             }
-            // Holding moves (loops) end when their hold does.
-            if (!backToIdle && Held(move) && time >= move.FireAt + move.Hold + 0.3f && animation != null && animation["Idle_Loop"] != null)
-            {
-                backToIdle = true;
-                animation["Idle_Loop"].wrapMode = WrapMode.Loop;
-                animation.CrossFade("Idle_Loop", 0.25f);
-            }
+            ShowCharge(move);
             running.Clear();
             running.AddRange(live);
             foreach (Live effect in running)
@@ -329,17 +371,80 @@ namespace Repulsor
                 }
                 effect.Step?.Invoke(effect, dt);
             }
-            dummyFlash = Mathf.Max(0f, dummyFlash - dt);
-            dummyPush = Vector3.Lerp(dummyPush, Vector3.zero, 1f - Mathf.Exp(-4f * dt));
-            if (dummy != null)
-            {
-                dummy.transform.localPosition = new Vector3(0f, 0f, Reach) + dummyPush;
-                dummy.Tick(dt, false, false, dummyFlash);
-            }
             if (time >= Duration(move))
             {
                 level = (level + 1) % 3;
                 StartMove();
+            }
+        }
+
+        /// <summary>A glow gathering on the fist (or between the hands) while the move charges.</summary>
+        void ShowCharge(Move move)
+        {
+            bool on = move.ChargeFrom >= 0f && time >= move.ChargeFrom && time < move.FireAt;
+            charge.gameObject.SetActive(on);
+            if (!on)
+                return;
+            float t = Mathf.Clamp01((time - move.ChargeFrom) / Mathf.Max(0.1f, move.FireAt - move.ChargeFrom));
+            charge.transform.localPosition = move.ChargeBoth ? BothHands + Vector3.forward * 0.06f : Hand(1) + Vector3.forward * 0.05f;
+            charge.Size = Vector3.one * Mathf.Lerp(0.08f, move.ChargeBoth ? 0.55f : 0.32f, t);
+            Color glow = move.Fx == Fx.Tornado ? new Color(0.8f, 0.95f, 1f) : move.Fx == Fx.Fireball ? new Color(1f, 0.45f, 0.1f)
+                : move.Fx == Fx.Rock || move.Fx == Fx.StickySnap ? new Color(1f, 0.55f, 0.2f) : color;
+            SetColor(charge, glow * Mathf.Lerp(0.6f, 1.6f, t));
+        }
+
+        // ---------------------------------------------------------------- posing, after the animation each frame
+
+        void Pose()
+        {
+            if (!Shown)
+                return;
+            Move move = Current;
+            for (int side = 0; side < 2; side++)
+            {
+                Arm arm = arms[side];
+                if (arm == null)
+                    continue;
+                HandSample s = ShowcasePoses.Sample(move.Keys, time, side == 0);
+                if (s.Weight > 0.001f && move.Clip == null)
+                    PoseArm(arm, side == 1, s);
+                arm.Rig?.Shape(s.From, s.To, s.Blend);
+            }
+            sign.Pose(move.Keys, time);
+        }
+
+        static Vector3 Mirror(Vector3 v, bool right) => right ? v : new Vector3(-v.x, v.y, v.z);
+
+        /// <summary>Two-bone reach of the arm to the key's wrist position, elbow down and out, then the hand turned.</summary>
+        void PoseArm(Arm arm, bool right, HandSample s)
+        {
+            Vector3 shoulder = arm.Upper.position;
+            Vector3 shoulderLocal = stage.InverseTransformPoint(shoulder);
+            Vector3 goal = stage.TransformPoint(shoulderLocal + Mirror(s.At, right));
+            Vector3 target = Vector3.Lerp(arm.Hand.position, goal, s.Weight);
+
+            float a = Vector3.Distance(arm.Upper.position, arm.Fore.position);
+            float b = Vector3.Distance(arm.Fore.position, arm.Hand.position);
+            Vector3 toTarget = target - shoulder;
+            float length = Mathf.Clamp(toTarget.magnitude, 0.05f * (a + b), (a + b) * 0.995f);
+            Vector3 along = toTarget.normalized;
+            float cos = Mathf.Clamp((a * a + length * length - b * b) / (2f * a * length), -1f, 1f);
+            float sin = Mathf.Sqrt(1f - cos * cos);
+            Vector3 pole = stage.TransformDirection(new Vector3(right ? 0.55f : -0.55f, -1f, -0.3f)).normalized;
+            Vector3 bendDir = Vector3.ProjectOnPlane(pole, along);
+            if (bendDir.sqrMagnitude < 1e-6f)
+                bendDir = stage.TransformDirection(Vector3.down);
+            bendDir.Normalize();
+            Vector3 elbow = shoulder + (along * cos + bendDir * sin) * a;
+
+            arm.Upper.rotation = Quaternion.FromToRotation(arm.Fore.position - shoulder, elbow - shoulder) * arm.Upper.rotation;
+            Vector3 wrist = shoulder + along * length;
+            arm.Fore.rotation = Quaternion.FromToRotation(arm.Hand.position - arm.Fore.position, wrist - arm.Fore.position) * arm.Fore.rotation;
+
+            if (arm.Rig != null)
+            {
+                Quaternion facing = arm.Rig.Facing(stage.TransformDirection(Mirror(s.Fingers, right)), stage.TransformDirection(Mirror(s.Palm, right)));
+                arm.Hand.rotation = Quaternion.Slerp(arm.Hand.rotation, facing, s.Weight);
             }
         }
 
@@ -354,14 +459,11 @@ namespace Repulsor
 
         Vector3 BothHands => (Hand(0) + Hand(1)) * 0.5f;
 
-        static Vector3 Target => new Vector3(0f, 0.75f, Reach - 0.1f);
+        /// <summary>Where shots land: out in front at chest height.</summary>
+        static Vector3 Target => new Vector3(0f, 1.1f, Reach);
 
-        void HitDummy(float push = 0.15f)
-        {
-            dummyFlash = 0.15f;
-            dummyPush = new Vector3(0f, 0f, push);
-            dummy?.PlayOnce("hit");
-        }
+        /// <summary>The same spot on the floor.</summary>
+        static Vector3 FloorTarget => new Vector3(0f, 0.02f, Reach);
 
         // ---------------------------------------------------------------- building blocks
 
@@ -462,7 +564,7 @@ namespace Repulsor
             }, land);
         }
 
-        /// <summary>A glowing ball from a hand to the robot.</summary>
+        /// <summary>A glowing ball from a hand out to the target spot.</summary>
         void Ball(Vector3 from, float size, Color tint, float seconds, float burst, bool trail = false)
         {
             GameObject go = Holder("Ball");
@@ -471,7 +573,6 @@ namespace Repulsor
             Fly(go, from, Target, seconds, () =>
             {
                 Burst(Target, burst, tint);
-                HitDummy();
             }, 0f, trail, tint * 0.8f);
         }
 
@@ -488,7 +589,9 @@ namespace Repulsor
                     Transform crossbow = Prop("Crossbow", go.transform);
                     Add(go, 99f, (e, dt) =>
                     {
-                        go.transform.localPosition = Hand(1) + Vector3.forward * 0.05f;
+                        Vector3 aim = arms[1]?.Rig != null ? stage.InverseTransformDirection(arms[1].Rig.Pointing) : Vector3.forward;
+                        go.transform.localPosition = Hand(1) + aim * 0.05f;
+                        go.transform.localRotation = Quaternion.LookRotation(aim, Vector3.up);
                         crossbow.localRotation = Quaternion.identity;
                     });
                     break;
@@ -499,7 +602,7 @@ namespace Repulsor
                     Transform bow = Prop("Bow", go.transform);
                     Transform arrow = Prop("Arrow", go.transform);
                     LineRenderer cord = Line(go.transform, 0.012f, new Color(0.9f, 0.9f, 0.85f), 3);
-                    Add(go, move.FireAt + 0.05f, (e, dt) =>
+                    Add(go, Duration(move) - Pause, (e, dt) =>
                     {
                         Vector3 grip = Hand(0);
                         Vector3 draw = Hand(1);
@@ -507,11 +610,13 @@ namespace Repulsor
                         bow.localRotation = Quaternion.identity;
                         Vector3 top = grip + new Vector3(0f, 0.56f, -0.29f);
                         Vector3 bottom = grip + new Vector3(0f, -0.56f, -0.29f);
-                        float pull = Mathf.Clamp01(e.Age / Mathf.Max(0.1f, move.FireAt));
-                        Vector3 nock = Vector3.Lerp(grip + new Vector3(0f, 0f, -0.29f), new Vector3(grip.x, grip.y, Mathf.Min(draw.z, grip.z - 0.3f)), pull);
+                        bool loosed = e.Age >= move.FireAt;
+                        Vector3 rest = grip + new Vector3(0f, 0f, -0.29f);
+                        Vector3 nock = !loosed && draw.z < rest.z ? new Vector3(grip.x, grip.y, draw.z) : rest;
                         cord.SetPosition(0, top);
                         cord.SetPosition(1, nock);
                         cord.SetPosition(2, bottom);
+                        arrow.gameObject.SetActive(!loosed);
                         arrow.localPosition = nock;
                         arrow.localRotation = Quaternion.identity;
                     });
@@ -568,7 +673,6 @@ namespace Repulsor
                         if (e.Age >= nextHit)
                         {
                             nextHit = e.Age + 0.35f;
-                            HitDummy(0.05f);
                         }
                     });
                     break;
@@ -625,8 +729,6 @@ namespace Repulsor
                                 SetColor(bit, Color.Lerp(flame * 1.6f, new Color(0.6f, 0.1f, 0.02f), k) * (1f - k * 0.8f));
                             });
                         }
-                        if (Mathf.Repeat(e.Age, 0.4f) < dt)
-                            HitDummy(0.04f);
                     });
                     break;
                 }
@@ -634,7 +736,7 @@ namespace Repulsor
                 {
                     // A rune circle under the robot, then a column of fire.
                     GameObject go = Holder("Fire Pillar");
-                    go.transform.localPosition = new Vector3(0f, 0.02f, Reach);
+                    go.transform.localPosition = FloorTarget;
                     FxSpin circle = BallLook.Sprite("Circle", go.transform, "FxRing", 1.2f, new Color(1f, 0.4f, 0.1f));
                     circle.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
                     circle.Set(tumble: new Vector3(0f, 0f, 90f));
@@ -644,14 +746,14 @@ namespace Repulsor
                     float nextFlame = 0f;
                     Add(go, move.Hold + 0.2f, (e, dt) =>
                     {
-                        float rise = Mathf.Clamp01((e.Age - 0.35f) / 0.2f);
+                        float rise = Mathf.Clamp01((e.Age - (1.25f - move.FireAt)) / 0.2f);
                         column.SetPosition(1, Vector3.up * 2.6f * rise);
                         column.widthMultiplier = 0.9f * Scale * (0.8f + 0.2f * Mathf.Sin(e.Age * 40f));
                         if (rise > 0f && e.Age >= nextFlame)
                         {
                             nextFlame = e.Age + 0.05f;
                             GameObject puff = Holder("Pillar Flame");
-                            Vector3 start = new Vector3(UnityEngine.Random.Range(-0.3f, 0.3f), 0.1f, Reach + UnityEngine.Random.Range(-0.3f, 0.3f));
+                            Vector3 start = FloorTarget + new Vector3(UnityEngine.Random.Range(-0.3f, 0.3f), 0.08f, UnityEngine.Random.Range(-0.3f, 0.3f));
                             FxSpin bit = Glow(puff.transform, "FxFlame", 0.4f, new Color(1f, 0.5f, 0.1f) * 1.5f, 0f);
                             Add(puff, 0.6f, (p, d) =>
                             {
@@ -660,13 +762,11 @@ namespace Repulsor
                                 SetColor(bit, new Color(1f, 0.5f, 0.1f) * (1.5f * (1f - k)));
                             });
                         }
-                        if (rise >= 1f && Mathf.Repeat(e.Age, 0.4f) < dt)
-                            HitDummy(0f);
                     });
                     break;
                 }
                 case Fx.Bolt:
-                    for (int i = 0; i < 2; i++)
+                    for (int i = 0; i < 1; i++)
                     {
                         float delay = i * 0.25f;
                         GameObject go = Holder("Bolt");
@@ -682,7 +782,6 @@ namespace Repulsor
                         }, () =>
                         {
                             Burst(Target, 0.4f, color);
-                            HitDummy(0.08f);
                         });
                     }
                     break;
@@ -691,37 +790,33 @@ namespace Repulsor
                     for (int i = 0; i < 3; i++)
                     {
                         float at = 0.35f + i * 0.45f;
-                        Add(Holder("Swing"), at + 0.01f, null, () => HitDummy(0.1f));
+                        Add(Holder("Swing"), at + 0.01f, null, () => { });
                     }
                     break;
                 case Fx.ForceThrow:
                 {
-                    // A rock lifts off the floor as the arm winds up, then flies at the robot.
+                    // A rock on the floor lifts as the cupped hand rises, hangs in front of it, and flies at the throw.
                     GameObject go = Holder("Lifted Rock");
                     Transform rock = Prop("RockSmallA", go.transform);
                     rock.localScale *= 1.6f;
                     Glow(go.transform, "FxGlow", 0.5f, color * 0.8f);
                     Vector3 rest = new Vector3(0.5f, 0.1f, 0.9f);
-                    Vector3 held = new Vector3(0.4f, 1.6f, 0.7f);
+                    Vector3 held = new Vector3(0.32f, 1.42f, 0.85f);
+                    const float lift = 0.55f;
+                    float throwAt = 1.25f - move.FireAt;
                     go.transform.localPosition = rest;
-                    float lift = move.FireAt;
-                    Add(go, lift, (e, dt) =>
+                    Add(go, throwAt, (e, dt) =>
                     {
                         float t = Mathf.SmoothStep(0f, 1f, e.Age / lift);
                         go.transform.localPosition = Vector3.Lerp(rest, held, t) + Vector3.up * (0.04f * Mathf.Sin(e.Age * 20f));
                         rock.localRotation = Quaternion.Euler(e.Age * 90f, e.Age * 60f, 0f);
                     });
-                    // The throw itself: a new rock from where the lifted one was.
-                    Add(Holder("Throw"), lift, null, () =>
+                    Add(Holder("Throw"), throwAt, null, () =>
                     {
                         GameObject thrown = Holder("Thrown Rock");
                         Transform flying = Prop("RockSmallA", thrown.transform);
                         flying.localScale *= 1.6f;
-                        Fly(thrown, held, Target, 0.35f, () =>
-                        {
-                            Burst(Target, 0.9f, new Color(0.8f, 0.7f, 0.6f));
-                            HitDummy(0.3f);
-                        });
+                        Fly(thrown, held, Target, 0.35f, () => Burst(Target, 0.9f, new Color(0.8f, 0.7f, 0.6f)));
                     });
                     break;
                 }
@@ -733,7 +828,6 @@ namespace Repulsor
                     Fly(go, Hand(1) + Vector3.forward * 0.3f, Target, 0.25f, () =>
                     {
                         Burst(Target, 0.4f, color);
-                        HitDummy(0.08f);
                     });
                     break;
                 }
@@ -745,7 +839,6 @@ namespace Repulsor
                     Fly(go, Hand(0) + Vector3.forward * 0.2f, Target, 0.25f, () =>
                     {
                         Burst(Target, 0.5f, color);
-                        HitDummy(0.15f);
                     });
                     break;
                 }
@@ -797,37 +890,36 @@ namespace Repulsor
                         if (t >= 1f && !stuck)
                         {
                             stuck = true;
-                            HitDummy(0.1f);
                         }
                     });
                     break;
                 }
                 case Fx.WebFling:
                 {
-                    // A web onto a rock, and the swing flings the rock round into the robot.
+                    // A web onto a rock down to the left; the arm swings it up overhead and slams it down in front.
                     GameObject go = Holder("Web Fling");
                     LineRenderer line = Line(go.transform, 0.03f, new Color(0.92f, 0.92f, 0.95f), 2);
                     Transform rock = Prop("RockSmallB", go.transform);
                     rock.localScale *= 1.5f;
-                    Vector3 rest = new Vector3(-1.2f, 0.15f, 1.2f);
-                    Vector3 swing = new Vector3(-1f, 1.5f, 1.8f);
+                    Vector3 rest = new Vector3(-1.1f, 0.15f, 1.1f);
+                    Vector3 overhead = new Vector3(0.3f, 2.3f, 0.5f);
                     bool hit = false;
                     Add(go, move.Hold, (e, dt) =>
                     {
-                        float t = e.Age / e.Life;
-                        Vector3 at = t < 0.3f ? rest
-                            : t < 0.75f ? Vector3.Lerp(Vector3.Lerp(rest, swing, (t - 0.3f) / 0.45f), swing, 0.5f)
-                            : Vector3.Lerp(swing, Target, (t - 0.75f) / 0.25f);
+                        float attach = Mathf.Clamp01(e.Age / 0.2f);
+                        float up = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((e.Age - 0.3f) / 0.35f));
+                        float down = Mathf.Clamp01((e.Age - 0.65f) / 0.25f);
+                        Vector3 at = down > 0f ? Vector3.Lerp(overhead, FloorTarget + Vector3.up * 0.15f, down * down)
+                            : Vector3.Lerp(rest, overhead, up) + Vector3.up * (Mathf.Sin(up * Mathf.PI) * 0.4f);
                         rock.localPosition = at;
                         rock.localRotation = Quaternion.Euler(e.Age * 200f, e.Age * 90f, 0f);
                         line.SetPosition(0, Hand(1));
-                        line.SetPosition(1, at);
-                        line.enabled = t < 0.85f;
-                        if (t >= 0.97f && !hit)
+                        line.SetPosition(1, Vector3.Lerp(Hand(1), at, attach));
+                        line.enabled = down < 0.9f;
+                        if (down >= 1f && !hit)
                         {
                             hit = true;
-                            Burst(Target, 0.9f, new Color(0.8f, 0.75f, 0.7f));
-                            HitDummy(0.35f);
+                            Burst(FloorTarget + Vector3.up * 0.15f, 1f, new Color(0.8f, 0.75f, 0.7f));
                         }
                     });
                     break;
@@ -849,7 +941,7 @@ namespace Repulsor
                             streak.widthMultiplier = 0.05f * Scale * (1f - t * 0.6f);
                         });
                     }
-                    Add(Holder("Gust Hit"), 0.4f, null, () => HitDummy(0.6f));
+                    Add(Holder("Gust Hit"), 0.4f, null, () => { });
                     break;
                 case Fx.Lightning:
                 {
@@ -871,15 +963,13 @@ namespace Repulsor
                             Vector3 jitter = i == 0 || i == 11 ? Vector3.zero : UnityEngine.Random.insideUnitSphere * 0.18f;
                             line.SetPosition(i, Vector3.Lerp(from, Target, k) + jitter);
                         }
-                        if (Mathf.Repeat(e.Age, 0.3f) < 0.05f)
-                            HitDummy(0.05f);
                     });
                     break;
                 }
                 case Fx.Tornado:
                 {
                     GameObject go = Holder("Tornado");
-                    go.transform.localPosition = new Vector3(0f, 0f, Reach);
+                    go.transform.localPosition = FloorTarget;
                     var rings = new FxSpin[6];
                     for (int i = 0; i < rings.Length; i++)
                     {
@@ -896,9 +986,6 @@ namespace Repulsor
                             rings[i].transform.localPosition = new Vector3(0.08f * Mathf.Sin(e.Age * 6f + i), height, 0.08f * Mathf.Cos(e.Age * 6f + i));
                             rings[i].Size = Vector3.one * (0.25f + i * 0.13f) * grow;
                         }
-                        dummyPush = new Vector3(0.1f * Mathf.Sin(e.Age * 9f), 0f, -0.2f) * grow;
-                        if (Mathf.Repeat(e.Age, 0.45f) < dt)
-                            dummyFlash = 0.1f;
                     });
                     break;
                 }
@@ -910,7 +997,6 @@ namespace Repulsor
                     Fly(go, hand, Target, 0.4f, () =>
                     {
                         Burst(Target, 0.7f, new Color(1f, 0.55f, 0.2f));
-                        HitDummy(0.2f);
                     });
                     break;
                 }
@@ -933,7 +1019,6 @@ namespace Repulsor
                             if (index == 2 && t >= 1f && !hit)
                             {
                                 hit = true;
-                                HitDummy(0.3f);
                             }
                         });
                     }
@@ -943,22 +1028,20 @@ namespace Repulsor
                     GameObject go = Holder("Sticky Rock");
                     Prop("RockSmallA", go.transform);
                     FxSpin glow = Glow(go.transform, "FxGlow", 0.3f, new Color(1f, 0.55f, 0.15f));
-                    Fly(go, hand, Target + new Vector3(0f, 0f, -0.25f), 0.35f, () =>
+                    Fly(go, hand, FloorTarget + Vector3.up * 0.1f, 0.4f, () =>
                     {
-                        HitDummy(0.05f);
                         GameObject stuck = Holder("Stuck");
                         Prop("RockSmallA", stuck.transform);
                         FxSpin pulse = Glow(stuck.transform, "FxGlow", 0.3f, new Color(1f, 0.55f, 0.15f));
                         Add(stuck, move.Hold, (e, dt) =>
                         {
-                            stuck.transform.localPosition = Target + new Vector3(0f, 0f, -0.25f) + dummyPush;
+                            stuck.transform.localPosition = FloorTarget + Vector3.up * 0.1f;
                             pulse.Size = Vector3.one * (0.3f + 0.25f * Mathf.Abs(Mathf.Sin(e.Age * (6f + e.Age * 12f))));
                         }, () =>
                         {
                             // The snap: a flash at the fingers, and the rock goes off.
                             Burst(Hand(LeadHand), 0.25f, Color.white);
-                            Burst(Target, 1.5f, new Color(1f, 0.5f, 0.15f));
-                            HitDummy(0.4f);
+                            Burst(FloorTarget + Vector3.up * 0.2f, 1.5f, new Color(1f, 0.5f, 0.15f));
                         });
                     });
                     break;
@@ -970,7 +1053,7 @@ namespace Repulsor
         void ShowAura()
         {
             CharacterDef def = CharacterDef.Get(character);
-            bool on = def.AuraStyle[level] > 0 || GlowTimer.PermanentFor(character, level + 1) || (character == CharacterId.Elementalist && level > 0);
+            bool on = def.AuraStyle[level] > 0 || (character == CharacterId.Technoman && level >= 2) || (character == CharacterId.Elementalist && level > 0);
             aura.gameObject.SetActive(on);
             if (on)
                 SetColor(aura, (character == CharacterId.KiFighter && level == 2 ? new Color(0.25f, 0.6f, 1f) : color) * 0.45f);
@@ -982,7 +1065,7 @@ namespace Repulsor
                 if (effect.Go != null)
                     UnityEngine.Object.Destroy(effect.Go);
             live.Clear();
-            dummyPush = Vector3.zero;
+            charge.gameObject.SetActive(false);
         }
     }
 }

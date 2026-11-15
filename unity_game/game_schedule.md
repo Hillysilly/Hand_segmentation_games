@@ -41,14 +41,21 @@ The APK is built; install it with `build_and_run.ps1 -NoBuild` when the headset 
 6. **BOSS FIGHT**: is it readable, too hard or too easy? 700 HP is a guess.
 7. **Valkyr**: do the crossbow and bow sit in your hands right? (orientation is guessed from renders)
 8. **Tempest and Terra**: try each gesture; tell me which miss or misfire.
-9. **Tight aura** (added 11/14 morning): DEBUG > INVINCIBLE 8s (or transform). Do your hands and forearms get a
-   glowing outline, with afterimages when you swing them? Stand in front of a mirror: does your reflection get
-   the glowing body outline? Is it too strong to see your hands through? Does the frame rate hold?
-10. **Character select** (redone 11/14): a symbol box per character on the left; top right a mannequin acting
-    out each level's move against a robot, cycling L1-L3 (arrows pick one); name and a scrolling ability list
-    under it. Is the figure big enough at arm's length? Do the effects read? Do the scroll buttons work?
+9. **Tight aura**: removed 11/14 evening (it lagged). Technoman level 3 has its old hand glow back.
+10. **Character select** (redone 11/14, poses redone that evening): no robot now. The mannequin's arms and hands
+    act out each move as the gesture detectors want it (fist then open, triangle then fists, bow draw, swirl...),
+    and a big HAND SIGN box beside it shows the hand shape with a caption. Do the signs read? Is anything still
+    wrong (tell me which character and level)?
 11. **Webline's webs** (11/14): web shots now fly as a real web (Quaternius cobweb) that opens and spins, and
-    stick on what they hit. Big enough? Readable against your room?
+    stick on what they hit. Big enough? Readable against your room? The boss can't be webbed (webs just hurt it).
+12. **Damage flash** (11/14 evening): now a sphere round your view, red past every edge. Any edges left?
+13. **Tempest tornado** (11/14 evening): only real circles of both hands charge it now (waving doesn't). About
+    one circle arms it, two charge it fully, then push both forward. Too strict?
+14. **Enemies** (11/14 evening): the yellow gunner is gone from waves (dashers and drones start). The Dasher runs
+    a routine: crouches with an orange line on the floor where it'll go, dashes, plants, fires twice, then the
+    other way. Enemy laser hitboxes are a little slimmer.
+15. **Lumen's force grab** (11/14 evening): at level 3, a cupped hand at an enemy grabs it like Webline's web:
+    swing it into others, swing fast to fling it, open the hand to drop it.
 
 ## Status, end of 11/8 session
 

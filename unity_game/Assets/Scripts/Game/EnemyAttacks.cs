@@ -107,7 +107,8 @@ namespace Repulsor
                 if (!hitDone && arena != null)
                 {
                     hitDone = true;
-                    arena.LaserHitsPlayer(start, end, 0.05f * width + 0.05f, damage);
+                    // A little slimmer than the beam looks (11/14: a touch easier to dodge): 5.5 cm either side for a gunner's.
+                    arena.LaserHitsPlayer(start, end, 0.035f * width + 0.02f, damage);
                 }
                 return;
             }

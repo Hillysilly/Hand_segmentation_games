@@ -77,6 +77,46 @@ namespace Repulsor.Tests
         }
 
         [Test]
+        public void WavingOrShakingTheHandsDoesNotChargeATornado()
+        {
+            HandPose left = Hand(true, new Vector3(-0.15f, 1.25f, 0.3f), 0f);
+            HandPose right = Hand(false, new Vector3(0.15f, 1.25f, 0.3f), 0f);
+            var swirl = new SwirlDetector();
+            // Side to side, fast, for three seconds: back and forth, never round.
+            for (int i = 0; i < 216; i++)
+            {
+                float wave = Mathf.Sin(i * 0.35f);
+                left.Velocity = new Vector3(wave, 0.05f * Mathf.Sin(i * 1.3f), 0f) * 1.2f;
+                right.Velocity = new Vector3(-wave, 0.05f * Mathf.Sin(i * 1.3f), 0f) * 1.2f;
+                swirl.Step(left, right, Body, Frame, out _, out _);
+            }
+            Assert.That(swirl.Charge, Is.LessThan(SwirlDetector.MinCharge), "waving is not circling");
+            // Held still: nothing either.
+            left.Velocity = right.Velocity = Vector3.zero;
+            for (int i = 0; i < 100; i++)
+                swirl.Step(left, right, Body, Frame, out _, out _);
+            Assert.That(swirl.Charge, Is.LessThan(0.05f));
+        }
+
+        [Test]
+        public void SlowCirclesOfEachHandChargeATornado()
+        {
+            HandPose left = Hand(true, new Vector3(-0.15f, 1.25f, 0.3f), 0f);
+            HandPose right = Hand(false, new Vector3(0.15f, 1.25f, 0.3f), 0f);
+            var swirl = new SwirlDetector();
+            // A circle a second, each hand its own way round, a little wobbly: two seconds is enough.
+            for (int i = 0; i < 144; i++)
+            {
+                float a = i * Mathf.PI * 2f / 72f;
+                float wobble = 0.08f * Mathf.Sin(i * 1.7f);
+                left.Velocity = new Vector3(Mathf.Cos(a) + wobble, Mathf.Sin(a), 0.1f) * 0.6f;
+                right.Velocity = new Vector3(-Mathf.Cos(a), Mathf.Sin(a) + wobble, 0.1f) * 0.6f;
+                swirl.Step(left, right, Body, Frame, out _, out _);
+            }
+            Assert.That(swirl.Charge, Is.GreaterThan(SwirlDetector.MinCharge));
+        }
+
+        [Test]
         public void APushWithoutChargingIsNoTornado()
         {
             HandPose left = Hand(true, new Vector3(-0.15f, 1.25f, 0.3f), 0f);

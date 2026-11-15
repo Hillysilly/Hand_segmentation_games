@@ -351,14 +351,17 @@ namespace Repulsor.Tests
             for (double roll = 0; roll < 1; roll += 0.01)
             {
                 EnemyKind kind = WavePlan.KindFor(1, roll);
-                Assert.That(kind == EnemyKind.Robot || kind == EnemyKind.Drone, $"{kind} in wave 1");
+                Assert.That(kind == EnemyKind.Dasher || kind == EnemyKind.Drone, $"{kind} in wave 1");
                 Assert.That(WavePlan.KindFor(5, roll), Is.Not.EqualTo(EnemyKind.Boss));
             }
             var seen = new System.Collections.Generic.HashSet<EnemyKind>();
             for (double roll = 0; roll < 1; roll += 0.005)
                 seen.Add(WavePlan.KindFor(4, roll));
-            Assert.That(seen, Is.EquivalentTo(new[] { EnemyKind.Robot, EnemyKind.Drone, EnemyKind.Brawler, EnemyKind.Dasher,
+            Assert.That(seen, Is.EquivalentTo(new[] { EnemyKind.Drone, EnemyKind.Brawler, EnemyKind.Dasher,
                 EnemyKind.Rocketeer, EnemyKind.Sniper, EnemyKind.Tank }));
+            // The yellow gunner isn't sent any more, nor called in by the boss.
+            for (double roll = 0; roll < 1; roll += 0.01)
+                Assert.That(WavePlan.BossHelper(roll), Is.Not.EqualTo(EnemyKind.Robot));
         }
 
         [Test]

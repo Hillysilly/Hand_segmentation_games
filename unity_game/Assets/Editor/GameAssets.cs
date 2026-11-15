@@ -20,6 +20,11 @@ public static class GameAssets
             m.SetColor("_Tint", new Color(0.32f, 0.32f, 0.34f));
             m.SetFloat("_Amount", 0f);
         });
+        Save("HurtFlash", "Repulsor/Hurt Vignette", m =>
+        {
+            m.SetColor("_Color", new Color(1f, 0.08f, 0.05f));
+            m.SetFloat("_Amount", 0f);
+        });
         SaveMesh("SphereMesh", PrimitiveType.Sphere);
         SaveMesh("QuadMesh", PrimitiveType.Quad);
         SaveMesh("CubeMesh", PrimitiveType.Cube);

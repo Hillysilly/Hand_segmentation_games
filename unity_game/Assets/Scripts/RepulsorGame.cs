@@ -195,9 +195,6 @@ namespace Repulsor
         public XROrigin Origin => origin;
         public AuraView Aura => aura;
         public PersonDetector Person => person;
-
-        /// <summary>Set by the game while it wants the person tracker running (a tight aura is up).</summary>
-        public bool PersonWanted { get; set; }
         public Transform TrackingSpace => origin.CameraFloorOffsetObject.transform;
         public AudioClip ClickSound => click;
         public AudioClip BoomSound => boom;
@@ -268,10 +265,8 @@ namespace Repulsor
 
             // In the game your aura follows your own head (Arena), so the camera tracker only runs in the old mode.
             bool tracking = (Legacy || AuraTestOn) && aura.IsLit;
-            // The game asks for it too while a tight aura is up, for the glow on the person the camera sees.
-            person.Running = tracking || PersonWanted;
-            person.Fast = aura.IsSuit || PersonWanted;
-            person.WantMask = PersonWanted;
+            person.Running = tracking;
+            person.Fast = aura.IsSuit;
             if (tracking)
                 aura.MoveTo(auraTracker.Tick(person, dt));
             if (tracking && aura.IsSuit)

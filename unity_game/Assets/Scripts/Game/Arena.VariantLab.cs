@@ -338,8 +338,8 @@ namespace Repulsor
             if (game.Room.TryDistance(head.position + forward * 0.5f, forward, out float wall))
                 distance = Mathf.Clamp(wall + 0.1f, 1.5f, 3f);
             Vector3 point = head.position + forward * distance;
-            point.y = FloorY + Enemy.MiddleHeight(EnemyKind.Robot);
-            practiceDummy = Enemy.Spawn(EnemyKind.Robot, point, this, head, foes);
+            point.y = FloorY + Enemy.MiddleHeight(EnemyKind.Dasher);
+            practiceDummy = Enemy.Spawn(EnemyKind.Dasher, point, this, head, foes);
             practiceDummy.Practice = true;
             OverheadBar.Attach(practiceDummy, head, foes, false);
         }

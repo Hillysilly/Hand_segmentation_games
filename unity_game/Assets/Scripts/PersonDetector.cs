@@ -89,34 +89,6 @@ namespace Repulsor
 
         public void Init(RoomSense roomSense) => room = roomSense;
 
-        /// <summary>Read the body mask too, while someone's tight aura is up.</summary>
-        public bool WantMask
-        {
-            get => wantMask;
-            set
-            {
-                wantMask = value;
-                if (tracker != null)
-                    tracker.WantMask = value;
-            }
-        }
-
-        bool wantMask;
-
-        /// <summary>The latest body mask, 0 to 1, <see cref="BodyTracker.MaskSize"/> square, rows from its top.</summary>
-        public float[] Mask => tracker?.Mask;
-
-        /// <summary>
-        /// The latest mask's corners in the room (top left, top right, bottom right, bottom left), on a flat square
-        /// through the person's hips, facing the camera as it was when the picture was taken.
-        /// </summary>
-        public Vector3[] MaskCorners { get; } = new Vector3[4];
-
-        /// <summary>Goes up each time a new mask is placed.</summary>
-        public int MaskVersion { get; private set; }
-
-        int placedMaskVersion = -1;
-
         /// <summary>The newest place someone was seen, once. False if nobody new has been seen.</summary>
         public bool TryTakeSighting(out Vector3 point)
         {
@@ -125,35 +97,6 @@ namespace Repulsor
             hasSighting = false;
             return had;
         }
-
-        /// <summary>
-        /// For PC tests: runs once on a picture as if the camera at <paramref name="cameraPosition"/> took it, with
-        /// the replay's field of view. Returns whether someone was found.
-        /// </summary>
-        public bool TestTrack(Texture2D picture, Vector3 cameraPosition, Quaternion cameraRotation)
-        {
-            tracker ??= new BodyTracker(model, landmarkModel, anchorsCsv.text, BackendType.CPU);
-            tracker.WantMask = wantMask;
-            imageWidth = picture.width;
-            imageHeight = picture.height;
-            rgba = new byte[imageWidth * imageHeight * 4];
-            BodyTracker.CopyPicture(picture, rgba);
-            float focal = imageHeight * 0.5f / Mathf.Tan(ReplayVerticalFov * 0.5f * Mathf.Deg2Rad);
-            focalLength = new Vector2(focal, focal);
-            centre = new Vector2(imageWidth, imageHeight) * 0.5f;
-            capturedPosition = cameraPosition;
-            capturedRotation = cameraRotation;
-            // A run that finds the person aims the crop; the next reads them from it. The search windows take turns.
-            tracker.Reset();
-            bool found = false;
-            for (int i = 0; i < 8 && !found; i++)
-                found = tracker.Run(rgba, imageWidth, imageHeight, frame) && tracker.Run(rgba, imageWidth, imageHeight, frame);
-            if (found)
-                Locate();
-            return found;
-        }
-
-        public const float TestFieldOfView = ReplayVerticalFov;
 
         /// <summary>Uses the pictures in the app's frames folder in place of the camera, on a loop.</summary>
         public void StartReplay()
@@ -185,8 +128,7 @@ namespace Repulsor
         void Start()
         {
             // The CPU, not the GPU: drawing doesn't have to wait for the model.
-            tracker ??= new BodyTracker(model, landmarkModel, anchorsCsv.text, BackendType.CPU);
-            tracker.WantMask = wantMask;
+            tracker = new BodyTracker(model, landmarkModel, anchorsCsv.text, BackendType.CPU);
             Debug.Log("[Person] Tracker ready");
             RequestCamera();
         }
@@ -379,17 +321,6 @@ namespace Repulsor
 
             frame.Place(capturedPosition, capturedRotation, focalLength, centre, hipDistance, Joints);
             BodyVersion++;
-            if (tracker.MaskVersion != placedMaskVersion)
-            {
-                placedMaskVersion = tracker.MaskVersion;
-                for (int i = 0; i < 4; i++)
-                {
-                    Vector2 pixel = tracker.MaskCorners[i];
-                    var line = new Vector3((pixel.x - centre.x) / focalLength.x, (centre.y - pixel.y) / focalLength.y, 1f);
-                    MaskCorners[i] = capturedPosition + capturedRotation * (line * hipDistance);
-                }
-                MaskVersion++;
-            }
 
             sighting = (Joints[HipLeft] + Joints[HipRight]) * 0.5f;
             hasSighting = true;

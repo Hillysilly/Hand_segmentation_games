@@ -125,3 +125,31 @@ shown front-on to the shooter. The shot hides its energy ball and flies the web,
 the web sticks to the robot (through the shot's OnHit) and fades after 3 s. Black at level 3. The select screen's
 web moves use it too. `Game/WebStrand.cs`, `Shaders/WebModel.shader`, `Resources/Props/Web` (PropModels).
 PC renders `Logs/play_web_*.png`. EditMode 169/169, PlayMode 14/14, APK built.
+
+
+## Evening notes from the headset (first install of the day's build)
+
+The headset had a build signed with another key, so the old app was uninstalled; its PlayerPrefs (best scores,
+picked variants) were backed up first and restored with `run-as`. The user's notes after playing:
+
+- **Tight aura lags: removed.** Reverted the tight-aura commit (GlowTimer, TightAura, both shaders, the mask
+  readout, the net Glow flag); Technoman level 3's old hand glow is back.
+- **Damage flash showed edges: now a sphere.** `HurtFlash` draws the inside of a 0.6 m sphere on the head with
+  `Repulsor/Hurt Vignette` (clear within 18 degrees, full red from 55), so it runs past the view on every side.
+- **Tornado needs real swirling.** `SwirlDetector` now tracks each hand's direction of travel turning steadily
+  one way round (waves and shakes reverse and cancel out); one circle arms it, two charge it. Two new tests.
+- **Select screen: no robot, accurate poses, hand signs.** The mannequin plays its idle clip and the arms are
+  posed over it each LateUpdate (two-bone reach to keyed wrist positions, hands turned and fingers shaped by
+  `HandRig`) from `ShowcasePoses`, written from the detectors' rules. Dragon fist and the laser sword keep their
+  clips. A HAND SIGN box shows the move's hand shape on the XR Hands sample hand (Unity, Package Distribution
+  License; same joint names as the game's), from behind for palm-out shapes, the side for pointing ones, above
+  for the spider sign, the front for the cup. `HandSignTests` reads each sign back into a HandPose and checks the
+  game's own classifier sees it (open, fist, gun, spider, cup, snap, and the two-hand triangle). Renders:
+  `Logs/play_select_*`, `Logs/play_signview_*`.
+- **Enemies:** the yellow gunner (Robot, "Stan") is out of the waves and the boss's helpers; wave 1 is dashers and
+  drones; the Variant Lab's practice dummy is a dasher. The Dasher now runs a learnable routine (tell with a floor
+  line and landing ring, 0.3 s dash with a trail, skid, two shots, back the other way). Enemy laser hit thickness
+  0.05w+0.05 became 0.035w+0.02. The boss can't be webbed. Lumen's force grabs enemies (same hold, swing and fling
+  as the web; opening the hand drops it). `EnemyRoutineTests` covers the routine and the grabs.
+- **Asked: masking your hands with preset 3D models.** Answered in chat; not built.
+- EditMode 165/165, PlayMode 18/18.

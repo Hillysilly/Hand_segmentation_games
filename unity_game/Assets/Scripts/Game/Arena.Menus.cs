@@ -212,6 +212,12 @@ namespace Repulsor
 
             // Top right: the stage the mannequin stands on (the figure itself is drawn in front, see TickShowcase).
             Ui.Box(s, WellCentre, WellSize, Ui.Well);
+            // At its right end, the hand sign (a big hand making the move's shape, drawn in front, see TickShowcase).
+            Ui.Box(s, SignBoxCentre, SignBoxSize, new Color(1f, 1f, 1f, 0.05f));
+            Ui.Label(s, "HAND SIGN", SignBoxCentre + new Vector2(0f, SignBoxSize.y * 0.5f - 9f), new Vector2(SignBoxSize.x, 14f), 9,
+                TextAnchor.MiddleCenter, FontStyle.Bold).color = Ui.Muted;
+            signCaption = Ui.Label(s, "", SignBoxCentre - new Vector2(0f, SignBoxSize.y * 0.5f - 16f), new Vector2(SignBoxSize.x - 6f, 28f), 9,
+                TextAnchor.MiddleCenter);
             Ui.Button(s, "<", new Vector2(36f, 4f), new Vector2(36f, 28f), () => StepShowcase(-1), 16);
             Ui.Button(s, ">", new Vector2(264f, 4f), new Vector2(36f, 28f), () => StepShowcase(1), 16);
             showcaseLevel = Ui.Label(s, "", new Vector2(150f, 4f), new Vector2(188f, 24f), 13, TextAnchor.MiddleCenter, FontStyle.Bold);

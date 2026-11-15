@@ -8,7 +8,8 @@ namespace Repulsor
     /// - Drone: weaves at head height, quick weaker lasers.
     /// - Brawler: runs at you and punches after a wind-up; step back out of reach.
     /// - Rocketeer: hangs back and fires missiles that blow up robots too, and can be shot down.
-    /// - Dasher: dashes side to side between double shots.
+    /// - Dasher: a set routine you can learn: it crouches and shows on the floor where it's about to dash, dashes
+    ///   in a streak, plants, fires twice, then dashes back the other way, zig-zagging in.
     /// - Sniper: keeps its distance; a long aim that follows you, then a big laser.
     /// - Tank: slow and tough, a fan of three lasers.
     /// - Boss: see <see cref="BossBrain"/>.
@@ -37,9 +38,28 @@ namespace Repulsor
         float floorY;
         // Brawler wind-up, dasher dash, double shots.
         float windUp;
-        float dashFor;
         Vector3 dashVelocity;
         float dashTimer;
+        DashStep dashStep;
+        float dashStepFor;
+        float dashSide = 1f;
+        Vector3 dashFrom;
+        Vector3 dashTo;
+        LineRenderer dashLine;
+        FxSpin dashMark;
+        TrailRenderer dashTrail;
+
+        enum DashStep { Approach, Tell, Dash, Plant, Shoot }
+
+        /// <summary>For tests: which part of the Dasher's routine it's in.</summary>
+        public string DashState => dashStep.ToString();
+
+        // The Dasher's routine (seconds): crouch and show the way, dash, skid to a stop, fire twice, catch its breath.
+        public const float DashTellSeconds = 0.5f;
+        public const float DashSeconds = 0.3f;
+        public const float DashLength = 1.5f;
+        const float DashPlantSeconds = 0.25f;
+        const float DashShootSeconds = 0.9f;
         int queuedShots;
         float queuedIn;
         float moving;
@@ -165,6 +185,14 @@ namespace Repulsor
             Vector3 step = transform.position - lastPosition;
             moving = Mathf.Lerp(moving, dt > 0f ? step.magnitude / dt : 0f, 1f - Mathf.Exp(-8f * dt));
             look?.Tick(dt, moving > 0.06f, running || moving > spec.Speed * 1.8f, flash);
+            if (!Alive || Webbed)
+            {
+                // Caught mid-routine: no floor line or streak left behind, and it starts over when it's free.
+                HideDashLine();
+                if (dashTrail != null)
+                    dashTrail.emitting = false;
+                dashStep = DashStep.Approach;
+            }
             if (!Alive)
                 return;
             if (Webbed)
@@ -241,8 +269,8 @@ namespace Repulsor
                 }
             }
             attackTimer -= dt;
-            // Smoke blinds them: no shooting from inside it, or through it.
-            if (attackTimer <= 0f && distance < 7f && !SmokeCloud.Blocks(transform.position, target))
+            // Smoke blinds them: no shooting from inside it, or through it. The Dasher shoots as part of its routine.
+            if (Kind != EnemyKind.Dasher && attackTimer <= 0f && distance < 7f && !SmokeCloud.Blocks(transform.position, target))
             {
                 attackTimer = Random.Range(spec.AttackMin, spec.AttackMax);
                 Attack(target);
@@ -325,24 +353,171 @@ namespace Repulsor
             fistGlow.transform.localScale = Vector3.one * Mathf.Lerp(0.1f, 0.45f, amount);
         }
 
-        /// <summary>Dasher: walks in, and every couple of seconds dashes sideways fast.</summary>
+        /// <summary>
+        /// Dasher: walks in until it's in range, then runs its routine. Tell: it crouches and leans, and a line on
+        /// the floor shows where it's going. Dash: fast, leaving a streak. Plant: it skids to a stop. Shoot: two quick
+        /// lasers. Then the same the other way, zig-zagging toward you (or back, if you're close).
+        /// </summary>
         void Dash(float dt, Vector3 toward, float distance)
         {
-            if (dashFor > 0f)
+            Vector3 target = arena.NearestPlayerHead(transform.position);
+            dashStepFor -= dt;
+            switch (dashStep)
             {
-                dashFor -= dt;
-                running = true;
-                transform.position += arena.Steer(transform.position, dashVelocity.normalized, dashVelocity.magnitude * dt);
-                return;
+                case DashStep.Approach:
+                    Lean(0f, 0f, dt);
+                    Walk(dt, distance > spec.Range ? toward : Vector3.zero, spec.Speed);
+                    dashTimer -= dt;
+                    if (dashTimer <= 0f && distance < spec.Range + 2.5f)
+                        StartTell(toward, distance);
+                    break;
+                case DashStep.Tell:
+                {
+                    float t = 1f - dashStepFor / DashTellSeconds;
+                    Lean(dashSide, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t * 2f)), dt);
+                    Walk(dt, Vector3.zero, 0f);
+                    ShowDashLine(t);
+                    if (dashStepFor <= 0f)
+                    {
+                        dashStep = DashStep.Dash;
+                        dashStepFor = DashSeconds;
+                        dashVelocity = (dashTo - dashFrom) / DashSeconds;
+                        HideDashLine();
+                        if (dashTrail != null)
+                        {
+                            dashTrail.Clear();
+                            dashTrail.emitting = true;
+                        }
+                        arena.Game.PlayAt(transform.position, arena.Game.WhooshSound);
+                    }
+                    break;
+                }
+                case DashStep.Dash:
+                    running = true;
+                    Lean(dashSide, 1f, dt);
+                    transform.position += arena.Steer(transform.position, dashVelocity.normalized, dashVelocity.magnitude * dt);
+                    if (dashStepFor <= 0f)
+                    {
+                        dashStep = DashStep.Plant;
+                        dashStepFor = DashPlantSeconds;
+                        if (dashTrail != null)
+                            dashTrail.emitting = false;
+                    }
+                    break;
+                case DashStep.Plant:
+                {
+                    // A short skid, leaning back against it.
+                    float skid = dashStepFor / DashPlantSeconds;
+                    transform.position += arena.Steer(transform.position, dashVelocity.normalized, dashVelocity.magnitude * 0.25f * skid * dt);
+                    Lean(-dashSide * 0.6f, skid, dt);
+                    if (dashStepFor <= 0f)
+                    {
+                        dashStep = DashStep.Shoot;
+                        dashStepFor = DashShootSeconds;
+                        if (!SmokeCloud.Blocks(transform.position, target))
+                        {
+                            Shoot(EnemyShot.QuickLaser, target);
+                            queuedShots = 1;
+                            queuedIn = 0.35f;
+                        }
+                    }
+                    break;
+                }
+                case DashStep.Shoot:
+                    Lean(0f, 0f, dt);
+                    Walk(dt, Vector3.zero, 0f);
+                    if (dashStepFor <= 0f)
+                    {
+                        // Back the other way. Farther off it walks in a little between dashes.
+                        dashSide = -dashSide;
+                        dashStep = DashStep.Approach;
+                        dashTimer = distance > spec.Range + 1f ? 0.6f : 0.25f;
+                    }
+                    break;
             }
-            Walk(dt, distance > spec.Range ? toward : Vector3.zero, spec.Speed);
-            dashTimer -= dt;
-            if (dashTimer > 0f)
+        }
+
+        /// <summary>Picks where the dash goes (the clear side, angled in or out), and starts showing it.</summary>
+        void StartTell(Vector3 toward, float distance)
+        {
+            Vector3 side = Vector3.Cross(Vector3.up, toward);
+            float inOut = distance > spec.Range + 0.5f ? 0.5f : distance < spec.Range - 0.6f ? -0.4f : 0f;
+            for (int attempt = 0; attempt < 2; attempt++)
+            {
+                Vector3 direction = (side * dashSide + toward * inOut).normalized;
+                Vector3 step = arena.Steer(transform.position, direction, DashLength);
+                if (step.sqrMagnitude > DashLength * DashLength * 0.5f || attempt == 1)
+                {
+                    dashFrom = transform.position;
+                    dashTo = transform.position + (step.sqrMagnitude > 1e-4f ? step : direction * DashLength);
+                    break;
+                }
+                dashSide = -dashSide;
+            }
+            dashStep = DashStep.Tell;
+            dashStepFor = DashTellSeconds;
+            look?.PlayOnce("hit", 0.6f);
+        }
+
+        /// <summary>Tilts and crouches the model: toward a side while it gets ready and dashes, back against a skid.</summary>
+        void Lean(float side, float amount, float dt)
+        {
+            if (look == null)
                 return;
-            dashTimer = Random.Range(1.6f, 2.6f);
-            dashFor = 0.35f;
-            Vector3 side = Vector3.Cross(Vector3.up, toward) * (Random.value < 0.5f ? -1f : 1f);
-            dashVelocity = (side + toward * (distance > spec.Range ? 0.4f : -0.2f)).normalized * 4f;
+            Quaternion want = Quaternion.Euler(amount * 8f, 0f, -side * amount * 16f);
+            Vector3 crouch = Vector3.down * (MiddleHeight(Kind) + amount * 0.08f);
+            float k = 1f - Mathf.Exp(-14f * dt);
+            look.transform.localRotation = Quaternion.Slerp(look.transform.localRotation, want, k);
+            look.transform.localPosition = Vector3.Lerp(look.transform.localPosition, crouch, k);
+        }
+
+        static readonly Color DashColor = new Color(1f, 0.45f, 0.12f);
+
+        /// <summary>The floor line from its feet to where it's about to land, drawing out over the tell.</summary>
+        void ShowDashLine(float t)
+        {
+            if (dashLine == null)
+            {
+                var go = new GameObject("Dash Line", typeof(LineRenderer));
+                go.transform.SetParent(transform.parent, false);
+                dashLine = go.GetComponent<LineRenderer>();
+                dashLine.sharedMaterial = Resources.Load<Material>("AimLine");
+                dashLine.positionCount = 2;
+                dashLine.useWorldSpace = true;
+                dashLine.numCapVertices = 4;
+                dashLine.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                dashMark = BallLook.Sprite("Dash Mark", go.transform, "FxRing", 0.5f, DashColor);
+                dashMark.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+                dashMark.Set(tumble: new Vector3(0f, 0f, 200f));
+
+                dashTrail = gameObject.AddComponent<TrailRenderer>();
+                dashTrail.sharedMaterial = Resources.Load<Material>("AimLine");
+                dashTrail.time = 0.22f;
+                dashTrail.widthCurve = new AnimationCurve(new Keyframe(0f, 0.12f), new Keyframe(1f, 0f));
+                dashTrail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                dashTrail.emitting = false;
+                var trailBlock = new MaterialPropertyBlock();
+                dashTrail.GetPropertyBlock(trailBlock);
+                trailBlock.SetColor("_BaseColor", DashColor * 0.6f);
+                dashTrail.SetPropertyBlock(trailBlock);
+            }
+            dashLine.gameObject.SetActive(true);
+            float floor = floorY + 0.02f;
+            Vector3 from = new Vector3(dashFrom.x, floor, dashFrom.z);
+            Vector3 to = new Vector3(dashTo.x, floor, dashTo.z);
+            float grow = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t * 1.6f));
+            dashLine.SetPosition(0, from);
+            dashLine.SetPosition(1, Vector3.Lerp(from, to, grow));
+            dashLine.widthMultiplier = Mathf.Lerp(0.03f, 0.09f, t);
+            Tint.Line(dashLine, DashColor * (1f + 0.6f * Mathf.Sin(t * 30f) * t));
+            dashMark.transform.position = to;
+            dashMark.Size = Vector3.one * Mathf.Lerp(0.15f, 0.55f, grow);
+        }
+
+        void HideDashLine()
+        {
+            if (dashLine != null)
+                dashLine.gameObject.SetActive(false);
         }
 
         void Attack(Vector3 target)
@@ -414,6 +589,8 @@ namespace Repulsor
         {
             if (spawnBubble != null)
                 Destroy(spawnBubble.gameObject);
+            if (dashLine != null)
+                Destroy(dashLine.gameObject);
             boss?.Stop();
         }
     }

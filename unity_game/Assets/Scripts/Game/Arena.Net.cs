@@ -281,7 +281,6 @@ namespace Repulsor
                     Lives = (byte)Mathf.Max(0, player.Lives),
                     Invincible = phase == Phase.Playing && player.InvincibleFor > 0f,
                     Boosted = phase == Phase.Playing && player.BoostFor > 0f,
-                    Glow = GlowOn,
                 }, dt);
                 if (net.Role == NetRole.Host && phase == Phase.Playing && waves != null)
                     SendEnemies(dt);

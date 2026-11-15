@@ -43,3 +43,7 @@ Assets/Resources/Icons (character select symbols)
 
 Assets/Props/Web (Cobweb.glb: the Spider's web shots and splats)
   Cobweb by Quaternius, CC0 1.0. Via Poly Pizza: https://poly.pizza/m/EHYNWew6JK
+
+Assets/Characters/Hands (select screen hand signs)
+  LeftHand.fbx / RightHand.fbx from the XR Hands package's HandVisualizer sample, Unity Technologies,
+  Unity Package Distribution License.

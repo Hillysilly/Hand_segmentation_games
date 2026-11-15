@@ -1,0 +1,3 @@
+LeftHand.fbx and RightHand.fbx: the hand models from the Unity XR Hands package's "HandVisualizer" sample
+(com.unity.xr.hands 1.9.0), copyright Unity Technologies, used under the Unity Package Distribution License
+(https://unity3d.com/legal/licenses/Unity_Package_Distribution_License). Used for the select screen's hand signs.

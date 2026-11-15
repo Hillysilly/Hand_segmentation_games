@@ -4,7 +4,8 @@ namespace Repulsor
 {
     /// <summary>
     /// Every kind of enemy. The numbers are sent over the network as a byte, so only add to the end.
-    /// Robot and Drone keep their old numbers.
+    /// Robot and Drone keep their old numbers. Robot (the yellow gunner) is no longer sent in waves (11/14: the
+    /// user didn't like it); it stays so the numbers don't shift.
     /// </summary>
     public enum EnemyKind : byte { Robot, Drone, Brawler, Rocketeer, Dasher, Sniper, Tank, Boss }
 
@@ -62,23 +63,20 @@ namespace Repulsor
     public static class WavePlan
     {
         /// <summary>
-        /// The kind for one spawn of a wave, from a roll between 0 and 1. Wave 1 is gunners and drones; brawlers
-        /// join at 2, dashers and rocketeers at 3, snipers and tanks at 4.
+        /// The kind for one spawn of a wave, from a roll between 0 and 1. Wave 1 is dashers and drones; brawlers
+        /// join at 2, rocketeers at 3, snipers and tanks at 4.
         /// </summary>
         public static EnemyKind KindFor(int wave, double roll)
         {
             var pool = new System.Collections.Generic.List<(EnemyKind kind, float weight)>
             {
-                (EnemyKind.Robot, 3f),
-                (EnemyKind.Drone, Math.Min(2.5f, 0.6f * wave)),
+                (EnemyKind.Dasher, 3f),
+                (EnemyKind.Drone, Math.Min(2.5f, 0.6f + 0.6f * wave)),
             };
             if (wave >= 2)
                 pool.Add((EnemyKind.Brawler, 1.6f));
             if (wave >= 3)
-            {
-                pool.Add((EnemyKind.Dasher, 1.4f));
                 pool.Add((EnemyKind.Rocketeer, 1.2f));
-            }
             if (wave >= 4)
             {
                 pool.Add((EnemyKind.Sniper, 1f));
@@ -94,11 +92,11 @@ namespace Repulsor
                     return entry.kind;
                 pick -= entry.weight;
             }
-            return EnemyKind.Robot;
+            return EnemyKind.Dasher;
         }
 
         /// <summary>The kinds the boss calls in to help, from a roll between 0 and 1.</summary>
         public static EnemyKind BossHelper(double roll) =>
-            roll < 0.4 ? EnemyKind.Drone : roll < 0.7 ? EnemyKind.Robot : roll < 0.85 ? EnemyKind.Brawler : EnemyKind.Dasher;
+            roll < 0.45 ? EnemyKind.Drone : roll < 0.75 ? EnemyKind.Dasher : EnemyKind.Brawler;
     }
 }

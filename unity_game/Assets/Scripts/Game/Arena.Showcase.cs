@@ -13,13 +13,18 @@ namespace Repulsor
         static readonly Vector2 WellCentre = new Vector2(150f, 98f);
         static readonly Vector2 WellSize = new Vector2(276f, 156f);
         /// <summary>Where the mannequin's feet stand on the screen, and how far in front of it (mm).</summary>
-        static readonly Vector3 FigureFeet = new Vector3(228f, 30f, -45f);
+        static readonly Vector3 FigureFeet = new Vector3(158f, 30f, -45f);
+        /// <summary>The hand sign's box on the stage (right end), and where the hand floats in front of it (mm).</summary>
+        static readonly Vector2 SignBoxCentre = new Vector2(242f, 104f);
+        static readonly Vector2 SignBoxSize = new Vector2(84f, 136f);
+        static readonly Vector3 SignHand = new Vector3(242f, 110f, -16f);
         const float AbilityLine = 15f;
         const float ManualScrollHold = 6f;
 
         CharacterShowcase showcase;
         RectTransform characterScreen;
         Text showcaseLevel;
+        Text signCaption;
         RectTransform abilityContent;
         RectTransform abilityViewport;
         Text[] abilityBlocks;
@@ -108,7 +113,10 @@ namespace Repulsor
             Vector3 feet = characterScreen.TransformPoint(FigureFeet);
             Vector3 heading = -characterScreen.right * 0.9f - characterScreen.forward * 0.42f;
             showcase.Place(feet, Quaternion.LookRotation(heading, characterScreen.up));
+            showcase.PlaceSign(characterScreen.TransformPoint(SignHand), Quaternion.LookRotation(characterScreen.forward, characterScreen.up));
             showcase.Tick(dt);
+            if (signCaption != null)
+                signCaption.text = showcase.SignCaption;
 
             int level = showcase.Level;
             if (level != shownShowcaseLevel)
@@ -148,6 +156,9 @@ namespace Repulsor
         public void TestShowcaseLevel(int level) => showcase?.SetLevel(level);
 
         public Transform TestCharacterScreen => characterScreen;
+
+        /// <summary>For tests: where the hand sign's box is on the select screen (the screen's own space, mm).</summary>
+        public static Vector3 TestSignHand => SignHand;
 
         /// <summary>For tests: fires a web shot the way the Spider's spider sign does.</summary>
         public void TestFireWeb(Vector3 origin, Vector3 direction, bool black)

@@ -29,6 +29,7 @@ namespace Repulsor.EditorTools
         public static void Build()
         {
             ImportIcons();
+            BuildHands();
             MakeLegacy(Library1);
             Directory.CreateDirectory(OutFolder);
 
@@ -122,6 +123,48 @@ namespace Repulsor.EditorTools
             Debug.Log($"[ShowcaseModels] Mannequin: scale {scale:0.0000}, {added}/{Clips.Length} clips, {clips.Count} in the libraries;{log}");
             Debug.Log("[ShowcaseModels] Library clips: " + string.Join(", ", clips.Keys.OrderBy(k => k)));
             AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// The hand sign's hands: the XR Hands package's sample hands (Unity Package Distribution License), copied
+        /// into Assets/Characters/Hands, as prefabs with one lit material the game tints.
+        /// </summary>
+        static void BuildHands()
+        {
+            Directory.CreateDirectory(OutFolder);
+            string materialPath = $"{OutFolder}/HandSign.mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+            if (material == null)
+            {
+                material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                AssetDatabase.CreateAsset(material, materialPath);
+            }
+            material.SetColor("_BaseColor", new Color(0.9f, 0.9f, 0.92f));
+            material.SetFloat("_Smoothness", 0.45f);
+            EditorUtility.SetDirty(material);
+            foreach (string side in new[] { "Right", "Left" })
+            {
+                var source = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/Characters/Hands/{side}Hand.fbx");
+                if (source == null)
+                {
+                    Debug.LogWarning($"[ShowcaseModels] No {side}Hand.fbx");
+                    continue;
+                }
+                var hand = (GameObject)PrefabUtility.InstantiatePrefab(source);
+                PrefabUtility.UnpackPrefabInstance(hand, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+                hand.name = side + "Hand";
+                foreach (Renderer renderer in hand.GetComponentsInChildren<Renderer>(true))
+                {
+                    renderer.sharedMaterials = Enumerable.Repeat(material, renderer.sharedMaterials.Length).ToArray();
+                    renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    renderer.receiveShadows = false;
+                    if (renderer is SkinnedMeshRenderer skinned)
+                        skinned.updateWhenOffscreen = true;
+                }
+                PrefabUtility.SaveAsPrefabAsset(hand, $"{OutFolder}/{side}Hand.prefab");
+                Object.DestroyImmediate(hand);
+            }
+            Debug.Log("[ShowcaseModels] Hand sign hands built");
         }
 
         static Material SlotMaterial(string slotName, Material original)

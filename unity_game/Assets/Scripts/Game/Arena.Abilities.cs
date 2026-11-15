@@ -127,7 +127,7 @@ namespace Repulsor
             spiderSense.Tick(canFight && character == CharacterId.Spider, dt);
             if (!canFight || character != CharacterId.Archer)
                 archerGear.Hide();
-            if (swinging != null && (!canFight || character != CharacterId.Spider))
+            if (swinging != null && (!canFight || character != (swingingByForce ? CharacterId.Saber : CharacterId.Spider)))
             {
                 ReleaseWebbed(swinging);
                 swinging = null;
@@ -306,9 +306,25 @@ namespace Repulsor
             }
         }
 
-        /// <summary>Force powers: a cupped hand at a piece of furniture lifts a copy of it; a fast swing throws it.</summary>
+        /// <summary>
+        /// Force powers: a cupped hand at an enemy grabs it (it hangs off your hand like the Spider's webbed ones, swing
+        /// to smash, swing fast to fling; the boss is too big); at a piece of furniture it lifts a copy of it, and a
+        /// fast swing throws it.
+        /// </summary>
         void TickForce(float dt)
         {
+            if (swinging != null && swingingByForce)
+            {
+                HandPose holding = swingingHand == 0 ? input.Left : input.Right;
+                GrabEvent kept = force[swingingHand].Step(holding, body, dt, out _);
+                if (TickWebSwing(dt) && kept == GrabEvent.Drop && swinging != null)
+                {
+                    // Let go of the cup: it drops where it is.
+                    ReleaseWebbed(swinging);
+                    swinging = null;
+                }
+                return;
+            }
             for (int i = 0; i < 2; i++)
             {
                 HandPose hand = i == 0 ? input.Left : input.Right;
@@ -324,6 +340,17 @@ namespace Repulsor
                 }
                 if (held != null || !(force[i].Forming || force[i].Holding))
                     continue;
+                Enemy foe = Grabbable(force[i].AimOrigin, force[i].AimDirection);
+                if (foe != null)
+                {
+                    ShowAim(i, force[i].AimOrigin, foe.Center);
+                    if (grab == GrabEvent.Grab)
+                    {
+                        WebEnemy(foe, i, true);
+                        return;
+                    }
+                    continue;
+                }
                 if (room.Count == 0 && matchTime > noFurnitureHint)
                 {
                     noFurnitureHint = matchTime + 15f;

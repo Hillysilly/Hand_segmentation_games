@@ -30,16 +30,6 @@ namespace Repulsor
 
         public bool Visible { get; private set; }
         public PlayerSnapshot Latest => latest;
-
-        /// <summary>Set by the game while the camera draws their tight aura on them; the stand-in shell hides then.</summary>
-        public bool SilhouetteShown { get; set; }
-
-        /// <summary>Their tight aura's colour: as their attacks are (red boosted, gold invincible, Ki blue at 3).</summary>
-        public Color GlowColor =>
-            latest.Boosted ? new Color(1f, 0.15f, 0.1f)
-            : latest.Invincible ? new Color(1f, 0.85f, 0.3f)
-            : latest.Character == (byte)CharacterId.KiFighter && latest.Level >= 3 ? new Color(0.25f, 0.6f, 1f)
-            : (Color)latest.Color;
         public bool ShowMarkers { get; set; } = true;
 
         public RemotePlayer(Transform parent, Transform localHead)
@@ -114,14 +104,11 @@ namespace Repulsor
             // Their aura or glow outline, as a body-shaped shell. The real auras use shared shader values, so a
             // second one can't be drawn; this stands in until it can.
             int style = character.AuraStyle[Mathf.Clamp(latest.Level, 1, 3) - 1];
-            // Their tight aura: drawn on their body by the camera when it sees them; this shell stands in otherwise.
-            bool technoGlow = latest.Glow && !SilhouetteShown;
+            bool technoGlow = character.Id == CharacterId.Technoman && latest.Level >= 3;
             bool aura = !latest.Dead && (style > 0 || technoGlow);
             auraGlow.transform.position = new Vector3(shownHead.x, (shownHead.y + 0.1f) * 0.5f, shownHead.z);
             auraGlow.transform.localScale = new Vector3(0.75f, shownHead.y + 0.2f, 0.6f);
             Color auraColor = character.Id == CharacterId.KiFighter && latest.Level >= 3 ? new Color(0.25f, 0.6f, 1f) : color;
-            if (technoGlow)
-                auraColor = GlowColor;
             auraGlow.Show(auraColor, technoGlow ? BubbleStyle.Energy : BubbleStyle.Flame, aura ? 0.7f : 0f);
 
             ShowMarker(0, shownHead + Vector3.up * 0.15f, 0.06f, color, ShowMarkers);

@@ -48,14 +48,21 @@ namespace Repulsor.Tests
 
             var shots = new (CharacterId id, int level, float wait)[]
             {
-                (CharacterId.Technoman, 1, 0.7f),
-                (CharacterId.KiFighter, 2, 1.3f),
-                (CharacterId.Mage, 2, 0.9f),
-                (CharacterId.Saber, 2, 0.6f),
-                (CharacterId.Archer, 2, 1.0f),
-                (CharacterId.Spider, 1, 0.42f),
-                (CharacterId.Elementalist, 3, 1.2f),
+                (CharacterId.Technoman, 1, 0.9f),
+                (CharacterId.Technoman, 2, 0.8f),
+                (CharacterId.KiFighter, 2, 1.0f),
+                (CharacterId.Mage, 3, 0.9f),
+                (CharacterId.Mage, 3, 1.6f),
+                (CharacterId.Saber, 1, 0.55f),
+                (CharacterId.Saber, 3, 0.8f),
+                (CharacterId.Archer, 2, 1.2f),
+                (CharacterId.Archer, 3, 0.45f),
+                (CharacterId.Spider, 1, 0.6f),
+                (CharacterId.Spider, 2, 0.95f),
+                (CharacterId.Elementalist, 2, 1.0f),
+                (CharacterId.Elementalist, 3, 1.0f),
                 (CharacterId.Earth, 2, 0.5f),
+                (CharacterId.Earth, 3, 1.6f),
             };
             bool first = true;
             foreach (var shot in shots)
@@ -70,14 +77,15 @@ namespace Repulsor.Tests
                 Assert.That(showcase.Level, Is.EqualTo(shot.level));
                 Debug.Log($"[Test] {shot.id} {shot.level}: {showcase.DebugState}");
                 Transform screen = arena.TestCharacterScreen;
-                Vector3 figure = screen.TransformPoint(new Vector3(160f, 95f, -40f));
                 if (first)
                 {
                     Snap(head.position, screen.position, 72f, "screen");
                     first = false;
                 }
-                Vector3 toward = (head.position - figure).normalized;
-                Snap(figure + toward * 0.32f, figure, 40f, $"{shot.id}_{shot.level}");
+                // The whole stage: the mannequin and the hand sign beside it.
+                Vector3 stage = screen.TransformPoint(new Vector3(150f, 98f, -30f));
+                Vector3 toward = (head.position - stage).normalized;
+                Snap(stage + toward * 0.36f, stage, 46f, $"{shot.id}_{shot.level}_{shot.wait:0.0}");
             }
 
             // It cycles on its own.

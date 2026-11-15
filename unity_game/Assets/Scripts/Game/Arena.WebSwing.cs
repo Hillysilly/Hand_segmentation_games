@@ -6,7 +6,8 @@ namespace Repulsor
     /// <summary>
     /// The Spider's level 2 web grab on enemies: a web that hits an enemy wraps it in a cocoon hanging off your hand.
     /// Move your arm and it swings, smashing into other enemies it touches; swing fast and it's flung, hurting itself
-    /// and whatever it lands on.
+    /// and whatever it lands on. Lumen's force grab (level 3, a cupped hand at an enemy) holds an enemy the same
+    /// way, in a glow of the force instead of a web. The boss is too big for either: webs only hurt it, and the force can't hold it.
     /// </summary>
     public sealed partial class Arena
     {
@@ -27,11 +28,14 @@ namespace Repulsor
             public Bubble Cocoon;
             public Vector3 Velocity;
             public float Age;
+            public bool Force;
             public readonly HashSet<IHittable> Hit = new HashSet<IHittable>();
         }
 
         Webbed swinging;
         int swingingHand;
+        /// <summary>The held enemy is in the force's grip (Lumen), not a web.</summary>
+        bool swingingByForce;
         readonly List<Webbed> flung = new List<Webbed>();
 
         /// <summary>The enemy a web from here would grab, if any (level 2 and up, local enemies only).</summary>
@@ -39,18 +43,23 @@ namespace Repulsor
         {
             if (player.Level < 2)
                 return null;
-            return Aim.Target(origin, direction, WebGrabDegrees, 8f) is Enemy enemy && !enemy.IsProxy && !enemy.Spawning
-                && !enemy.Webbed ? enemy : null;
+            return Grabbable(origin, direction);
         }
 
-        void WebEnemy(Enemy enemy, int hand)
+        /// <summary>An enemy within reach of a grab along this line: not the boss, not a copy, not already held.</summary>
+        static Enemy Grabbable(Vector3 origin, Vector3 direction) =>
+            Aim.Target(origin, direction, WebGrabDegrees, 8f) is Enemy enemy && !enemy.IsProxy && !enemy.Spawning
+                && !enemy.Webbed && !enemy.IsBoss ? enemy : null;
+
+        void WebEnemy(Enemy enemy, int hand, bool byForce = false)
         {
             enemy.Webbed = true;
-            swinging = new Webbed { Enemy = enemy, Cocoon = Bubble.Create("Web Cocoon", foes) };
+            swinging = new Webbed { Enemy = enemy, Cocoon = Bubble.Create(byForce ? "Force Grip" : "Web Cocoon", foes), Force = byForce };
             swingingHand = hand;
+            swingingByForce = byForce;
             PlaceCocoon(swinging);
             game.PlayAt(enemy.Center, game.WhooshSound);
-            Log($"Webbed a {enemy.Kind}");
+            Log($"{(byForce ? "Force-grabbed" : "Webbed")} a {enemy.Kind}");
         }
 
         /// <summary>Holding a webbed enemy: true while one hangs from a hand (other web shots wait).</summary>
@@ -130,8 +139,8 @@ namespace Repulsor
                 if (!landed && !hitSomeone)
                     continue;
                 Log($"Flung {thrown.Enemy.Kind} {(hitSomeone ? "hit another enemy" : "landed")}");
-                game.Strike(thrown.Enemy, player.Outgoing(WebFlingDamage), to, "Web fling");
-                game.Explode(to, 0.6f, player.Outgoing(WebFlingDamage * 0.4f), new Color(0.9f, 0.92f, 1f));
+                game.Strike(thrown.Enemy, player.Outgoing(WebFlingDamage), to, thrown.Force ? "Force throw" : "Web fling");
+                game.Explode(to, 0.6f, player.Outgoing(WebFlingDamage * 0.4f), thrown.Force ? AttackColor : new Color(0.9f, 0.92f, 1f));
                 ReleaseWebbed(thrown);
                 flung.RemoveAt(i);
             }
@@ -164,7 +173,10 @@ namespace Repulsor
                 return;
             webbed.Cocoon.transform.position = webbed.Enemy.Center;
             webbed.Cocoon.transform.localScale = Vector3.one * (webbed.Enemy.Radius * 2.8f);
-            webbed.Cocoon.Show(Color.white, BubbleStyle.Web, 0.9f);
+            if (webbed.Force)
+                webbed.Cocoon.Show(AttackColor, BubbleStyle.Energy, 0.55f + 0.1f * Mathf.Sin(Time.time * 9f));
+            else
+                webbed.Cocoon.Show(Color.white, BubbleStyle.Web, 0.9f);
         }
 
         void ReleaseWebbed(Webbed webbed)

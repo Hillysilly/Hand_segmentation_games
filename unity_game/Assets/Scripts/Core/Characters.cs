@@ -108,7 +108,7 @@ namespace Repulsor
                 {
                     new[] { "Push an open palm forward: gust of wind (knocks enemies back)" },
                     new[] { "Both hands out flat: chain lightning, up to 5 s at a time", "Swirling wind aura" },
-                    new[] { "Circle both hands to charge, push both forward: tornado that pulls enemies in", "Faster, thicker wind" },
+                    new[] { "Swirl both hands round in circles to charge, push both forward: tornado that pulls enemies in", "Faster, thicker wind" },
                 },
             },
             new CharacterDef
