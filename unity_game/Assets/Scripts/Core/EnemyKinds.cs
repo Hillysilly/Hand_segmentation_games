@@ -4,8 +4,8 @@ namespace Repulsor
 {
     /// <summary>
     /// Every kind of enemy. The numbers are sent over the network as a byte, so only add to the end.
-    /// Robot and Drone keep their old numbers. Robot (the yellow gunner) is no longer sent in waves (11/14: the
-    /// user didn't like it); it stays so the numbers don't shift.
+    /// Robot and Drone keep their old numbers. The Brawler (the yellow melee robot) is no longer sent in waves
+    /// (11/15: the user didn't like it); it stays so the numbers don't shift.
     /// </summary>
     public enum EnemyKind : byte { Robot, Drone, Brawler, Rocketeer, Dasher, Sniper, Tank, Boss, Mech }
 
@@ -79,9 +79,9 @@ namespace Repulsor
         {
             switch (kind)
             {
-                case EnemyKind.Drone: return 1;
-                case EnemyKind.Dasher: return 2;
-                case EnemyKind.Brawler: return 3;
+                case EnemyKind.Robot: return 1;
+                case EnemyKind.Drone: return 2;
+                case EnemyKind.Dasher: return 3;
                 case EnemyKind.Rocketeer: return 5;
                 case EnemyKind.Sniper: return 7;
                 case EnemyKind.Tank: return 8;
@@ -100,8 +100,9 @@ namespace Repulsor
         }
 
         /// <summary>
-        /// The kind for one spawn of a wave, from a roll between 0 and 1: drones (1), dashers (2), brawlers (3),
-        /// rocketeers (5), snipers (7), tanks (8). A kind is rarer in its first round and common after.
+        /// The kind for one spawn of a wave, from a roll between 0 and 1: gunners (1), drones (2), dashers (3),
+        /// rocketeers (5), snipers (7), tanks (8). A kind is rarer in its first round and common after (except the
+        /// gunners, who are the whole of round 1).
         /// </summary>
         public static EnemyKind KindFor(int wave, double roll)
         {
@@ -112,9 +113,9 @@ namespace Repulsor
                 if (since >= 0)
                     pool.Add((kind, since == 0 ? weight * 0.7f : weight));
             }
-            Add(EnemyKind.Drone, wave == 1 ? 3f : 2f);
-            Add(EnemyKind.Dasher, 2.6f);
-            Add(EnemyKind.Brawler, 1.8f);
+            Add(EnemyKind.Robot, wave == 1 ? 4f : 2.6f);
+            Add(EnemyKind.Drone, 2f);
+            Add(EnemyKind.Dasher, 2.2f);
             Add(EnemyKind.Rocketeer, 1.3f);
             Add(EnemyKind.Sniper, 1.1f);
             Add(EnemyKind.Tank, 0.9f);
@@ -128,11 +129,11 @@ namespace Repulsor
                     return entry.kind;
                 pick -= entry.weight;
             }
-            return EnemyKind.Dasher;
+            return EnemyKind.Robot;
         }
 
         /// <summary>The kinds the boss calls in to help, from a roll between 0 and 1.</summary>
         public static EnemyKind BossHelper(double roll) =>
-            roll < 0.45 ? EnemyKind.Drone : roll < 0.75 ? EnemyKind.Dasher : EnemyKind.Brawler;
+            roll < 0.4 ? EnemyKind.Drone : roll < 0.75 ? EnemyKind.Robot : EnemyKind.Dasher;
     }
 }

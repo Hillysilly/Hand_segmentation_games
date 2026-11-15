@@ -9,8 +9,8 @@ namespace Repulsor
     /// </summary>
     public sealed class ShowcaseSign
     {
-        const float OneHandScale = 0.3f;
-        const float TwoHandScale = 0.21f;
+        const float OneHandScale = 0.48f;
+        const float TwoHandScale = 0.34f;
         /// <summary>How the player's forward, up and right show in the box: from behind, a little above and to the right.</summary>
         static readonly Quaternion BehindView = Quaternion.Euler(14f, -20f, 0f);
         /// <summary>For a hand pointing forward (it'd show only its wrist from behind): from the right side and above.</summary>

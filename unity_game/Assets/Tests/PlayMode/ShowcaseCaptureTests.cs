@@ -82,10 +82,13 @@ namespace Repulsor.Tests
                     Snap(head.position, screen.position, 72f, "screen");
                     first = false;
                 }
-                // The whole stage: the mannequin and the hand sign beside it.
+                // The life-size mannequin beside the menu, as you'd see it turning your head to the right,
+                // and the hand sign in the panel.
+                Vector3 figure = arena.TestFigureFeet + Vector3.up * 1f;
+                Snap(head.position, figure + (figure - head.position).normalized * 0.8f, 80f, $"{shot.id}_{shot.level}_{shot.wait:0.0}_figure");
                 Vector3 stage = screen.TransformPoint(new Vector3(150f, 98f, -30f));
                 Vector3 toward = (head.position - stage).normalized;
-                Snap(stage + toward * 0.36f, stage, 46f, $"{shot.id}_{shot.level}_{shot.wait:0.0}");
+                Snap(stage + toward * 0.36f, stage, 46f, $"{shot.id}_{shot.level}_{shot.wait:0.0}_sign");
             }
 
             // It cycles on its own.

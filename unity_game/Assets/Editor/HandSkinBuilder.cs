@@ -324,10 +324,14 @@ namespace Repulsor.EditorTools
                 Vector3 thumbTip = spec.ThumbTip.HasValue ? ToHand(Landmark(view, spec.ThumbTip.Value, g.Vertices)) : xr["ThumbTip"];
                 chains.Add(Straight("Thumb", thumbBase, thumbTip, seg));
             }
-            // The middle joints moved onto the finger: the centre of the mesh in a thin slice across it there.
-            for (int pass = 0; pass < 2; pass++)
-                foreach (Chain chain in chains)
-                    Refine(chain, chains, usedPoints);
+            // Each finger's joints laid along the centre line of its own mesh (11/15: placing only the middle joints at
+            // slice centres bent the bones 16-29 degrees inside fingers modelled straight, so gloves were drawn curled).
+            var straightChains = chains.Select(c => new Chain { Name = c.Name, Joints = (Vector3[])c.Joints.Clone() }).ToList();
+            foreach (Chain chain in chains)
+            {
+                float[] seg = Enumerable.Range(0, 3).Select(i => Vector3.Distance(chain.Joints[i], chain.Joints[i + 1])).ToArray();
+                FitCurl(chain, straightChains, usedPoints, seg, log, spec.Name);
+            }
 
             var joints = new Dictionary<string, Vector3> { ["Wrist"] = Vector3.zero };
             joints["Palm"] = (chains[1].Joints[0]) * 0.5f;
@@ -381,38 +385,83 @@ namespace Repulsor.EditorTools
         }
 
         /// <summary>
-        /// Moves a chain's two middle joints to the centre of this finger's vertices in a thin slice across the finger
-        /// there (only vertices nearer this chain than any other), so a curled finger's joints sit inside its curve.
+        /// Fits a finger's chain to its own mesh. The knuckle and tip stay where they were placed by hand; between them
+        /// the chain curls evenly toward the palm (the same angle at both middle joints), and the angle chosen, from
+        /// straight to 60 degrees a joint, is the one whose chain runs closest to the middle of the finger's vertices.
+        /// So straight gloves get straight bones and curled ones follow their curl, with no joint pulled off-centre.
+        /// Vertices count for a finger when they're nearer its straight knuckle-to-tip line than any other finger's.
         /// </summary>
-        static void Refine(Chain chain, List<Chain> all, List<Vector3> points)
+        static void FitCurl(Chain chain, List<Chain> guesses, List<Vector3> points, float[] segments, StringBuilder log, string model)
         {
-            const float Slice = 0.006f;
-            for (int k = 1; k <= 2; k++)
+            Chain mine = guesses.First(c => c.Name == chain.Name);
+            var own = new List<Vector3>();
+            foreach (Vector3 p in points)
             {
-                Vector3 a = chain.Joints[k - 1], b = chain.Joints[k + 1];
-                Vector3 joint = chain.Joints[k];
-                Vector3 axis = (b - a).normalized;
-                Vector3 sum = Vector3.zero;
-                int count = 0;
-                foreach (Vector3 p in points)
+                float d = DistanceToChain(p, mine.Joints, out _);
+                if (d > 0.025f)
+                    continue;
+                bool nearest = true;
+                foreach (Chain other in guesses)
+                    if (other != mine && DistanceToChain(p, other.Joints, out _) < d)
+                    {
+                        nearest = false;
+                        break;
+                    }
+                if (nearest)
+                    own.Add(p);
+            }
+            Vector3 knuckle = mine.Joints[0], tip = mine.Joints[3];
+            Vector3 chord = tip - knuckle;
+            if (own.Count < 12 || chord.sqrMagnitude < 1e-6f)
+                return;
+            Vector3 x = chord.normalized;
+            // Toward the palm (hand space: the palm faces -Y), across the chord.
+            Vector3 y = Vector3.ProjectOnPlane(Vector3.down, x);
+            if (y.sqrMagnitude < 1e-4f)
+                y = Vector3.ProjectOnPlane(Vector3.forward, x);
+            y.Normalize();
+
+            float bestCost = float.MaxValue, bestAngle = 0f;
+            Vector3[] best = (Vector3[])mine.Joints.Clone();
+            var trial = new Vector3[4];
+            for (float angle = 0f; angle <= 60f; angle += 2f)
+            {
+                Curl(knuckle, chord, x, y, segments, angle, trial);
+                float cost = 0f;
+                foreach (Vector3 p in own)
+                    cost += DistanceToChain(p, trial, out _);
+                cost /= own.Count;
+                // A slight preference for straighter fingers when two fit about as well.
+                cost += angle * 0.00002f;
+                if (cost < bestCost)
                 {
-                    if (Mathf.Abs(Vector3.Dot(p - joint, axis)) > Slice || (p - joint).sqrMagnitude > 0.03f * 0.03f)
-                        continue;
-                    float mine = DistanceToChain(p, chain.Joints, out _);
-                    bool nearest = true;
-                    foreach (Chain other in all)
-                        if (other != chain && DistanceToChain(p, other.Joints, out _) < mine)
-                        {
-                            nearest = false;
-                            break;
-                        }
-                    if (!nearest)
-                        continue;
-                    sum += p;
-                    count++;
+                    bestCost = cost;
+                    bestAngle = angle;
+                    best = (Vector3[])trial.Clone();
                 }
-                if (count >= 6)
-                    chain.Joints[k] = Vector3.Lerp(joint, sum / count, 0.8f);
+            }
+            for (int k = 0; k < 4; k++)
+                chain.Joints[k] = best[k];
+            log.Append($"[{model} {chain.Name} curl {bestAngle:0}] ");
+        }
+
+        /// <summary>A three-segment chain from <paramref name="from"/> spanning <paramref name="chord"/>, bending <paramref name="angle"/> degrees toward y at each middle joint.</summary>
+        static void Curl(Vector3 from, Vector3 chord, Vector3 x, Vector3 y, float[] segments, float angle, Vector3[] into)
+        {
+            // In the bend's own plane: lay the segments out, then turn and scale the whole so it ends on the tip.
+            float phi = angle * Mathf.Deg2Rad;
+            var flat = new Vector2[4];
+            flat[0] = Vector2.zero;
+            for (int k = 0; k < 3; k++)
+                flat[k + 1] = flat[k] + new Vector2(Mathf.Cos(phi * k), Mathf.Sin(phi * k)) * segments[k];
+            Vector2 end = flat[3];
+            float turn = -Mathf.Atan2(end.y, end.x);
+            float scale = chord.magnitude / Mathf.Max(1e-6f, end.magnitude);
+            float cos = Mathf.Cos(turn), sin = Mathf.Sin(turn);
+            for (int k = 0; k < 4; k++)
+            {
+                Vector2 q = new Vector2(flat[k].x * cos - flat[k].y * sin, flat[k].x * sin + flat[k].y * cos) * scale;
+                into[k] = from + x * q.x + y * q.y;
             }
         }
 

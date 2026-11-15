@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Repulsor
@@ -17,8 +18,22 @@ namespace Repulsor
         const float BallMinSize = 1.2f;
         const float BallMaxSize = 4f;
         const float BladeLength = 1f;
-        const float BladeRadius = 0.05f;
-        const float BladeDps = 30f;
+        const float BladeRadius = 0.06f;
+        /// <summary>
+        /// The laser sword deals most of its damage the moment it cuts into an enemy: a slash. Fast swings hit for the
+        /// full amount, a slow push for less; the same enemy can't be slashed again for <see cref="SlashCooldown"/>.
+        /// Holding the blade inside an enemy only adds a little more.
+        /// </summary>
+        public static float SlashDamage = 20f;
+        public static float SlashMinDamage = 9f;
+        /// <summary>Tip speed (m/s) at which a slash does full damage.</summary>
+        public static float SlashFullSpeed = 2.5f;
+        public static float SlashCooldown = 0.35f;
+        const float BladeHoldDps = 6f;
+        readonly Vector3[] lastHilt = new Vector3[2];
+        readonly Vector3[] lastTip = new Vector3[2];
+        readonly bool[] bladeWasOut = new bool[2];
+        readonly Dictionary<IHittable, float> slashedAt = new Dictionary<IHittable, float>();
         const float CrossbowReload = 2.5f;
         const float SmokeCooldown = 15f;
         readonly UnderhandThrowDetector[] bomb = { new UnderhandThrowDetector(), new UnderhandThrowDetector() };
@@ -213,27 +228,55 @@ namespace Repulsor
                     Vector3 hilt = grip[i].Hilt;
                     Vector3 tip = hilt + grip[i].BladeDirection * BladeLength;
                     (i == 0 ? leftHand : rightHand).ShowBlade(hilt, tip);
-                    CutWithBlade(hilt, tip, dt);
+                    CutWithBlade(i, hilt, tip, dt);
                     continue;
                 }
+                bladeWasOut[i] = false;
                 if (TickGun(i, hand, dt, out Vector3 origin, out Vector3 direction))
                     game.FireBlast(origin, direction, 0.2f, 0.45f, 1.7f, player.Outgoing(4f), 0f, BlasterRed);
             }
         }
 
-        void CutWithBlade(Vector3 hilt, Vector3 tip, float dt)
+        void CutWithBlade(int hand, Vector3 hilt, Vector3 tip, float dt)
         {
+            bool was = bladeWasOut[hand];
+            Vector3 oldHilt = was ? lastHilt[hand] : hilt, oldTip = was ? lastTip[hand] : tip;
+            float tipSpeed = was && dt > 0f ? Vector3.Distance(tip, oldTip) / dt : 0f;
+            lastHilt[hand] = hilt;
+            lastTip[hand] = tip;
+            bladeWasOut[hand] = true;
             var all = Hittables.All;
             for (int i = all.Count - 1; i >= 0; i--)
             {
                 if (i >= all.Count)
                     continue;
                 IHittable target = all[i];
-                if (target.Alive && target.Team == Team.Enemies
-                    && HitTest.Segment(target, hilt, tip, BladeRadius))
-                    game.Strike(target, player.Outgoing(BladeDps * dt), hilt, "Sword");
+                if (!target.Alive || target.Team != Team.Enemies)
+                    continue;
+                bool inside = HitTest.Segment(target, hilt, tip, BladeRadius);
+                // A fast swing can pass right through between frames: check where the blade swept as well, along
+                // the tip's path and the middle of the blade's.
+                bool swept = !inside && was && (HitTest.Segment(target, oldTip, tip, BladeRadius)
+                    || HitTest.Segment(target, (oldHilt + oldTip) * 0.5f, (hilt + tip) * 0.5f, BladeRadius));
+                if (!inside && !swept)
+                    continue;
+                if (!slashedAt.TryGetValue(target, out float last) || Time.time - last >= SlashCooldown)
+                {
+                    slashedAt[target] = Time.time;
+                    float hit = Mathf.Lerp(SlashMinDamage, SlashDamage, Mathf.Clamp01(tipSpeed / SlashFullSpeed));
+                    game.Strike(target, player.Outgoing(hit), hilt, "Sword slash");
+                }
+                else if (inside)
+                {
+                    game.Strike(target, player.Outgoing(BladeHoldDps * dt), hilt, "Sword");
+                }
             }
+            if (slashedAt.Count > 32)
+                slashedAt.Clear();
         }
+
+        /// <summary>For tests: one frame of a blade held from hilt to tip in this hand (0 left, 1 right).</summary>
+        public void TestBlade(int hand, Vector3 hilt, Vector3 tip, float dt) => CutWithBlade(hand, hilt, tip, dt);
 
         void TickArcher(float dt)
         {

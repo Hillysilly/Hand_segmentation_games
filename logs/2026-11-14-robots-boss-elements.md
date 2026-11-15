@@ -255,3 +255,21 @@ sweep (`LineFade` arcs), a second ring and thinner taper on its shockwave, the g
 the line of flight instead of three ring sprites), the tornado (1.25 wide to 2 tall, 28% opacity; it filled the
 view and went opaque). Not changed: dash line, powerups, missiles, smoke, lightning, shields.
 EditMode 175/175, PlayMode 22/22.
+
+## 11/15 afternoon
+
+- Gunner (EnemyKind.Robot, model Stan) restored: earlier "remove the yellowish robot" was applied to the gunner by
+  mistake; the yellow one is the brawler ("Classic"). `EnemyKinds.Introduced`: gunner 1, drone 2, dasher 3,
+  rocketeer 5, sniper 7, tank 8; brawler never. Boss helpers: drone/gunner/dasher.
+- Saber: `CutWithBlade` sweeps the blade between frames (tip and mid-blade segments) so a swing hits even when the
+  blade passes through in one frame; a slash deals `Lerp(9, 20, tip speed / 2.5 m/s)` once per 0.35 s per enemy;
+  held inside, 6 dps. Test `TheLaserSwordHitsHardOnTheSlashNotWhileHeldIn` (slash 20, held 1.5).
+- Hand skins: `HandSkinBuilder.FitCurl` replaces Refine (middle joints at slice centres bent bones 16-29 degrees in
+  straight fingers). Knuckle and tip stay; the chain curls evenly toward the palm, 0-60 degrees per joint, the
+  angle that best fits the finger's own vertices. `HandSkinCheck` prints the bind bends. Emberwitch (Rouker glove)
+  still stretches in tight poses: its fingers are modelled curled and packed.
+- Select screen: `CharacterShowcase` takes a figure height (life size there); it stands 1.2 m beyond and 1.1 m right
+  of the menu on the floor. The panel's well is the hand-sign box (sign hand scale 0.48 / 0.34).
+- Grab test made robust to wave spawns (`TestCanGrab` sets other enemies aside).
+- Tornado shortlist TN1-TN6 added to the hand shortlist page.
+EditMode 175/175, PlayMode 23/23. Installed.

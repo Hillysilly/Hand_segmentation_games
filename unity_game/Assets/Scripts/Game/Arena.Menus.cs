@@ -215,14 +215,15 @@ namespace Repulsor
                 b.Selected = customColor && chosenColor == swatch;
             }
 
-            // Top right: the stage the mannequin stands on (the figure itself is drawn in front, see TickShowcase).
+            // Top right: the hand sign (a big hand making the move's shape, drawn in front, see TickShowcase). The
+            // mannequin acting out the move stands life size beside the menu, to your right.
             Ui.Box(s, WellCentre, WellSize, Ui.Well);
-            // At its right end, the hand sign (a big hand making the move's shape, drawn in front, see TickShowcase).
-            Ui.Box(s, SignBoxCentre, SignBoxSize, new Color(1f, 1f, 1f, 0.05f));
-            Ui.Label(s, "HAND SIGN", SignBoxCentre + new Vector2(0f, SignBoxSize.y * 0.5f - 9f), new Vector2(SignBoxSize.x, 14f), 9,
-                TextAnchor.MiddleCenter, FontStyle.Bold).color = Ui.Muted;
-            signCaption = Ui.Label(s, "", SignBoxCentre - new Vector2(0f, SignBoxSize.y * 0.5f - 16f), new Vector2(SignBoxSize.x - 6f, 28f), 9,
-                TextAnchor.MiddleCenter);
+            Ui.Label(s, "HAND SIGN", SignBoxCentre + new Vector2(-SignBoxSize.x * 0.5f + 44f, SignBoxSize.y * 0.5f - 11f), new Vector2(80f, 16f), 10,
+                TextAnchor.MiddleLeft, FontStyle.Bold).color = Ui.Muted;
+            Ui.Label(s, "WATCH THE MOVE ON YOUR RIGHT  >", SignBoxCentre + new Vector2(SignBoxSize.x * 0.5f - 84f, SignBoxSize.y * 0.5f - 11f), new Vector2(160f, 16f), 9,
+                TextAnchor.MiddleRight).color = Ui.Muted;
+            signCaption = Ui.Label(s, "", SignBoxCentre - new Vector2(0f, SignBoxSize.y * 0.5f - 12f), new Vector2(SignBoxSize.x - 12f, 18f), 11,
+                TextAnchor.MiddleCenter, FontStyle.Bold);
             Ui.Button(s, "<", new Vector2(36f, 4f), new Vector2(36f, 28f), () => StepShowcase(-1), 16);
             Ui.Button(s, ">", new Vector2(264f, 4f), new Vector2(36f, 28f), () => StepShowcase(1), 16);
             showcaseLevel = Ui.Label(s, "", new Vector2(150f, 4f), new Vector2(188f, 24f), 13, TextAnchor.MiddleCenter, FontStyle.Bold);

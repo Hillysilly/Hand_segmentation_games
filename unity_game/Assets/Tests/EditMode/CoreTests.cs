@@ -351,14 +351,14 @@ namespace Repulsor.Tests
             for (double roll = 0; roll < 1; roll += 0.01)
             {
                 EnemyKind kind = WavePlan.KindFor(1, roll);
-                Assert.That(kind, Is.EqualTo(EnemyKind.Drone), "wave 1 is drones");
-                Assert.That(WavePlan.KindFor(2, roll) == EnemyKind.Drone || WavePlan.KindFor(2, roll) == EnemyKind.Dasher, "wave 2 adds dashers");
+                Assert.That(kind, Is.EqualTo(EnemyKind.Robot), "round 1 is gunners");
+                Assert.That(WavePlan.KindFor(2, roll) == EnemyKind.Robot || WavePlan.KindFor(2, roll) == EnemyKind.Drone, "round 2 adds drones");
                 Assert.That(WavePlan.KindFor(5, roll), Is.Not.EqualTo(EnemyKind.Boss));
             }
             var seen = new System.Collections.Generic.HashSet<EnemyKind>();
             for (double roll = 0; roll < 1; roll += 0.005)
                 seen.Add(WavePlan.KindFor(9, roll));
-            Assert.That(seen, Is.EquivalentTo(new[] { EnemyKind.Drone, EnemyKind.Brawler, EnemyKind.Dasher,
+            Assert.That(seen, Is.EquivalentTo(new[] { EnemyKind.Robot, EnemyKind.Drone, EnemyKind.Dasher,
                 EnemyKind.Rocketeer, EnemyKind.Sniper, EnemyKind.Tank }));
             // One new kind at a time, spread over the story, never in the boss round.
             int newRounds = 0;
@@ -371,9 +371,13 @@ namespace Repulsor.Tests
             Assert.That(newRounds, Is.EqualTo(6));
             Assert.That(WavePlan.NewIn(WavePlan.StoryRounds), Is.Empty);
             Assert.That(WavePlan.Introduced(EnemyKind.Tank), Is.LessThan(WavePlan.StoryRounds - 1), "every kind gets a round before the boss");
-            // The yellow gunner isn't sent any more, nor called in by the boss.
+            // The yellow melee robot isn't sent any more, nor called in by the boss.
             for (double roll = 0; roll < 1; roll += 0.01)
-                Assert.That(WavePlan.BossHelper(roll), Is.Not.EqualTo(EnemyKind.Robot));
+            {
+                Assert.That(WavePlan.BossHelper(roll), Is.Not.EqualTo(EnemyKind.Brawler));
+                for (int wave = 1; wave < WavePlan.StoryRounds; wave++)
+                    Assert.That(WavePlan.KindFor(wave, roll), Is.Not.EqualTo(EnemyKind.Brawler));
+            }
         }
 
         [Test]

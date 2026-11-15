@@ -78,12 +78,21 @@ The APK is built; install it with `build_and_run.ps1 -NoBuild` when the headset 
     attacks (lightning, flames, lasers) drop out less? Any attack firing when you didn't mean it?
 26. **Looks** (11/15): boss attack warnings are filled red shapes that fill up as the hit comes; the gust is a blade
     of wind; the tornado is slimmer and fainter; the mech's sword leaves a fading sweep.
-21. **Story mode is 10 rounds** (11/15): drones (1), dashers (2), brawlers (3), rocketeers (5), snipers (7), tanks (8),
+21. **Story mode is 10 rounds** (11/15): gunners (1), drones (2), dashers (3), rocketeers (5), snipers (7), tanks (8),
     each announced as NEW ENEMY in its first round; round 10 is GOLIATH. Too long? Pace right?
 22. **GOLIATH, the mech boss** (also BOSS FIGHT on the mode screen): swing combos with the reach shown red on the
     floor (step back or shield), paired arm lasers, shoulder rockets, a jump slam at where you stand (red ring,
     view tints red) and a shockwave across the floor (jump for real as it passes, shield it, or be 4.5 m away).
     Body: The Morser 16 (B3), its blade arm swinging and gun arm aiming in code. Does the swing read as a swing?
+27. **Gunner back, brawler out** (11/15 pm): the laser-shooting robot is back from round 1 (it was removed by mistake;
+    the yellow melee one is the brawler, now never sent). The boss's helpers are drones, gunners and dashers.
+28. **Fingers** (11/15 pm): the hand models' bones were off-centre in the fingers, so even straight gloves drew
+    curled 16-29 degrees. Each finger's bones now follow the curl that best fits its own mesh. Straighter now?
+29. **Life-size select figure** (11/15 pm): the mannequin acting out each move stands life size on the floor to the
+    right of the menu; the panel's box is now just the big hand sign. Is it in a sensible spot in your room?
+30. **Saber slash** (11/15 pm): a swing through an enemy deals 9-20 damage by blade speed (once per 0.35 s per
+    enemy); holding the blade inside only does 6 a second. Feels right?
+31. **Tornado options** TN1-TN6 on the shortlist page (the white N1 is still in until you pick one).
 
 ## Status, end of 11/8 session
 

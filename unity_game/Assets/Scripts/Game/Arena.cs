@@ -755,7 +755,20 @@ namespace Repulsor
         public void TestForceGrab(Enemy enemy) => WebEnemy(enemy, 1, true);
 
         /// <summary>PlayMode test: whether a web or the force aimed straight at this enemy from your head would grab it.</summary>
-        public bool TestCanGrab(Enemy enemy) => Grabbable(head.position, (enemy.Center - head.position).normalized) == enemy;
+        public bool TestCanGrab(Enemy enemy)
+        {
+            // Aimed straight at it, with every other enemy set aside (one wandering into the line would be picked instead).
+            var others = new List<IHittable>();
+            foreach (IHittable foe in Hittables.All)
+                if (!ReferenceEquals(foe, enemy) && foe.Team == Team.Enemies)
+                    others.Add(foe);
+            foreach (IHittable foe in others)
+                Hittables.Remove(foe);
+            bool can = Grabbable(head.position, (enemy.Center - head.position).normalized) == enemy;
+            foreach (IHittable foe in others)
+                Hittables.Add(foe);
+            return can;
+        }
 
         /// <summary>PlayMode test: anything still held or flying in a web.</summary>
         public bool TestAnyWebbed => swinging != null || flung.Count > 0;

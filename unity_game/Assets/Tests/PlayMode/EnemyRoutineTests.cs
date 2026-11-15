@@ -116,5 +116,42 @@ namespace Repulsor.Tests
             yield return null;
             Assert.That(victim == null || !victim.Alive, Is.True, "a dasher is crushed");
         }
+
+        [UnityTest]
+        public IEnumerator TheLaserSwordHitsHardOnTheSlashNotWhileHeldIn()
+        {
+            LogAssert.ignoreFailingMessages = true;
+            SceneManager.LoadScene("Main");
+            for (int i = 0; i < 30; i++)
+                yield return null;
+            var arena = Object.FindAnyObjectByType<Arena>();
+            Transform head = Camera.main.transform;
+            arena.TestStart(CharacterId.Saber);
+            arena.TestGod(true);
+            yield return null;
+            arena.TestSkipTime(WaveDirector.CountdownSeconds + 0.1f);
+            Enemy tank = arena.TestSpawn(EnemyKind.Tank);
+            tank.transform.position = head.position + new Vector3(0f, -0.9f, 1.2f);
+            yield return new WaitForSecondsRealtime(Enemy.SpawnSeconds + 0.3f);
+            tank.transform.position = head.position + new Vector3(0f, -0.9f, 1.2f);
+            Vector3 c = tank.Center;
+            const float frame = 1f / 72f;
+            float before = tank.Hp;
+            // A fast swing: the blade passes right through it between two frames (never inside on a frame).
+            arena.TestBlade(1, c + new Vector3(-0.9f, 0f, -0.6f), c + new Vector3(-0.9f, 0f, 0.4f), frame);
+            arena.TestBlade(1, c + new Vector3(0.9f, 0f, -0.6f), c + new Vector3(0.9f, 0f, 0.4f), frame);
+            float slash = before - tank.Hp;
+            Debug.Log($"[Test] slash took {slash:0.0}");
+            Assert.That(slash, Is.GreaterThan(15f), "a fast slash hits hard, even passing through between frames");
+            // Then held inside it (straight after, within the slash's cooldown): only a little more.
+            c = tank.Center;
+            before = tank.Hp;
+            for (int i = 0; i < 18; i++)
+                arena.TestBlade(1, c + new Vector3(0f, 0f, -0.6f), c + new Vector3(0f, 0f, 0.4f), frame);
+            Assert.That(before - tank.Hp, Is.GreaterThan(0f), "holding it in still does something");
+            float held = before - tank.Hp;
+            Debug.Log($"[Test] held in: {held:0.0}");
+            Assert.That(held, Is.LessThan(slash), "holding it in does less than a slash");
+        }
     }
 }

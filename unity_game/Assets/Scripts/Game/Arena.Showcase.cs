@@ -12,12 +12,14 @@ namespace Repulsor
         static readonly Vector2 SelectSize = new Vector2(600f, 400f);
         static readonly Vector2 WellCentre = new Vector2(150f, 98f);
         static readonly Vector2 WellSize = new Vector2(276f, 156f);
-        /// <summary>Where the mannequin's feet stand on the screen, and how far in front of it (mm).</summary>
-        static readonly Vector3 FigureFeet = new Vector3(158f, 30f, -45f);
         /// <summary>The hand sign's box on the stage (right end), and where the hand floats in front of it (mm).</summary>
-        static readonly Vector2 SignBoxCentre = new Vector2(242f, 104f);
-        static readonly Vector2 SignBoxSize = new Vector2(84f, 136f);
-        static readonly Vector3 SignHand = new Vector3(242f, 110f, -16f);
+        /// <summary>The panel's stage area is now the hand sign's box; the mannequin stands life size beside the menu.</summary>
+        static readonly Vector2 SignBoxCentre = WellCentre;
+        static readonly Vector2 SignBoxSize = WellSize;
+        static readonly Vector3 SignHand = new Vector3(150f, 112f, -20f);
+        /// <summary>Where the life-size mannequin stands: this far beyond the menu and to its right (metres), on the floor.</summary>
+        const float FigureAhead = 1.2f;
+        const float FigureRight = 1.1f;
         const float AbilityLine = 15f;
         const float ManualScrollHold = 6f;
 
@@ -109,10 +111,14 @@ namespace Repulsor
             }
             showcase ??= new CharacterShowcase(game, transform);
             showcase.Show(character, PlayerColor);
-            // The moves head left across the stage and a little toward you.
-            Vector3 feet = characterScreen.TransformPoint(FigureFeet);
-            Vector3 heading = -characterScreen.right * 0.9f - characterScreen.forward * 0.42f;
-            showcase.Place(feet, Quaternion.LookRotation(heading, characterScreen.up));
+            // Life size, standing on the floor beyond the menu's right edge and facing off to the right and a little
+            // toward you, so you see its moves side-on and its shots fly away from the menu.
+            Vector3 away = Vector3.ProjectOnPlane(characterScreen.forward, Vector3.up).normalized;
+            Vector3 right = Vector3.ProjectOnPlane(characterScreen.right, Vector3.up).normalized;
+            Vector3 feet = characterScreen.position + away * FigureAhead + right * FigureRight;
+            feet.y = FloorY;
+            Vector3 heading = right * 0.9f - away * 0.35f;
+            showcase.Place(feet, Quaternion.LookRotation(heading, Vector3.up));
             showcase.PlaceSign(characterScreen.TransformPoint(SignHand), Quaternion.LookRotation(characterScreen.forward, characterScreen.up));
             showcase.Tick(dt);
             if (signCaption != null)
@@ -159,6 +165,12 @@ namespace Repulsor
 
         /// <summary>For tests: where the hand sign's box is on the select screen (the screen's own space, mm).</summary>
         public static Vector3 TestSignHand => SignHand;
+
+        /// <summary>For tests: where the life-size mannequin stands (its feet), beside the open select screen.</summary>
+        public Vector3 TestFigureFeet => characterScreen == null ? Vector3.zero
+            : new Vector3(0f, FloorY, 0f) + Vector3.Scale(characterScreen.position
+                + Vector3.ProjectOnPlane(characterScreen.forward, Vector3.up).normalized * FigureAhead
+                + Vector3.ProjectOnPlane(characterScreen.right, Vector3.up).normalized * FigureRight, new Vector3(1f, 0f, 1f));
 
         /// <summary>For tests: fires a web shot the way the Spider's spider sign does.</summary>
         public void TestFireWeb(Vector3 origin, Vector3 direction, bool black)

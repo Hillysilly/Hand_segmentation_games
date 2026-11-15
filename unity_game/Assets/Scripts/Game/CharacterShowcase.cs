@@ -6,17 +6,19 @@ namespace Repulsor
 {
     /// <summary>
     /// The character select screen's little stage: a mannequin (Quaternius, CC0) in the chosen colour acting out
-    /// each level's move with a small version of the effect, and beside it a big hand making the move's hand sign
+    /// each level's move with its effect, life size beside the menu (11/15; it was a 12 cm model in the panel), and a big
+    /// hand in the panel making the move's hand sign
     /// (<see cref="ShowcaseSign"/>). The arms and hands follow <see cref="ShowcasePoses"/>, built from what the
     /// gesture detectors look for; the idle animation (or the punch and sword clips) moves the rest. It goes level
     /// 1, 2, 3 and round again; the screen's arrows pick a level. Everything is built in "human" metres under a
-    /// stage that is scaled down, so a 1.8 m mannequin stands about 12 cm tall in front of the menu.
+    /// stage that can be scaled (life size on the select screen).
     /// </summary>
     public sealed class CharacterShowcase
     {
         public const float FigureHeight = 0.12f;
         const float Human = 1.8f;
-        const float Scale = FigureHeight / Human;
+        /// <summary>How big the stage is drawn: 1 for life size (the select screen, since 11/15), less for a model.</summary>
+        readonly float Scale;
         const float Reach = 2f;
         const float Chest = 1.25f;
         const float Pause = 0.6f;
@@ -182,9 +184,10 @@ namespace Repulsor
         public ShowcaseSign Sign => sign;
         public string SignCaption => Current.Sign;
 
-        public CharacterShowcase(RepulsorGame game, Transform parent)
+        public CharacterShowcase(RepulsorGame game, Transform parent, float figureHeight = Human)
         {
             this.game = game;
+            Scale = figureHeight / Human;
             stage = new GameObject("Character Showcase").transform;
             stage.SetParent(parent, false);
             stage.localScale = Vector3.one * Scale;
