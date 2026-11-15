@@ -321,3 +321,12 @@ EditMode 175/175, PlayMode 23/23. Installed.
   are harmless (`Shockwave.Harmless`, `RepulsorGame.Replaying`). The user's "Ryu starts to break after a bit" is
   not yet diagnosed: needs the headset log.
   EditMode 177/177, PlayMode 25/25. Built; no headset connected.
+- Ryu diagnosed from 2G97C5ZH9300P6's log (PVP 17:00): level 1 blasts every second, then nothing after
+  "Transformed to level 2" except "Hand weapons were held off ... by the two-hand charge". Two-handed blasts leave
+  both hands open side by side, which counted as the ki charge at once (Charge > 0), locking the hand weapons
+  0.6 s, through the next fist, so the next blast never charged: a loop. Now the charge needs the hands together
+  0.5 s (`TwoHandChargeDetector.Holding`, MaxGap 0.16 -> 0.12, MinCharge 0.15 -> 0.25) and the ki hold-off is 0.2 s.
+  Test `HandsOpenSideBySideForAMomentAreNotACharge`.
+- PVP lasers/flames sent one PlayerHit per frame (and the victim logged each, 70 lines a second). Now batched about
+  ten times a second (`Arena.FlushPvpHits`; hits of 5 or more go at once).
+  EditMode 178/178, PlayMode 25/25. Installed on 2G97C5ZH9300P6.

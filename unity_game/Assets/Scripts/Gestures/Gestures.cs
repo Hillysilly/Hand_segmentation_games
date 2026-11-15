@@ -124,12 +124,19 @@ namespace Repulsor
         }
     }
 
-    /// <summary>Energy ball: hands held together to charge, then pushed forward together to fire.</summary>
+    /// <summary>
+    /// Energy ball: hands held together to charge, then pushed forward together to fire. It only counts as charging
+    /// (<see cref="Holding"/>) once the hands have been together for half a second: two-handed blasts leave both hands
+    /// open side by side for a moment, and that alone used to switch the hand weapons off (11/15, Ryu stopped firing
+    /// after reaching level 2).
+    /// </summary>
     public sealed class TwoHandChargeDetector
     {
-        public static float MaxGap = 0.16f;
+        public static float MaxGap = 0.12f;
         public static float FullSeconds = 2f;
-        public static float MinCharge = 0.15f;
+        public static float MinCharge = 0.25f;
+        /// <summary>Seconds the hands must be together before it's a charge.</summary>
+        public static float HoldSeconds = 0.5f;
         public static float PushSpeed = 1.2f;
         public static float ApartGrace = 0.35f;
         public static float ApartCancel = 0.6f;
@@ -139,6 +146,8 @@ namespace Repulsor
         /// <summary>0 to 1.</summary>
         public float Charge { get; private set; }
         public bool Charging => apart < ApartGrace && Charge > 0f;
+        /// <summary>Charging for real: held together long enough (the hand weapons step aside then).</summary>
+        public bool Holding => Charging && Charge * FullSeconds >= HoldSeconds;
         public Vector3 Center { get; private set; }
 
         public bool Step(HandPose left, HandPose right, Stance body, float dt, out Vector3 direction, out float power)

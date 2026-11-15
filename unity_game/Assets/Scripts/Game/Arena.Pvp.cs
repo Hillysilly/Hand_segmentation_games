@@ -40,9 +40,27 @@ namespace Repulsor
             {
                 if (!Alive)
                     return 0f;
-                arena.net.SendPlayerHit(damage);
+                arena.pvpOutgoing += damage;
                 return Mathf.Min(damage, Hp);
             }
+        }
+
+        /// <summary>
+        /// Damage to the other player not sent yet. Lasers and flames hit every frame; those go out about ten times a
+        /// second as one hit (they were 70 packets and log lines a second). A big hit goes at once.
+        /// </summary>
+        float pvpOutgoing;
+        float pvpSendTimer;
+
+        void FlushPvpHits(float dt)
+        {
+            pvpSendTimer -= dt;
+            if (pvpOutgoing <= 0f || (pvpSendTimer > 0f && pvpOutgoing < 5f))
+                return;
+            if (net.Connected)
+                net.SendPlayerHit(pvpOutgoing);
+            pvpOutgoing = 0f;
+            pvpSendTimer = 0.1f;
         }
 
         void CreatePvp()

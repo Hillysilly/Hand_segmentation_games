@@ -395,6 +395,7 @@ namespace Repulsor
                     SendLobby();
                 }
             }
+            FlushPvpHits(dt);
             remote.FloorY = FloorY;
             remote.Tick(dt);
             TickRemoteLooks(dt);

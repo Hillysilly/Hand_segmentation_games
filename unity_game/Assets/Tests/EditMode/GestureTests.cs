@@ -208,6 +208,26 @@ namespace Repulsor.Tests
         }
 
         [Test]
+        public void HandsOpenSideBySideForAMomentAreNotACharge()
+        {
+            // Both fists snap open together (a two-handed blast) and stay side by side briefly: not a charge, so the
+            // hand weapons stay on.
+            var left = new HandPose(true);
+            var right = new HandPose(false);
+            Pose(left, new Vector3(-0.04f, 1.3f, 0.3f), Vector3.forward, Vector3.left, 0.2f, ThumbPose.Out);
+            Pose(right, new Vector3(0.04f, 1.3f, 0.3f), Vector3.forward, Vector3.right, 0.2f, ThumbPose.Out);
+            var charge = new TwoHandChargeDetector();
+            for (float t = 0f; t < 0.4f; t += Frame)
+            {
+                charge.Step(left, right, Body, Frame, out _, out _);
+                Assert.That(charge.Holding, Is.False, $"a charge after {t:0.00} s");
+            }
+            for (float t = 0f; t < 0.2f; t += Frame)
+                charge.Step(left, right, Body, Frame, out _, out _);
+            Assert.That(charge.Holding, Is.True, "held together half a second: charging");
+        }
+
+        [Test]
         public void TriangleAimsAtTheFloorAndFistsFire()
         {
             var left = new HandPose(true);

@@ -152,10 +152,11 @@ namespace Repulsor
             handsBusyFor = Mathf.Max(0f, handsBusyFor - dt);
             // Each detector only updates for its own character, so only that character's counts (a stale one can't lock others out).
             bool busy = canFight && ((character == CharacterId.Mage && triangle.Aiming)
-                || (character == CharacterId.KiFighter && kiCharge.Charging)
+                || (character == CharacterId.KiFighter && kiCharge.Holding)
                 || (character == CharacterId.Archer && bow.Formed));
+            // A brief hold-off after a two-hand move (shorter for the ki charge: letting go of it isn't a move).
             if (busy)
-                handsBusyFor = 0.6f;
+                handsBusyFor = Mathf.Max(handsBusyFor, character == CharacterId.KiFighter ? 0.2f : 0.6f);
             // Diagnostic: a two-hand gesture that keeps the hand weapons off for long may be a false detection.
             if (busy)
                 busyFor += dt;
@@ -199,7 +200,7 @@ namespace Repulsor
                     DecorateBall(ball.Head, PickedBall, AttackColor);
                     Log($"Energy ball, power {power:0.00}");
                 }
-                charging = kiCharge.Charging;
+                charging = kiCharge.Holding;
             }
             if (player.Level >= 3)
             {
