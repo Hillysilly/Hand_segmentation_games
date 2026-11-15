@@ -247,7 +247,8 @@ namespace Repulsor
 
     /// <summary>
     /// One of the boss's tracking strikes: a ring on the floor closes in for half a second, then a red beam slams down
-    /// from above and bursts. Hurts you if you're still standing in it.
+    /// from above and bursts. Hurts you if you're still standing in it. While you stand inside the ring your view
+    /// turns slightly red (you can't see a ring under your own feet), stronger as it's about to land.
     /// </summary>
     public sealed class TrackingStrike : MonoBehaviour
     {
@@ -293,6 +294,8 @@ namespace Repulsor
                     float angle = i / 32f * Mathf.PI * 2f;
                     ring.SetPosition(i, centre + new Vector3(Mathf.Cos(angle), 0.01f, Mathf.Sin(angle)) * radius);
                 }
+                if (arena != null && arena.PlayerStandsWithin(centre, radius))
+                    arena.WarnPlayer(Mathf.Lerp(0.2f, 0.45f, t));
                 return;
             }
             if (!landed)

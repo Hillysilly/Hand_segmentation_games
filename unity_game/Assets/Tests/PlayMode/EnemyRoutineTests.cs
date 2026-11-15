@@ -105,6 +105,16 @@ namespace Repulsor.Tests
             yield return new WaitForSecondsRealtime(2f);
             Assert.That(arena.TestAnyWebbed, Is.False, "the flung enemy landed");
             Assert.That(arena.TestEnemyHp(id) < hp, Is.True, "landing hurt it");
+
+            // Grab another and close the fist: crushed.
+            Enemy victim = arena.TestSpawn(EnemyKind.Dasher);
+            victim.transform.position = head.position + new Vector3(-1f, -0.6f, 2.5f);
+            yield return new WaitForSecondsRealtime(Enemy.SpawnSeconds + 0.3f);
+            arena.TestForceGrab(victim);
+            yield return null;
+            arena.TestCrushHeld();
+            yield return null;
+            Assert.That(victim == null || !victim.Alive, Is.True, "a dasher is crushed");
         }
     }
 }

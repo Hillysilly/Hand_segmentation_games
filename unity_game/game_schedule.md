@@ -56,6 +56,12 @@ The APK is built; install it with `build_and_run.ps1 -NoBuild` when the headset 
     other way. Enemy laser hitboxes are a little slimmer.
 15. **Lumen's force grab** (11/14 evening): at level 3, a cupped hand at an enemy grabs it like Webline's web:
     swing it into others, swing fast to fling it, open the hand to drop it.
+    Close the hand into a fist on a held enemy: it's crushed (50 damage; most die, a tank survives).
+16. **Boss strikes** (11/14 late): standing inside a red strike ring now tints your whole view slightly red until it
+    lands or you step out. Enough warning?
+17. **Health bars** (11/14 late): what the current attack took shows orange, held while hits keep landing, then
+    drains. On your bar, enemy bars, the boss bar and your partner's.
+18. **Hand models**: shortlist page sent (codes like T1, M2); waiting on picks. Tornado model shortlist is on it too.
 
 ## Status, end of 11/8 session
 

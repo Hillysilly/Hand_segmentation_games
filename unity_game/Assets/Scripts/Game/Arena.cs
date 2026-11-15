@@ -735,6 +735,9 @@ namespace Repulsor
             return (0, 0f);
         }
 
+        /// <summary>PlayMode test: grabs this enemy with the force, as Lumen's cupped hand does, and keeps holding it.</summary>
+        public void TestForceGrab(Enemy enemy) => WebEnemy(enemy, 1, true);
+
         /// <summary>PlayMode test: whether a web or the force aimed straight at this enemy from your head would grab it.</summary>
         public bool TestCanGrab(Enemy enemy) => Grabbable(head.position, (enemy.Center - head.position).normalized) == enemy;
 

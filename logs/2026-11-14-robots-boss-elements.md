@@ -153,3 +153,19 @@ picked variants) were backed up first and restored with `run-as`. The user's not
   as the web; opening the hand drops it). `EnemyRoutineTests` covers the routine and the grabs.
 - **Asked: masking your hands with preset 3D models.** Answered in chat; not built.
 - EditMode 165/165, PlayMode 18/18.
+
+## Late evening
+
+- **Boss strike warning:** `TrackingStrike` calls `Arena.WarnPlayer` each frame while you stand in its ring;
+  `HurtFlash.Warn` tints the whole view a little (the vignette's clear centre is pulled in) and pulses.
+- **Orange damage on health bars:** `Ui.Bar`'s trailing bar is now orange (`Bar.DamageColor`), waits 0.6 s after
+  the last hit and drains at 0.8 a second, so a held attack's damage stays orange; on for every health bar.
+- **Lumen crush:** a fist held 0.12 s on an enemy held by the force deals `Arena.CrushDamage` (50). Tested.
+- **Hand models:** searched Sketchfab's public API for downloadable CC0/CC BY models per character and for
+  tornadoes; 4 picks each on a page with codes (T, M, K, L, V, W, S, E, N). Free themed gloves and gauntlets are
+  rarely rigged, so unrigged picks favour separate plates per finger joint (to be bound to the tracked bones).
+  Spider-Man and Fortnite models were skipped (someone else's characters). Sketchfab downloads need the user's
+  account. Waiting on picks.
+- **Muted tests:** `Tests/PlayMode/Muted.cs` silences every PlayMode test (user's request).
+- Installed on the headset (saved data kept: same signing key now). It was asleep, so no on-device check yet.
+- EditMode 165/165, PlayMode 18/18.

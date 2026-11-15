@@ -75,7 +75,7 @@ namespace Repulsor
                 {
                     new[] { "Finger gun, flick up: blaster bolt" },
                     new[] { "Make a fist: laser sword", "Light aura" },
-                    new[] { "Cupped hand at an object: lift it, then throw", "Brighter aura with a halo" },
+                    new[] { "Cupped hand at an enemy or object: lift it, then throw. Make a fist on a held enemy: crush it", "Brighter aura with a halo" },
                 },
             },
             new CharacterDef

@@ -204,6 +204,13 @@ namespace Repulsor
         public bool PlayerStandsWithin(Vector3 floorPoint, float radius) =>
             CanBeHit && Vector3.Distance(Flat(head.position), Flat(floorPoint)) < radius + BodyRadius;
 
+        /// <summary>You're standing where something is about to hit (the boss's strikes): the view goes slightly red.</summary>
+        public void WarnPlayer(float amount)
+        {
+            if (CanBeHit)
+                hurtFlash.Warn(amount);
+        }
+
         /// <summary>A laser beam from one point to another: hurts you if it crosses your body.</summary>
         public void LaserHitsPlayer(Vector3 from, Vector3 to, float thickness, float damage)
         {

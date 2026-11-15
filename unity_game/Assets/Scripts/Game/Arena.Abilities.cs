@@ -316,8 +316,15 @@ namespace Repulsor
             if (swinging != null && swingingByForce)
             {
                 HandPose holding = swingingHand == 0 ? input.Left : input.Right;
+                // Close the hand into a fist round it: it's crushed.
+                crushFist = holding.Fist ? crushFist + dt : 0f;
+                if (crushFist >= CrushHoldSeconds)
+                {
+                    CrushHeld();
+                    return;
+                }
                 GrabEvent kept = force[swingingHand].Step(holding, body, dt, out _);
-                if (TickWebSwing(dt) && kept == GrabEvent.Drop && swinging != null)
+                if (TickWebSwing(dt) && kept == GrabEvent.Drop && swinging != null && !holding.Fist)
                 {
                     // Let go of the cup: it drops where it is.
                     ReleaseWebbed(swinging);
@@ -364,6 +371,35 @@ namespace Repulsor
                 if (grab == GrabEvent.Grab)
                     LiftBox(box, i, AttackColor);
             }
+        }
+
+        /// <summary>Lumen's crush: damage from closing a fist on an enemy held by the force (most die; a tank survives).</summary>
+        public static float CrushDamage = 50f;
+        /// <summary>The fist has to stay closed this long, so a hand passing through a fist on its way to a throw doesn't crush.</summary>
+        const float CrushHoldSeconds = 0.12f;
+        float crushFist;
+
+        void CrushHeld()
+        {
+            Webbed crushed = swinging;
+            swinging = null;
+            crushFist = 0f;
+            Enemy enemy = crushed.Enemy;
+            ReleaseWebbed(crushed);
+            if (enemy == null || !enemy.Alive)
+                return;
+            Vector3 at = enemy.Center;
+            game.Strike(enemy, player.Outgoing(CrushDamage), at, "Force crush");
+            game.Explode(at, 0.35f, 0f, AttackColor);
+            game.PlayAt(at, game.BoomSound);
+            Log($"Crushed a {enemy.Kind} with the force");
+        }
+
+        /// <summary>For tests: crush what the force holds, as closing the fist does.</summary>
+        public void TestCrushHeld()
+        {
+            if (swinging != null && swingingByForce)
+                CrushHeld();
         }
 
         void LiftBox(UnityEngine.XR.ARFoundation.ARBoundingBox box, int hand, Color color)

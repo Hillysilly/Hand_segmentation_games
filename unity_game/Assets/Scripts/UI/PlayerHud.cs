@@ -85,6 +85,7 @@ namespace Repulsor
                 return;
             partnerText.text = name;
             partnerBar.Fraction = fraction;
+            partnerBar.Tick(Time.deltaTime);
         }
 
         public PlayerHud(Transform parent, Transform head)
@@ -112,6 +113,7 @@ namespace Repulsor
             fpsText = Ui.Label(panel, "", new Vector2(110f, 76f), new Vector2(80f, 14f), 11, TextAnchor.MiddleRight);
             partnerText = Ui.Label(panel, "", new Vector2(-80f, -62f), new Vector2(130f, 14f), 11, TextAnchor.MiddleLeft);
             partnerBar = Ui.Bar(panel, new Vector2(60f, -62f), new Vector2(150f, 7f), new Color(0.08f, 0.08f, 0.1f, 0.95f), new Color(0.3f, 1f, 0.4f));
+            partnerBar.Trail = true;
             Partner(null, 0f);
 
             message = Ui.Canvas("Message", parent, new Vector2(700f, 260f));

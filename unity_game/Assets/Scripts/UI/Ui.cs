@@ -143,11 +143,15 @@ namespace Repulsor
         }
     }
 
-    /// <summary>A fill bar with a trailing "damage" bar behind it, like a fighting game's health bar.</summary>
+    /// <summary>
+    /// A fill bar with a trailing "damage" bar behind it, like a fighting game's health bar: what the current attack
+    /// took shows orange, and holds while hits keep coming (a held laser, a flamethrower), then drains away.
+    /// </summary>
     public sealed class Bar : MonoBehaviour
     {
-        const float TrailDelay = 0.5f;
-        const float TrailSpeed = 0.6f;
+        public static readonly Color DamageColor = new Color(1f, 0.5f, 0.05f);
+        const float TrailDelay = 0.6f;
+        const float TrailSpeed = 0.8f;
 
         RectTransform fill;
         RectTransform trail;
@@ -162,7 +166,7 @@ namespace Repulsor
         public void Build(Color color)
         {
             var rect = (RectTransform)transform;
-            trailImage = Ui.Box(rect, Vector2.zero, Vector2.zero, new Color(0.9f, 0.15f, 0.1f, 1f), false);
+            trailImage = Ui.Box(rect, Vector2.zero, Vector2.zero, DamageColor, false);
             trail = trailImage.rectTransform;
             fillImage = Ui.Box(rect, Vector2.zero, Vector2.zero, color, false);
             fill = fillImage.rectTransform;
@@ -171,7 +175,7 @@ namespace Repulsor
             trailImage.enabled = false;
         }
 
-        /// <summary>Shows a red trail that catches up after a drop. Off by default.</summary>
+        /// <summary>Shows the orange trail of the latest damage, which catches up after the attack ends. Off by default.</summary>
         public bool Trail
         {
             set => trailImage.enabled = value;
