@@ -207,3 +207,10 @@ Rouker's "glove", M4, not RedRocket's "Leather Gloves", M1; used as is, asked ab
   (debug spawns) but neither the story nor BOSS FIGHT uses it now.
 - Co-op: the mech's swing, slam and shockwave are worked out on the host only (lasers and rockets are sent).
 - EditMode 165/165, PlayMode 22/22 (`MechBossTests` runs the routine and pictures the warnings). Installed.
+- Mech model: the user picked B3, "The Morser 16" (anonDutch, CC BY 4.0, 19k triangles, 87 bones, walking and
+  running clips, a blade on the right arm and a gun on the left). Imported through EnemyModels as a GLB (glTFast's
+  animation method set to legacy through its serialized import settings; its materials moved onto URP Lit with
+  their colour, normal and glow maps). No attack clips, so MechBrain poses the arms after the walk each frame:
+  the blade arm draws back and up through the wind-up and sweeps across at the strike; the gun arm aims at you
+  while firing and kicks back per volley; lasers come from its `Gun_FX` bone. With no idle clip, standing still
+  holds the walk's pose (EnemyLook). Pictures `Logs/play_mech_*.png`.

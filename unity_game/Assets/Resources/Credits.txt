@@ -13,6 +13,11 @@ Assets/Enemies/Mechs (George, Leela, Mike, Stan)
   Animated Mech Pack by Quaternius, CC0 1.0.
   https://opengameart.org/content/animated-mech-pack
 
+Assets/Enemies/Morser (GOLIATH, the round 10 mech boss)
+  "The Morser 16 - Dieselpunk Mech" by anonDutch, CC BY 4.0, from Sketchfab. Changed: scaled, materials
+  converted, its sword swing and gun aim animated in the game.
+  https://sketchfab.com/models/9e39d4d8ce374dca9a9e238763d7c525
+
 Assets/Enemies/ClassicRobot (Robot)
   Animated LowPoly Robot by Quaternius, CC0 1.0.
   https://opengameart.org/content/animated-lowpoly-robot

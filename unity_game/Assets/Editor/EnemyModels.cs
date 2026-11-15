@@ -38,6 +38,8 @@ namespace Repulsor.EditorTools
             public float Height => EnemySpecFor(Key)?.Height ?? 1.3f;
             /// <summary>The height the eye positions were measured at; they scale with the real height.</summary>
             public float EyeHeight = 1.3f;
+            /// <summary>Keep the model's own textures (glTF models), moved onto the game's lit shader.</summary>
+            public bool OwnTextures;
         }
 
         static EnemySpec EnemySpecFor(string key) => System.Array.Find(EnemySpec.All, spec => spec.Model == key);
@@ -64,9 +66,9 @@ namespace Repulsor.EditorTools
             // The boss: the sci-fi kit's four-legged walker with twin cannons, scaled up to 2.3 m.
             new Entry { Key = "Trilobite", Model = Kit + "Enemy_Trilobite.fbx", Texture = Kit + "Textures/T_Enemies_Large_BaseColor.png",
                 Emissive = Kit + "Textures/T_Enemies_Large_Emissive.png", EyeHeight = 2.3f },
-            // GOLIATH, the mech boss: a stand-in (Mike, scaled to 2.7 m) until its own model is picked.
-            new Entry { Key = "MechBoss", Model = Mechs + "Mike.fbx", Texture = Mechs + "Textures/Mike_Texture.png",
-                Eyes = new[] { new Vector3(0.067f, 1.21f, 0.15f), new Vector3(-0.05f, 1.21f, 0.15f) }, EyeSize = 0.085f },
+            // GOLIATH, the mech boss: "The Morser 16" by anonDutch (CC BY 4.0), scaled to 2.7 m. Its swing and gun
+            // aim are animated in code (MechBrain); the model brings walking and running.
+            new Entry { Key = "MechBoss", Model = "Assets/Enemies/Morser/Morser16.glb", OwnTextures = true },
         };
 
         /// <summary>Drones are this wide.</summary>
@@ -196,10 +198,10 @@ namespace Repulsor.EditorTools
             var source = AssetDatabase.LoadAssetAtPath<GameObject>(entry.Model);
             AnimationClip[] clips = AssetDatabase.LoadAllAssetRepresentationsAtPath(entry.Model).OfType<AnimationClip>()
                 .Where(c => !c.name.StartsWith("__preview")).ToArray();
-            AnimationClip walk = Clip(clips, "Walk", "Robot_Walking");
+            AnimationClip walk = Clip(clips, "Walk", "Robot_Walking", "Walking");
             AnimationClip idle = Clip(clips, "Idle", "Robot_Idle");
             AnimationClip shoot = Clip(clips, "Shoot", "Robot_Punch", "Attack");
-            AnimationClip run = Clip(clips, "Run", "Robot_Running");
+            AnimationClip run = Clip(clips, "Run", "Robot_Running", "Running");
             AnimationClip attack = Clip(clips, "AttackAuto", "Kick");
             AnimationClip hit = Clip(clips, "Hit", "HitRecieve_1");
 
@@ -226,7 +228,7 @@ namespace Repulsor.EditorTools
                 renderer.receiveShadows = false;
                 Material[] slots = renderer.sharedMaterials;
                 for (int i = 0; i < slots.Length; i++)
-                    slots[i] = material != null ? material : ColourMaterial(entry.Key, slots[i]);
+                    slots[i] = material != null ? material : entry.OwnTextures ? TexturedMaterial(entry.Key, slots[i]) : ColourMaterial(entry.Key, slots[i]);
                 renderer.sharedMaterials = slots;
                 if (renderer is SkinnedMeshRenderer skinned)
                     skinned.updateWhenOffscreen = true;
@@ -359,6 +361,37 @@ namespace Repulsor.EditorTools
             return Save(material, path);
         }
 
+        /// <summary>A glTF material's colour, normal and glow maps on URP Lit (so the hit flash and lighting work as for the others).</summary>
+        static Material TexturedMaterial(string key, Material original)
+        {
+            string path = $"{OutFolder}/Materials/{key}_{(original != null ? original.name : "Plain")}.mat";
+            var material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            if (original != null)
+            {
+                Texture colour = original.HasProperty("baseColorTexture") ? original.GetTexture("baseColorTexture") : null;
+                Texture normal = original.HasProperty("normalTexture") ? original.GetTexture("normalTexture") : null;
+                Texture glow = original.HasProperty("emissiveTexture") ? original.GetTexture("emissiveTexture") : null;
+                if (colour != null)
+                    material.SetTexture("_BaseMap", colour);
+                if (original.HasProperty("baseColorFactor"))
+                    material.SetColor("_BaseColor", original.GetColor("baseColorFactor"));
+                if (normal != null)
+                {
+                    material.SetTexture("_BumpMap", normal);
+                    material.EnableKeyword("_NORMALMAP");
+                }
+                if (glow != null)
+                {
+                    material.SetTexture("_EmissionMap", glow);
+                    material.SetColor("_EmissionColor", original.HasProperty("emissiveFactor") ? original.GetColor("emissiveFactor") : Color.white);
+                    material.EnableKeyword("_EMISSION");
+                }
+            }
+            material.SetFloat("_Smoothness", 0.35f);
+            material.SetFloat("_Metallic", 0.3f);
+            return Save(material, path);
+        }
+
         static Material Save(Material material, string path)
         {
             if (AssetDatabase.LoadAssetAtPath<Material>(path) != null)
@@ -407,7 +440,20 @@ namespace Repulsor.EditorTools
 
         static void MakeLegacy(string path)
         {
-            var importer = (ModelImporter)AssetImporter.GetAtPath(path);
+            AssetImporter any = AssetImporter.GetAtPath(path);
+            if (!(any is ModelImporter importer))
+            {
+                // glTF (glTFast): its animation method lives in its serialized import settings (1 = legacy).
+                var settings = new SerializedObject(any);
+                SerializedProperty method = settings.FindProperty("importSettings.animationMethod");
+                if (method != null && method.intValue != 1)
+                {
+                    method.intValue = 1;
+                    settings.ApplyModifiedPropertiesWithoutUndo();
+                    any.SaveAndReimport();
+                }
+                return;
+            }
             if (importer.animationType == ModelImporterAnimationType.Legacy)
                 return;
             importer.animationType = ModelImporterAnimationType.Legacy;

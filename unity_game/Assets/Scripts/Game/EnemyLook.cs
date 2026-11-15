@@ -67,6 +67,9 @@ namespace Repulsor
                 : walking && animation.GetClip("walk") != null ? "walk"
                 : animation.GetClip("idle") != null ? "idle" : "walk";
             AnimationState state = animation[clip];
+            // No idle clip (the mech boss): standing still holds the walk's pose instead of walking on the spot.
+            if (state != null && clip == "walk")
+                state.speed = walking || running ? 1f : 0f;
             if (clip != playing && state != null)
             {
                 playing = clip;

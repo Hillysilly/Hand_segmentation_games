@@ -65,8 +65,12 @@ namespace Repulsor.Tests
             mech.transform.position = new Vector3(head.position.x + 0.5f, mech.transform.position.y, head.position.z + 3.5f);
             Assert.That(mech.IsBoss, Is.True);
             Vector3 eye = head.position + new Vector3(-1.2f, 0.6f, -1.2f);
+            yield return new WaitForSecondsRealtime(Enemy.SpawnSeconds + 1f);
+            // As you first see it: facing you, walking in.
+            Snap(head.position + Vector3.down * 0.2f, mech.Center, "arrives");
+            Snap(mech.Center + new Vector3(3.5f, 0.3f, 0.2f), mech.Center, "side");
 
-            bool swingShot = false, jumpShot = false;
+            bool swingShot = false, jumpShot = false, lasersShot = false;
             float clock = 0f;
             bool hurt = false;
             while (clock < 40f && !(moves.Contains("Swing") && moves.Contains("Lasers") && moves.Contains("Rockets") && moves.Contains("Jump") && moves.Contains("Summon")))
@@ -79,9 +83,15 @@ namespace Repulsor.Tests
                 }
                 if (!swingShot && mech.BossMove == "Swing")
                 {
-                    yield return new WaitForSecondsRealtime(0.45f);
+                    yield return new WaitForSecondsRealtime(0.6f);
                     Snap(eye, mech.Center + Vector3.down * 0.8f, "swing");
                     swingShot = true;
+                }
+                if (!lasersShot && mech.BossMove == "Lasers")
+                {
+                    yield return new WaitForSecondsRealtime(0.6f);
+                    Snap(eye, mech.Center + Vector3.down * 0.5f, "lasers");
+                    lasersShot = true;
                 }
                 if (!jumpShot && mech.BossMove == "Jump" && mech.Center.y > head.position.y - 0.2f)
                 {

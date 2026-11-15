@@ -13,6 +13,8 @@ namespace Repulsor
     ///   while you're in it), lands hard there, and a shockwave races out across the floor. Get out of the ring
     ///   before it lands; jump (for real) as the wave passes, or block it with your shield.
     /// Below 40% health it's enraged: shorter rests, more swings and rockets. Below 60% it calls in two helpers once.
+    /// The model ("The Morser 16" by anonDutch, CC BY 4.0) brings its walk; the swing of its blade arm (right) and the
+    /// aim and kick of its gun arm (left) are animated here, on its bones, after the walk each frame.
     /// Lines tagged [Mech] go to the headset log.
     /// </summary>
     public sealed class MechBrain : IBossBrain
@@ -64,6 +66,82 @@ namespace Repulsor
         {
             this.body = body;
             arena = body.Arena;
+            body.gameObject.AddComponent<ShowcasePoser>().Late = Pose;
+        }
+
+        // ------------------------------------------------------------------ the model's arms, posed over its walk
+
+        Transform bladeArm, gunArm, gunMuzzle;
+        bool bonesFound;
+        float aim;
+        float recoil;
+        float sweepAge = -1f;
+
+        void FindBones()
+        {
+            bonesFound = true;
+            if (body.Look == null)
+                return;
+            foreach (Transform t in body.Look.GetComponentsInChildren<Transform>(true))
+            {
+                if (t.name == "Upperarm_Right_Mech_Rig")
+                    bladeArm = t;
+                else if (t.name == "Upperarm_Left_Mech_Rig")
+                    gunArm = t;
+                else if (t.name == "Gun_FX_Mech_Rig")
+                    gunMuzzle = t;
+            }
+        }
+
+        /// <summary>Where the gun arm's shots come from: its barrel, or beside the chest if the model has none.</summary>
+        Vector3 GunMuzzle => gunMuzzle != null ? gunMuzzle.position : Arm(-1f);
+
+        void Pose()
+        {
+            if (!bonesFound)
+                FindBones();
+            if (!body.Alive)
+                return;
+            float dt = Time.deltaTime;
+            Vector3 up = body.transform.up, right = body.transform.right;
+            Vector3 target = arena.NearestPlayerHead(body.Center);
+
+            // Blade arm: drawn back and up through the wind-up, swept across at the strike, then back to the walk.
+            if (bladeArm != null)
+            {
+                float yaw = 0f, lift = 0f;
+                if (move == Move.Swing && timer > 0f)
+                {
+                    float t = Mathf.SmoothStep(0f, 1f, 1f - timer / (SwingWindUp * (Enraged ? 0.8f : 1f)));
+                    yaw = 75f * t;
+                    lift = 35f * t;
+                    sweepAge = -1f;
+                }
+                else if (sweepAge >= 0f)
+                {
+                    sweepAge += dt;
+                    float strike = Mathf.Clamp01(sweepAge / 0.18f);
+                    float back = Mathf.Clamp01((sweepAge - 0.18f) / 0.45f);
+                    yaw = Mathf.Lerp(75f, -80f, strike) * (1f - back);
+                    lift = 35f * (1f - strike) * (1f - back) + 10f * strike * (1f - back);
+                    if (back >= 1f)
+                        sweepAge = -1f;
+                }
+                if (yaw != 0f || lift != 0f)
+                    bladeArm.rotation = Quaternion.AngleAxis(yaw, up) * Quaternion.AngleAxis(-lift, right) * bladeArm.rotation;
+            }
+
+            // Gun arm: raised onto you while it fires, kicking back with each shot.
+            bool firing = move == Move.Lasers;
+            aim = Mathf.MoveTowards(aim, firing ? 1f : 0f, dt * 3f);
+            recoil = Mathf.MoveTowards(recoil, 0f, dt * 6f);
+            if (gunArm != null && gunMuzzle != null && aim > 0.001f)
+            {
+                Vector3 now = gunMuzzle.position - gunArm.position;
+                Vector3 want = target + Vector3.down * 0.3f - gunArm.position;
+                Quaternion turn = Quaternion.FromToRotation(now, want);
+                gunArm.rotation = Quaternion.Slerp(Quaternion.identity, turn, aim) * Quaternion.AngleAxis(-25f * recoil, right) * gunArm.rotation;
+            }
         }
 
         bool Enraged => body.Hp < body.MaxHp * 0.4f;
@@ -220,6 +298,7 @@ namespace Repulsor
             }
             // The sweep.
             ShowMarker(false);
+            sweepAge = 0f;
             SweepTrail(swingFacing);
             if (InSwing(target))
             {
@@ -279,13 +358,12 @@ namespace Repulsor
                 RestThen(Move.Approach);
                 return;
             }
-            float side = count % 2 == 0 ? -1f : 1f;
-            Vector3 muzzle = Arm(side);
-            Vector3 aim = (target + Vector3.down * 0.3f - muzzle).normalized;
+            Vector3 muzzle = GunMuzzle;
+            Vector3 aimAt = (target + Vector3.down * 0.3f - muzzle).normalized;
             // Two beams a little apart, so a small step clears both.
-            arena.EnemyFires(EnemyShot.Laser, muzzle, Quaternion.AngleAxis(-5f, Vector3.up) * aim, body);
-            arena.EnemyFires(EnemyShot.Laser, muzzle, Quaternion.AngleAxis(5f, Vector3.up) * aim, body);
-            body.Look?.PlayOnce("shoot");
+            arena.EnemyFires(EnemyShot.Laser, muzzle, Quaternion.AngleAxis(-5f, Vector3.up) * aimAt, body);
+            arena.EnemyFires(EnemyShot.Laser, muzzle, Quaternion.AngleAxis(5f, Vector3.up) * aimAt, body);
+            recoil = 1f;
             count++;
             timer = Enraged ? 0.55f : 0.75f;
         }

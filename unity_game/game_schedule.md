@@ -72,7 +72,7 @@ The APK is built; install it with `build_and_run.ps1 -NoBuild` when the headset 
 22. **GOLIATH, the mech boss** (also BOSS FIGHT on the mode screen): swing combos with the reach shown red on the
     floor (step back or shield), paired arm lasers, shoulder rockets, a jump slam at where you stand (red ring,
     view tints red) and a shockwave across the floor (jump for real as it passes, shield it, or be 4.5 m away).
-    It's wearing a stand-in body (a Quaternius mech at 2.7 m) until you pick B1-B4 on the shortlist page.
+    Body: The Morser 16 (B3), its blade arm swinging and gun arm aiming in code. Does the swing read as a swing?
 
 ## Status, end of 11/8 session
 

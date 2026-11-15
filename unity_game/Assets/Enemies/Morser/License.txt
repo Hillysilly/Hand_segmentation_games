@@ -1,0 +1,5 @@
+Morser16.glb: "The Morser 16 - Dieselpunk Mech" by anonDutch, CC BY 4.0
+(https://creativecommons.org/licenses/by/4.0/), from Sketchfab:
+https://sketchfab.com/3d-models/the-morser-16-dieselpunk-mech-9e39d4d8ce374dca9a9e238763d7c525
+Used as GOLIATH, the story's round 10 boss. Changed: scaled to 2.7 m, materials converted, its arm swing and
+gun aim animated in code.

@@ -14,8 +14,8 @@ namespace Repulsor.Tests
                 try
                 {
                     Assert.That(look, Is.Not.Null, spec.Model);
-                    if (spec.Kind == EnemyKind.Boss)
-                        continue;   // its glow is its own emissive lights
+                    if (EnemySpec.IsBoss(spec.Kind))
+                        continue;   // the bosses glow with their own emissive lights and visors
                     Assert.That(look.GetComponentsInChildren<EnemyEye>(), Is.Not.Empty, spec.Model + " has no eyes");
                     Assert.That(look.GetComponentsInChildren<FxSpin>(), Is.Not.Empty, spec.Model + " eyes don't glow");
                 }
