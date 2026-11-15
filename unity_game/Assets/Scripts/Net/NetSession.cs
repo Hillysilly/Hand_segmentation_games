@@ -45,6 +45,8 @@ namespace Repulsor
         public event Action<bool> EndReceived;
         public event Action<float> PlayerHitReceived;
         public event Action<byte, byte, byte, byte, bool> RoundReceived;
+        public event Action<EffectEvent> EffectReceived;
+        public event Action<EnemyMoveEvent> EnemyMoveReceived;
         public event Action PeerJoined;
 
         /// <summary>The game mode: set by the host, told to the client in the welcome.</summary>
@@ -199,6 +201,16 @@ namespace Repulsor
                             return;
                         ShotReceived?.Invoke(NetProtocol.ReadShot(reader));
                         break;
+                    case NetMessage.Effect:
+                        if (!FromPeer(from))
+                            return;
+                        EffectReceived?.Invoke(NetProtocol.ReadEffect(reader));
+                        break;
+                    case NetMessage.EnemyMove when Role == NetRole.Client:
+                        if (!FromPeer(from))
+                            return;
+                        EnemyMoveReceived?.Invoke(NetProtocol.ReadEnemyMove(reader));
+                        break;
                     case NetMessage.Enemies:
                     case NetMessage.EnemyHit:
                     case NetMessage.EnemyBolt:
@@ -323,6 +335,18 @@ namespace Repulsor
         {
             if (Connected)
                 Send(NetProtocol.Shot(shot));
+        }
+
+        public void SendEffect(in EffectEvent effect)
+        {
+            if (Connected)
+                Send(NetProtocol.Effect(effect));
+        }
+
+        public void SendEnemyMove(in EnemyMoveEvent move)
+        {
+            if (Connected)
+                Send(NetProtocol.EnemyMove(move));
         }
 
         void Send(byte[] packet)

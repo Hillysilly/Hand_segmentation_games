@@ -289,3 +289,23 @@ EditMode 175/175, PlayMode 23/23. Installed.
   number (the joiner fills in its own first three). The host's lobby shows its IP big; the join keypad has a "."
   key and takes an address (`NetProtocol.TryParseAddress`) or a code; the last address is offered again
   (PlayerPrefs LastHostAddress). Installed on 2G97C5ZH9300P6 (headsets also seen: 2G0YC5ZG8V05SS, 2G97C5ZH920328).
+- Hand aura overlap fixed: `Repulsor/HandAura` is one shell (8 mm) with a depth-only first pass (SRPDefaultUnlit,
+  ZWrite, ColorMask 0) and the glow on the nearest surface only (UniversalForward, ZTest LEqual), queue
+  Transparent+50 so its depth hides only itself. Capture `play_aura_*_alone.png`.
+- Multiplayer (protocol version 2, both headsets need this build):
+  - Shots carry a look (`ShotLook`: ki ball + style, arrow, bolt, rock, web, comet + style); `Arena.NextShot` before
+    FireBlast, `TakeShotLook` in BlastFired; `RepulsorGame.FiringComet` marks repulsor shots.
+  - Player updates carry each hand's beam (`HandBeam`: laser, flames, blade, lightning, from/to), from
+    `HandRepulsor.ShownBeam` and `ChainLightning.ShownNow`; drawn by `Arena.NetLooks` (laser views, flamethrowers,
+    lightning bolts).
+  - `NetMessage.Effect` (`NetEffect`): dragon fist, fire pillar, gust, tornado, rock spikes, explosion (snap), smoke.
+    Replayed with no damage; `RepulsorGame.Strike` ignores damage <= 0 (so replays never hit or report hits).
+  - The other player's real aura: a copy of the AuraView style object with _AuraPower/_AuraTint/_AuraFoot/
+    _AuraFloorHidden set per renderer (MaterialPropertyBlock), plus a second `ElementAura`. The stand-in shell is gone.
+  - Their shield wraps the whole body (it was placed like your own, round the upper body).
+  - GOLIATH: `NetMessage.EnemyMove`; MechBrain.Tell on swing (facing, wind-up), jump (from, to), lasers, rockets,
+    summon, rest; the client's copy `Replay`s and `TickProxy`s it (wind-up mark, sweep, jump arc, slam, shockwave),
+    hurting only its own player. Host swings now check the host's own head (before: the nearest player's, so a
+    swing at the client hurt the host).
+  - Tests: NetTests round trip; CoopTests.ClientPlaysTheMechsSwingAndDrawsThePartnersLooks (HP 100 -> 84;
+    Logs/play_coop_remote.png). EditMode 177/177, PlayMode 24/24. Built; no headset connected to install.

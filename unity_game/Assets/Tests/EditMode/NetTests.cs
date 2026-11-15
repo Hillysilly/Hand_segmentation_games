@@ -182,5 +182,39 @@ namespace Repulsor.Tests
             foreach (string bad in new[] { "", "172.96.99", "172.96.99.", "172.96.99.256", "1.2.3.4.5", "1..2.3", "1234.1.1.1" })
                 Assert.That(NetProtocol.TryParseAddress(bad, out _), Is.False, bad);
         }
+
+        [Test]
+        public void ShotLooksBeamsEffectsAndBossMovesSurviveTheTrip()
+        {
+            byte[] shot = NetProtocol.Shot(new ShotEvent { Origin = Vector3.one, Direction = Vector3.forward, Size = 1f, Speed = 1f, Look = ShotLook.Arrow, Style = 3 });
+            Assert.That(NetProtocol.TryRead(shot, shot.Length, out NetMessage type, out var reader), Is.True);
+            ShotEvent s = NetProtocol.ReadShot(reader);
+            Assert.That(s.Look, Is.EqualTo(ShotLook.Arrow));
+            Assert.That(s.Style, Is.EqualTo(3));
+
+            var p = new PlayerSnapshot { Head = Vector3.up, HeadRotation = Quaternion.identity, Lives = 2, RightBeam = (byte)HandBeam.Blade,
+                RightBeamFrom = new Vector3(1f, 2f, 3f), RightBeamTo = new Vector3(4f, 5f, 6f) };
+            byte[] player = NetProtocol.Player(p);
+            NetProtocol.TryRead(player, player.Length, out type, out reader);
+            PlayerSnapshot back = NetProtocol.ReadPlayer(reader);
+            Assert.That(back.Lives, Is.EqualTo(2));
+            Assert.That(back.LeftBeam, Is.EqualTo(0));
+            Assert.That(back.RightBeam, Is.EqualTo((byte)HandBeam.Blade));
+            Assert.That(back.RightBeamTo, Is.EqualTo(new Vector3(4f, 5f, 6f)));
+
+            byte[] effect = NetProtocol.Effect(new EffectEvent { Kind = NetEffect.Tornado, A = Vector3.one, B = Vector3.right, F = 0.7f, Style = 2 });
+            NetProtocol.TryRead(effect, effect.Length, out type, out reader);
+            Assert.That(type, Is.EqualTo(NetMessage.Effect));
+            EffectEvent e = NetProtocol.ReadEffect(reader);
+            Assert.That(e.Kind, Is.EqualTo(NetEffect.Tornado));
+            Assert.That(e.F, Is.EqualTo(0.7f));
+
+            byte[] move = NetProtocol.EnemyMove(new EnemyMoveEvent { Id = 9, Move = 1, A = Vector3.forward, B = Vector3.one, F = 0.5f });
+            NetProtocol.TryRead(move, move.Length, out type, out reader);
+            Assert.That(type, Is.EqualTo(NetMessage.EnemyMove));
+            EnemyMoveEvent m = NetProtocol.ReadEnemyMove(reader);
+            Assert.That(m.Id, Is.EqualTo(9));
+            Assert.That(m.F, Is.EqualTo(0.5f));
+        }
     }
 }

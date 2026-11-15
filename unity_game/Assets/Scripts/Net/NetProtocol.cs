@@ -19,6 +19,8 @@ namespace Repulsor
         End = 11,       // host -> client: the match is over
         PlayerHit = 12, // either way: I hit you for this much (PVP or friendly fire)
         Round = 13,     // host -> client: a PVP round ended
+        Effect = 14,    // either way: I made a one-off attack effect (for the other headset to draw)
+        EnemyMove = 15, // host -> client: a boss began a move (the client plays it and checks its own player)
     }
 
     public struct EnemyNet
@@ -60,6 +62,42 @@ namespace Repulsor
         public Color32 Color;
         public byte Character;
         public byte Lives;
+        /// <summary>What each hand is drawing right now (<see cref="HandBeam"/>), and from where to where.</summary>
+        public byte LeftBeam;
+        public Vector3 LeftBeamFrom;
+        public Vector3 LeftBeamTo;
+        public byte RightBeam;
+        public Vector3 RightBeamFrom;
+        public Vector3 RightBeamTo;
+    }
+
+    /// <summary>A held attack drawn from a hand, sent with every player update.</summary>
+    public enum HandBeam : byte { None, Laser, Flames, Blade, Lightning }
+
+    /// <summary>How a shot looks, so the other headset draws the same thing.</summary>
+    public enum ShotLook : byte { Plain, KiBall, Arrow, Bolt, Rock, Web, Comet }
+
+    /// <summary>One-off attack effects the other headset draws (no damage there).</summary>
+    public enum NetEffect : byte { DragonFist, FirePillar, Gust, Tornado, RockSpikes, Explosion, Shockwave, Smoke }
+
+    public struct EffectEvent
+    {
+        public NetEffect Kind;
+        public Vector3 A;
+        public Vector3 B;
+        public float F;
+        public Color32 Color;
+        public byte Style;
+    }
+
+    /// <summary>A boss move starting (host to client): which enemy, which move, two points and a number.</summary>
+    public struct EnemyMoveEvent
+    {
+        public ushort Id;
+        public byte Move;
+        public Vector3 A;
+        public Vector3 B;
+        public float F;
     }
 
     public struct LobbyState
@@ -78,6 +116,8 @@ namespace Repulsor
         public float Size;
         public float Speed;
         public Color32 Color;
+        public ShotLook Look;
+        public byte Style;
     }
 
     /// <summary>
@@ -88,7 +128,8 @@ namespace Repulsor
     {
         public const int Port = 47777;
         const ushort Magic = 0x5257;   // "RW"
-        const byte Version = 1;
+        // 2 (11/15): shot looks, hand beams, effects and boss moves.
+        const byte Version = 2;
 
         public static byte[] Hello(string name) => Write(NetMessage.Hello, w => w.Write(name ?? ""));
 
@@ -137,6 +178,18 @@ namespace Repulsor
                 WriteColor(w, s.Color);
                 w.Write(s.Character);
                 w.Write(s.Lives);
+                w.Write(s.LeftBeam);
+                if (s.LeftBeam != 0)
+                {
+                    WriteVector(w, s.LeftBeamFrom);
+                    WriteVector(w, s.LeftBeamTo);
+                }
+                w.Write(s.RightBeam);
+                if (s.RightBeam != 0)
+                {
+                    WriteVector(w, s.RightBeamFrom);
+                    WriteVector(w, s.RightBeamTo);
+                }
             });
         }
 
@@ -241,8 +294,56 @@ namespace Repulsor
                 w.Write(s.Size);
                 w.Write(s.Speed);
                 WriteColor(w, s.Color);
+                w.Write((byte)s.Look);
+                w.Write(s.Style);
             });
         }
+
+        public static byte[] Effect(in EffectEvent e)
+        {
+            EffectEvent s = e;
+            return Write(NetMessage.Effect, w =>
+            {
+                w.Write((byte)s.Kind);
+                WriteVector(w, s.A);
+                WriteVector(w, s.B);
+                w.Write(s.F);
+                WriteColor(w, s.Color);
+                w.Write(s.Style);
+            });
+        }
+
+        public static EffectEvent ReadEffect(BinaryReader r) => new EffectEvent
+        {
+            Kind = (NetEffect)r.ReadByte(),
+            A = ReadVector(r),
+            B = ReadVector(r),
+            F = r.ReadSingle(),
+            Color = ReadColor(r),
+            Style = r.ReadByte(),
+        };
+
+        public static byte[] EnemyMove(in EnemyMoveEvent e)
+        {
+            EnemyMoveEvent s = e;
+            return Write(NetMessage.EnemyMove, w =>
+            {
+                w.Write(s.Id);
+                w.Write(s.Move);
+                WriteVector(w, s.A);
+                WriteVector(w, s.B);
+                w.Write(s.F);
+            });
+        }
+
+        public static EnemyMoveEvent ReadEnemyMove(BinaryReader r) => new EnemyMoveEvent
+        {
+            Id = r.ReadUInt16(),
+            Move = r.ReadByte(),
+            A = ReadVector(r),
+            B = ReadVector(r),
+            F = r.ReadSingle(),
+        };
 
         /// <summary>Reads the header. False for anything that isn't ours.</summary>
         public static bool TryRead(byte[] data, int length, out NetMessage type, out BinaryReader reader)
@@ -296,6 +397,18 @@ namespace Repulsor
             s.Color = ReadColor(r);
             s.Character = r.ReadByte();
             s.Lives = r.ReadByte();
+            s.LeftBeam = r.ReadByte();
+            if (s.LeftBeam != 0)
+            {
+                s.LeftBeamFrom = ReadVector(r);
+                s.LeftBeamTo = ReadVector(r);
+            }
+            s.RightBeam = r.ReadByte();
+            if (s.RightBeam != 0)
+            {
+                s.RightBeamFrom = ReadVector(r);
+                s.RightBeamTo = ReadVector(r);
+            }
             return s;
         }
 
@@ -315,6 +428,8 @@ namespace Repulsor
             Size = r.ReadSingle(),
             Speed = r.ReadSingle(),
             Color = ReadColor(r),
+            Look = (ShotLook)r.ReadByte(),
+            Style = r.ReadByte(),
         };
 
         static byte[] Write(NetMessage type, Action<BinaryWriter> body)

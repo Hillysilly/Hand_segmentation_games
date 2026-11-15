@@ -84,6 +84,10 @@ namespace Repulsor.Tests
                 Vector3 centre = wrist + facing * Vector3.forward * 0.07f;
                 Snap(wrist + new Vector3(-0.04f, 0.26f, -0.2f), centre, $"{shape.what}_view");
                 Snap(centre + new Vector3(0.3f, 0.04f, 0.02f), centre, $"{shape.what}_side");
+                // The aura alone: overlapping fingers (a fist) must not glow through each other.
+                real.Root.gameObject.SetActive(false);
+                Snap(wrist + new Vector3(-0.04f, 0.26f, -0.2f), centre, $"{shape.what}_alone");
+                real.Root.gameObject.SetActive(true);
             }
             Object.Destroy(parent.gameObject);
             Object.Destroy(light.gameObject);

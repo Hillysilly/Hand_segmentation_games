@@ -116,6 +116,8 @@ namespace Repulsor
         public bool IsBoss => EnemySpec.IsBoss(Kind);
         /// <summary>For tests: the mech boss's current move (empty for anything else).</summary>
         public string BossMove => boss is MechBrain mech ? mech.MoveName : "";
+        /// <summary>GOLIATH's brain, if this is GOLIATH (on the client, its copy plays the host's moves).</summary>
+        public MechBrain Mech => boss as MechBrain;
         public Arena Arena => arena;
         public EnemyLook Look => look;
         /// <summary>Where its middle should be above the floor.</summary>
@@ -265,6 +267,9 @@ namespace Repulsor
             {
                 transform.position = Vector3.Lerp(transform.position, netPosition, 1f - Mathf.Exp(-12f * dt));
                 Face(head.position, dt);
+                // GOLIATH's copy plays the host's moves (and checks its swings, slam and shockwave on you).
+                if (boss is MechBrain mech && Alive)
+                    mech.TickProxy(dt);
                 return;
             }
             if (Spawning)

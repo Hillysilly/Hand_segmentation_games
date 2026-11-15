@@ -30,6 +30,7 @@ namespace Repulsor
         RockGauntlets gauntlets;
         Material rockMaterial;
         Material rockHot;
+        Material rockGold;
         GameObject tornadoCharge;
         float lightningLeft = LightningSeconds;
         float lightningCooldown;
@@ -40,6 +41,7 @@ namespace Repulsor
             rockMaterial = Resources.Load<Material>("Props/Materials/Rock");
             rockHot = Resources.Load<Material>("Props/Materials/RockHot");
             Material gold = Resources.Load<Material>("Props/Materials/RockGold");
+            rockGold = gold;
             elementAura = new ElementAura(transform, rockMaterial, gold);
             gauntlets = new RockGauntlets(transform, rockMaterial);
             // The lightning uses the energy ball's arc material.
@@ -77,6 +79,7 @@ namespace Repulsor
                 if (swirl.Step(input.Left, input.Right, body, dt, out Vector3 direction, out float power))
                 {
                     Tornado.Launch(game, swirl.Center, direction, power, FloorY, player.Outgoing(TornadoDps), foes);
+                    SendEffect(NetEffect.Tornado, swirl.Center, direction, power);
                     handsBusyFor = 0.6f;
                     Log($"Tornado, power {power:0.00}");
                 }
@@ -134,6 +137,7 @@ namespace Repulsor
                 {
                     direction = Aim.Assist(origin, direction);
                     WindGust.Launch(game, origin + direction * 0.1f, direction, player.Outgoing(WindGust.Damage), foes);
+                    SendEffect(NetEffect.Gust, origin + direction * 0.1f, direction);
                 }
             }
         }
@@ -177,6 +181,7 @@ namespace Repulsor
                         if (target != null)
                             direction = Vector3.ProjectOnPlane(target.Center - head.position, Vector3.up).normalized;
                         RockSpikes.Erupt(game, feet, direction, player.Outgoing(RockSpikes.Damage), rockMaterial, foes);
+                        SendEffect(NetEffect.RockSpikes, feet, direction);
                         handsBusyFor = 0.5f;
                         Log("Rock spikes");
                     }
@@ -191,6 +196,7 @@ namespace Repulsor
                     if (rock == null)
                         continue;
                     game.Explode(rock.transform.position, 0.6f, player.Outgoing(12f), new Color(1f, 0.4f, 0.1f));
+                    SendEffect(NetEffect.Explosion, rock.transform.position, Vector3.up, 0.6f, new Color(1f, 0.4f, 0.1f));
                     Destroy(rock.gameObject);
                     blown++;
                 }
@@ -247,6 +253,18 @@ namespace Repulsor
         /// <summary>Rock orbs: a stone with glowing cracks instead of the energy ball; at level 3 it sticks to what it hits.</summary>
         void DressRock(Blast shot)
         {
+            DressRockLook(shot);
+            if (player.Level >= 3)
+                shot.OnHit = (target, at) =>
+                {
+                    if (target is Enemy enemy && enemy != null && enemy.Alive)
+                        stuckRocks.Add(StuckRock.Attach(enemy, at, rockHot, foes));
+                };
+        }
+
+        /// <summary>A rock orb's look alone (also the other player's).</summary>
+        void DressRockLook(Blast shot)
+        {
             BallLook.HideCrackle(shot.Head, true);
             foreach (Renderer renderer in shot.Head.GetComponentsInChildren<Renderer>())
                 renderer.enabled = false;
@@ -262,12 +280,6 @@ namespace Repulsor
             }
             BallLook.Sprite("Heat", shot.Head, "FxGlow", 1.8f, new Color(1f, 0.35f, 0.08f) * 0.7f).Set(billboard: true, flicker: 0.2f);
             BallLook.Particles("Embers", shot.Head, "FxGlow", new Color(1f, 0.5f, 0.15f), new Color(0.4f, 0.1f, 0.02f, 0f), 0.4f, 0.35f, 35f, 0.2f, 0.4f);
-            if (player.Level >= 3)
-                shot.OnHit = (target, at) =>
-                {
-                    if (target is Enemy enemy && enemy != null && enemy.Alive)
-                        stuckRocks.Add(StuckRock.Attach(enemy, at, rockHot, foes));
-                };
         }
     }
 }

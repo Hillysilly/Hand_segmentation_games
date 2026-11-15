@@ -56,10 +56,27 @@ namespace Repulsor
         public Vector3 IndexTip { get; private set; }
         public HandGesture Gesture => gesture;
 
+        HandBeam shownBeam;
+        int shownFrame = -10;
+
+        /// <summary>What this hand drew this frame or the last (laser, flames or blade), for the other headset.</summary>
+        public HandBeam ShownBeam => Time.frameCount - shownFrame <= 1 ? shownBeam : HandBeam.None;
+        public Vector3 ShownFrom { get; private set; }
+        public Vector3 ShownTo { get; private set; }
+
+        void Shown(HandBeam kind, Vector3 from, Vector3 to)
+        {
+            shownBeam = kind;
+            shownFrame = Time.frameCount;
+            ShownFrom = from;
+            ShownTo = to;
+        }
+
         /// <summary>Draws the laser beam as a sword blade this frame (the Saber). Only while the hand has no weapon.</summary>
         public void ShowBlade(Vector3 hilt, Vector3 tip)
         {
             laserBeam.Aim(hilt, tip, false, Vector3.up);
+            Shown(HandBeam.Blade, hilt, tip);
             if (!laserHum.isPlaying)
                 laserHum.Play();
             bladeShown = true;
@@ -244,6 +261,7 @@ namespace Repulsor
                 if (flames == null)
                     flames = Flamethrower.Create(game.transform);
                 flames.Pour(mouth, laserDirection, game.WeaponColor);
+                Shown(HandBeam.Flames, mouth, mouth + laserDirection * Flamethrower.Reach);
                 Flamethrower.Burn(game, mouth, laserDirection, Flamethrower.Reach, game.LaserDps * Flamethrower.DamageScale, dt);
                 laserFrames++;
                 return;
@@ -266,6 +284,7 @@ namespace Repulsor
             bool onTarget = game.BurnWithLaser(start, laserDirection, reach, dt, out float length, game.LaserDps);
             laserBeam.Aim(start, start + laserDirection * length, onTarget || beamLength.Hitting,
                 onTarget ? -laserDirection : surfaceNormal);
+            Shown(HandBeam.Laser, start, start + laserDirection * length);
             game.DimRoom();
 
             laserFrames++;

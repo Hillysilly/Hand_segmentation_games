@@ -209,5 +209,107 @@ namespace Repulsor.Tests
             Assert.That(roundsSeen, Is.EqualTo(1), "no round result reached the client");
             Assert.That(winner, Is.EqualTo(0), "the host should have won the round");
         }
+
+        /// <summary>
+        /// The client's copy of GOLIATH plays the host's swing (11/15: before, only the host's player could be hit by its
+        /// swing, slam and shockwave), and the other player's laser and real aura are drawn. Pictures:
+        /// Logs/play_coop_remote.png.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator ClientPlaysTheMechsSwingAndDrawsThePartnersLooks()
+        {
+            LogAssert.ignoreFailingMessages = true;
+            SceneManager.LoadScene("Main");
+            yield return null;
+            yield return null;
+            var arena = Object.FindAnyObjectByType<Arena>();
+            Assert.That(arena, Is.Not.Null);
+
+            using var host = new NetSession();
+            host.Host(Port + 3);
+            Assert.That(arena.TestJoin(Port + 3), Is.True);
+            for (int i = 0; i < 300 && !host.Connected; i++)
+            {
+                host.Poll(Time.unscaledDeltaTime);
+                yield return null;
+            }
+            Assert.That(host.Connected, Is.True, "the game's hello never reached the host");
+            host.SendStart(1, 0);
+
+            Vector3 me = arena.LocalHead;
+            Vector3 ahead = new Vector3(me.x, 0f, me.z + 1.6f);
+            var list = new List<EnemyNet>
+            {
+                new EnemyNet { Id = 7, Kind = (byte)EnemyKind.Mech, Position = ahead + Vector3.up * 1.2f, Hp = 900f, MaxHp = 900f },
+            };
+            var partner = new PlayerSnapshot
+            {
+                Slot = 0, Head = new Vector3(me.x + 1.2f, 1.6f, me.z + 2.5f), HeadRotation = Quaternion.Euler(0f, 180f, 0f),
+                LeftPalm = new Vector3(me.x + 1f, 1.3f, me.z + 2.2f), RightPalm = new Vector3(me.x + 1.4f, 1.3f, me.z + 2.2f),
+                LeftTracked = true, RightTracked = true, Hp = 100f, MaxHp = 100f, Level = 3, Color = new Color(1f, 0.82f, 0.25f),
+                Character = (byte)CharacterId.KiFighter, Lives = 3,
+                RightBeam = (byte)HandBeam.Laser, RightBeamFrom = new Vector3(me.x + 1.4f, 1.3f, me.z + 2.2f),
+                RightBeamTo = new Vector3(me.x - 1f, 1.1f, me.z + 3.5f),
+            };
+            float until = Time.realtimeSinceStartup + 3f;
+            while (Time.realtimeSinceStartup < until && (arena.Phase != Phase.Playing || arena.TestEnemyCount == 0))
+            {
+                host.SendEnemies(new WaveNet { Wave = 10, WaveCount = 10, State = (byte)WaveState.Fighting }, list);
+                host.SendPlayer(partner, 1f);
+                host.Poll(Time.unscaledDeltaTime);
+                yield return null;
+            }
+            Assert.That(arena.TestEnemyCount, Is.EqualTo(1), "the host's mech wasn't copied");
+
+            // Past its spawn, keep the partner and the mech coming, then the host's swing straight at you.
+            until = Time.realtimeSinceStartup + 1.5f;
+            while (Time.realtimeSinceStartup < until)
+            {
+                host.SendEnemies(new WaveNet { Wave = 10, WaveCount = 10, State = (byte)WaveState.Fighting }, list);
+                host.SendPlayer(partner, 1f);
+                host.Poll(Time.unscaledDeltaTime);
+                yield return null;
+            }
+            Assert.That(arena.TestRemoteBeam(1), Is.True, "the partner's laser isn't drawn");
+            Assert.That(arena.TestRemoteAura, Is.True, "the partner's aura isn't drawn");
+            Snap(me + new Vector3(0f, 0.1f, -0.6f), partner.Head + Vector3.down * 0.6f, "coop_remote");
+
+            float before = arena.TestHp;
+            Vector3 facing = Vector3.ProjectOnPlane(me - ahead, Vector3.up).normalized;
+            host.SendEnemyMove(new EnemyMoveEvent { Id = 7, Move = MechBrain.SwingMove, A = facing, F = 0.5f });
+            until = Time.realtimeSinceStartup + 1.5f;
+            while (Time.realtimeSinceStartup < until && arena.TestHp >= before)
+            {
+                host.SendEnemies(new WaveNet { Wave = 10, WaveCount = 10, State = (byte)WaveState.Fighting }, list);
+                host.SendPlayer(partner, 1f);
+                host.Poll(Time.unscaledDeltaTime);
+                yield return null;
+            }
+            Debug.Log($"[Test] client HP {before} -> {arena.TestHp}");
+            Assert.That(arena.TestHp, Is.LessThan(before), "the mech's swing didn't reach the client's player");
+        }
+
+        static void Snap(Vector3 eye, Vector3 target, string name)
+        {
+            var cameraObject = new GameObject("Capture Camera", typeof(Camera));
+            cameraObject.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(target - eye));
+            var camera = cameraObject.GetComponent<Camera>();
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.36f, 0.34f, 0.31f);
+            camera.nearClipPlane = 0.05f;
+            camera.fieldOfView = 70f;
+            var texture = new RenderTexture(800, 600, 24) { antiAliasing = 4 };
+            camera.targetTexture = texture;
+            camera.Render();
+            RenderTexture.active = texture;
+            var image = new Texture2D(800, 600, TextureFormat.RGB24, false);
+            image.ReadPixels(new Rect(0, 0, 800, 600), 0, 0);
+            image.Apply();
+            RenderTexture.active = null;
+            camera.targetTexture = null;
+            Object.Destroy(cameraObject);
+            System.IO.Directory.CreateDirectory("Logs");
+            System.IO.File.WriteAllBytes($"Logs/play_{name}.png", image.EncodeToPNG());
+        }
     }
 }

@@ -16,6 +16,9 @@ namespace Repulsor
     /// The model ("The Morser 16" by anonDutch, CC BY 4.0) brings its walk; the swing of its blade arm (right) and the
     /// aim and kick of its gun arm (left) are animated here, on its bones, after the walk each frame.
     /// Lines tagged [Mech] go to the headset log.
+    /// Co-op (11/15): the host runs it and tells the client each move as it begins (<see cref="Replay"/>); the client
+    /// plays the same move on its copy (wind-up, floor marks, sweep, jump arc, shockwave) and checks the hits on its
+    /// own player. Each headset only ever hurts its own player.
     /// </summary>
     public sealed class MechBrain : IBossBrain
     {
@@ -61,6 +64,64 @@ namespace Repulsor
 
         /// <summary>For tests: what it's doing.</summary>
         public string MoveName => move.ToString();
+
+        /// <summary>The move number of a swing, whose first point is a direction (its facing) rather than a place.</summary>
+        public const byte SwingMove = (byte)Move.Swing;
+
+        /// <summary>Host: tells the client's copy that a move began.</summary>
+        void Tell(Move what, Vector3 a = default, Vector3 b = default, float f = 0f)
+        {
+            if (!body.IsProxy)
+                arena.SendEnemyMove(body, (byte)what, a, b, f, what == Move.Swing);
+        }
+
+        /// <summary>Client: the host's copy began this move; play it here.</summary>
+        public void Replay(byte what, Vector3 a, Vector3 b, float f)
+        {
+            var m = (Move)what;
+            ShowMarker(false);
+            count = 0;
+            switch (m)
+            {
+                case Move.Swing:
+                    move = Move.Swing;
+                    swingFacing = a.sqrMagnitude > 0.5f ? a.normalized : body.transform.forward;
+                    timer = windUp = Mathf.Max(0.1f, f);
+                    body.Look?.PlayOnce("attack", 0.8f);
+                    arena.Game.PlayAt(body.Center, arena.Game.WhooshSound);
+                    break;
+                case Move.Jump:
+                    move = Move.Jump;
+                    timer = CrouchSeconds;
+                    jumpFrom = a;
+                    jumpTo = b;
+                    body.Look?.PlayOnce("hit", 0.7f);
+                    break;
+                case Move.Rockets:
+                    move = m;
+                    body.Look?.PlayOnce("shoot");
+                    break;
+                case Move.Summon:
+                    move = m;
+                    body.Look?.PlayOnce("hit");
+                    break;
+                default:
+                    move = m;
+                    break;
+            }
+        }
+
+        /// <summary>Client, every frame: the copy plays its current move (it moves only for the jump).</summary>
+        public void TickProxy(float dt)
+        {
+            timer -= dt;
+            TickWaves(dt);
+            Vector3 me = arena.LocalHead;
+            if (move == Move.Swing)
+                TickSwing(dt, me, true);
+            else if (move == Move.Jump)
+                TickJump(dt, me, true);
+        }
 
         public MechBrain(Enemy body)
         {
@@ -177,7 +238,7 @@ namespace Repulsor
                     }
                     break;
                 case Move.Swing:
-                    TickSwing(dt, target);
+                    TickSwing(dt, target, false);
                     break;
                 case Move.Lasers:
                     body.Walk(dt, Vector3.zero, 0f);
@@ -190,7 +251,7 @@ namespace Repulsor
                     TickRockets(target);
                     break;
                 case Move.Jump:
-                    TickJump(dt, target);
+                    TickJump(dt, target, false);
                     break;
                 case Move.Summon:
                     body.Walk(dt, Vector3.zero, 0f);
@@ -231,7 +292,7 @@ namespace Repulsor
             switch (what)
             {
                 case Move.Swing:
-                    StartSwing();
+                    StartSwing(SwingWindUp * (Enraged ? 0.8f : 1f));
                     break;
                 case Move.Lasers:
                     timer = 0.3f;
@@ -245,6 +306,7 @@ namespace Repulsor
                     jumpFrom = body.transform.position;
                     jumpTo = LandingSpot();
                     body.Look?.PlayOnce("hit", 0.7f);
+                    Tell(Move.Jump, jumpFrom, jumpTo);
                     break;
                 case Move.Summon:
                     timer = 1.2f;
@@ -254,6 +316,8 @@ namespace Repulsor
                     timer = 2.5f;
                     break;
             }
+            if (what != Move.Swing && what != Move.Jump)
+                Tell(what);
             Debug.Log($"[Mech] {what}, HP {body.Hp:0}/{body.MaxHp:0}{(Enraged ? " (enraged)" : "")}");
         }
 
@@ -263,6 +327,7 @@ namespace Repulsor
             timer = RestSeconds;
             next = after;
             ShowMarker(false);
+            Tell(Move.Rest);
         }
 
         // ------------------------------------------------------------------ swing
@@ -270,30 +335,38 @@ namespace Repulsor
         Vector3 swingFacing;
         float windUp = SwingWindUp;
 
-        void StartSwing()
+        void StartSwing(float windup)
         {
-            timer = windUp = SwingWindUp * (Enraged ? 0.8f : 1f);
+            timer = windUp = windup;
             Vector3 target = arena.NearestPlayerHead(body.Center);
             swingFacing = Vector3.ProjectOnPlane(target - body.Center, Vector3.up).normalized;
             if (swingFacing.sqrMagnitude < 0.5f)
                 swingFacing = body.transform.forward;
             body.Look?.PlayOnce("attack", 0.8f);
             arena.Game.PlayAt(body.Center, arena.Game.WhooshSound);
+            Tell(Move.Swing, swingFacing, default, windup);
         }
 
-        void TickSwing(float dt, Vector3 target)
+        /// <summary>
+        /// The swing at <paramref name="target"/> (the nearest player). Its warning and hit are for your own player:
+        /// in co-op the other headset plays the same swing and checks its own. A copy (<paramref name="puppet"/>)
+        /// keeps the facing it was told and ends after one sweep (the host tells it of the next).
+        /// </summary>
+        void TickSwing(float dt, Vector3 target, bool puppet)
         {
-            body.Walk(dt, Vector3.zero, 0f);
+            if (!puppet)
+                body.Walk(dt, Vector3.zero, 0f);
             // It turns with you a little during the wind-up, then commits.
             Vector3 toYou = Vector3.ProjectOnPlane(target - body.Center, Vector3.up).normalized;
-            if (timer > 0.25f && toYou.sqrMagnitude > 0.5f)
+            if (!puppet && timer > 0.25f && toYou.sqrMagnitude > 0.5f)
                 swingFacing = Vector3.Slerp(swingFacing, toYou, 2f * dt).normalized;
             body.Face(body.Center + swingFacing, dt, 6f);
+            Vector3 mine = arena.LocalHead;
             if (timer > 0f)
             {
                 float t = Mathf.Clamp01(1f - timer / windUp);
                 Mark(Floor(body.Center), swingFacing, SwingReach, SwingDegrees * 0.5f, t);
-                if (InSwing(target))
+                if (InSwing(mine))
                     arena.WarnPlayer(Mathf.Lerp(0.25f, 0.5f, t));
                 return;
             }
@@ -301,20 +374,25 @@ namespace Repulsor
             ShowMarker(false);
             sweepAge = 0f;
             SweepTrail(swingFacing);
-            if (InSwing(target))
+            if (InSwing(mine))
             {
                 if (arena.PlayerShieldBlocks(body.Center))
                     Debug.Log("[Mech] swing blocked by the shield");
                 else
                     arena.HurtPlayer(SwingDamage, "mech swing");
             }
+            if (puppet)
+            {
+                move = Move.Rest;
+                timer = 99f;
+                return;
+            }
             count++;
             int swings = Enraged ? 3 : 2;
             float distance = Vector3.ProjectOnPlane(target - body.Center, Vector3.up).magnitude;
             if (count < swings && distance < SwingReach + 0.5f)
             {
-                StartSwing();
-                timer = windUp = windUp * 0.75f;
+                StartSwing(windUp * 0.75f);
                 return;
             }
             RestThen(Move.Approach);
@@ -398,7 +476,7 @@ namespace Repulsor
             return spot;
         }
 
-        void TickJump(float dt, Vector3 target)
+        void TickJump(float dt, Vector3 target, bool puppet)
         {
             float middle = Enemy.MiddleHeight(body.Kind);
             Vector3 land = Floor(jumpTo);
@@ -443,6 +521,12 @@ namespace Repulsor
             }
             StartWave(land);
             body.Look?.PlayOnce("hit", 1.4f);
+            if (puppet)
+            {
+                move = Move.Rest;
+                timer = 99f;
+                return;
+            }
             RestThen(Move.Approach);
         }
 

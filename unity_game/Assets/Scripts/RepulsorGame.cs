@@ -438,21 +438,8 @@ namespace Repulsor
         {
             Blast blast = Instantiate(blastPrefab, transform);
             int style = Legacy ? 0 : CometStyle;
-            blast.Launch(this, position, direction, charge, style == 1 ? 0.75f : style == 2 ? 1.35f : 1f, style == 1 ? 1.2f : 1f);
-            if (style == 1)
-                blast.TailScale = 1.9f;
-            else if (style == 2)
-            {
-                blast.TailScale = 0.45f;
-                Bubble shell = Bubble.Create("Shell", blast.Head);
-                shell.transform.localScale = Vector3.one * 1.4f;
-                shell.Show(WeaponColor, BubbleStyle.Energy, 0.8f);
-            }
-            else if (style == 3)
-            {
-                blast.TailScale = 1.3f;
-                BallLook.ApplyTech(blast.Head, WeaponColor);
-            }
+            blast.Launch(this, position, direction, charge, CometSize(style), CometSpeed(style));
+            DressComet(blast, style, WeaponColor);
             blast.Aoe = Legacy ? 0f : RepulsorAoe;
             blast.Color = WeaponColor;
             if (WeaponColor != DefaultWeaponColor)
@@ -463,9 +450,36 @@ namespace Repulsor
             if (!Legacy)
                 Dress?.Invoke(blast);
             PlayAt(position, zap);
-            BlastFired?.Invoke(position, direction, 1f, 1f, WeaponColor);
+            FiringComet = true;
+            BlastFired?.Invoke(position, direction, CometSize(style), CometSpeed(style), WeaponColor);
+            FiringComet = false;
             shots++;
             Debug.Log($"[Repulsor] Fired shot {shots}, charge {charge:0.00}");
+        }
+
+        /// <summary>True while <see cref="BlastFired"/> is telling of a repulsor (comet) shot, in <see cref="CometStyle"/>.</summary>
+        public bool FiringComet { get; private set; }
+
+        public static float CometSize(int style) => style == 1 ? 0.75f : style == 2 ? 1.35f : 1f;
+        public static float CometSpeed(int style) => style == 1 ? 1.2f : 1f;
+
+        /// <summary>A repulsor shot's look for a comet style (also for drawing the other player's shots).</summary>
+        public static void DressComet(Blast blast, int style, Color color)
+        {
+            if (style == 1)
+                blast.TailScale = 1.9f;
+            else if (style == 2)
+            {
+                blast.TailScale = 0.45f;
+                Bubble shell = Bubble.Create("Shell", blast.Head);
+                shell.transform.localScale = Vector3.one * 1.4f;
+                shell.Show(color, BubbleStyle.Energy, 0.8f);
+            }
+            else if (style == 3)
+            {
+                blast.TailScale = 1.3f;
+                BallLook.ApplyTech(blast.Head, color);
+            }
         }
 
         public void FireShockwave(Vector3 position, Vector3 direction, float charge)
@@ -593,6 +607,9 @@ namespace Repulsor
         /// <summary>Applies one hit: damage, then the explosion if it finished the target off.</summary>
         public void Strike(IHittable target, float damage, Vector3 from, string weapon, bool scaled = true)
         {
+            // The other player's attacks are replayed here with no damage (their headset deals it): no hit at all.
+            if (damage <= 0f && !Legacy)
+                return;
             if (Legacy)
                 damage = float.MaxValue;
             else if (scaled)

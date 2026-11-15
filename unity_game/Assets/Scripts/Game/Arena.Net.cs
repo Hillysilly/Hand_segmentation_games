@@ -45,6 +45,32 @@ namespace Repulsor
         /// <summary>The nearest player's chest, for aiming at bodies rather than heads.</summary>
         public Vector3 NearestPlayerChest(Vector3 from) => NearestPlayerHead(from) + Vector3.down * 0.3f;
 
+        /// <summary>Your own head (for things each headset checks against its own player, like a boss's sweep).</summary>
+        public Vector3 LocalHead => head.position;
+
+        /// <summary>A boss began a move (host): the client plays the same move on its copy.</summary>
+        public void SendEnemyMove(Enemy enemy, byte move, Vector3 a, Vector3 b, float f, bool aIsDirection)
+        {
+            if (!Multiplayer || !net.Connected || net.Role != NetRole.Host || enemy == null)
+                return;
+            net.SendEnemyMove(new EnemyMoveEvent
+            {
+                Id = enemy.Id,
+                Move = move,
+                A = aIsDirection ? frame.DirectionToShared(a) : frame.ToShared(a),
+                B = frame.ToShared(b),
+                F = f,
+            });
+        }
+
+        void OnEnemyMove(EnemyMoveEvent e)
+        {
+            if (phase != Phase.Playing || !proxies.TryGetValue(e.Id, out Enemy proxy) || proxy == null || proxy.Mech == null)
+                return;
+            bool aIsDirection = e.Move == MechBrain.SwingMove;
+            proxy.Mech.Replay(e.Move, aIsDirection ? frame.DirectionToWorld(e.A) : frame.ToWorld(e.A), frame.ToWorld(e.B), e.F);
+        }
+
         public Vector3 NearestPlayerHead(Vector3 from)
         {
             Vector3 mine = head.position;
@@ -196,6 +222,10 @@ namespace Repulsor
                 snapshot.HeadRotation = frame.ToWorld(snapshot.HeadRotation);
                 snapshot.LeftPalm = frame.ToWorld(snapshot.LeftPalm);
                 snapshot.RightPalm = frame.ToWorld(snapshot.RightPalm);
+                snapshot.LeftBeamFrom = frame.ToWorld(snapshot.LeftBeamFrom);
+                snapshot.LeftBeamTo = frame.ToWorld(snapshot.LeftBeamTo);
+                snapshot.RightBeamFrom = frame.ToWorld(snapshot.RightBeamFrom);
+                snapshot.RightBeamTo = frame.ToWorld(snapshot.RightBeamTo);
                 remote.Receive(snapshot);
             };
             net.LobbyReceived += state =>
@@ -235,12 +265,17 @@ namespace Repulsor
             net.ShotReceived += shot =>
             {
                 replayingShot = true;
-                game.FireBlast(frame.ToWorld(shot.Origin), frame.DirectionToWorld(shot.Direction), 1f, shot.Size, shot.Speed,
+                Vector3 origin = frame.ToWorld(shot.Origin);
+                Blast blast = game.FireBlast(origin, frame.DirectionToWorld(shot.Direction), 1f, shot.Size, shot.Speed,
                     0f, 0f, shot.Color);
+                DressReplayedShot(blast, origin, shot.Look, shot.Style, shot.Color);
                 replayingShot = false;
             };
+            net.EffectReceived += ReplayEffect;
+            net.EnemyMoveReceived += OnEnemyMove;
             game.BlastFired += (origin, direction, size, speed, color) =>
             {
+                (ShotLook look, byte style) = TakeShotLook();
                 if (replayingShot || !Multiplayer || !net.Connected)
                     return;
                 net.SendShot(new ShotEvent
@@ -251,6 +286,8 @@ namespace Repulsor
                     Size = size,
                     Speed = speed,
                     Color = color,
+                    Look = look,
+                    Style = style,
                 });
             };
         }
@@ -262,8 +299,16 @@ namespace Repulsor
             net.Poll(dt);
             if (net.Connected)
             {
+                HandBeam leftBeam = BeamOf(0, out Vector3 leftFrom, out Vector3 leftTo);
+                HandBeam rightBeam = BeamOf(1, out Vector3 rightFrom, out Vector3 rightTo);
                 net.SendPlayer(new PlayerSnapshot
                 {
+                    LeftBeam = (byte)leftBeam,
+                    LeftBeamFrom = frame.ToShared(leftFrom),
+                    LeftBeamTo = frame.ToShared(leftTo),
+                    RightBeam = (byte)rightBeam,
+                    RightBeamFrom = frame.ToShared(rightFrom),
+                    RightBeamTo = frame.ToShared(rightTo),
                     Slot = net.Slot,
                     Head = frame.ToShared(head.position),
                     HeadRotation = frame.ToShared(head.rotation),
@@ -292,7 +337,9 @@ namespace Repulsor
                     SendLobby();
                 }
             }
+            remote.FloorY = FloorY;
             remote.Tick(dt);
+            TickRemoteLooks(dt);
             if (phase == Phase.Playing && Multiplayer && remote.Visible)
             {
                 PlayerSnapshot partner = remote.Latest;

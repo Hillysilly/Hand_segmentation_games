@@ -142,9 +142,26 @@ namespace Repulsor
             Tint.Apply(holder.gameObject, color);
         }
 
+        int shownFrame = -10;
+
+        /// <summary>Whether it struck this frame or the last, and its first bolt (for the other headset).</summary>
+        public bool ShownNow => Time.frameCount - shownFrame <= 1;
+        public Vector3 ShownFrom { get; private set; }
+        public Vector3 ShownTo { get; private set; }
+
+        /// <summary>Draws one bolt from here to there, hitting nothing (the other player's lightning).</summary>
+        public void ShowBolt(Vector3 from, Vector3 to)
+        {
+            Draw(0, from, to);
+            for (int i = 1; i < Links; i++)
+                lines[i].enabled = false;
+        }
+
         /// <summary>Strikes for this frame. Returns how many enemies it touched.</summary>
         public int Strike(RepulsorGame game, Vector3 from, Vector3 direction, float damagePerSecond, float dt)
         {
+            shownFrame = Time.frameCount;
+            ShownFrom = from;
             chain.Clear();
             IHittable first = Aim.Target(from, direction, ConeDegrees, Reach);
             Vector3 start = from;
@@ -152,6 +169,7 @@ namespace Repulsor
             {
                 // Crackles into the air ahead.
                 Vector3 end = from + Quaternion.Euler(Random.Range(-15f, 15f), Random.Range(-15f, 15f), 0f) * direction * Random.Range(0.6f, 1.4f);
+                ShownTo = end;
                 Draw(0, start, end);
                 for (int i = 1; i < Links; i++)
                     lines[i].enabled = false;
@@ -186,6 +204,8 @@ namespace Repulsor
                     continue;
                 }
                 Vector3 end = HitTest.Nearest(chain[i], start);
+                if (i == 0)
+                    ShownTo = end;
                 Draw(i, start, end);
                 start = end;
             }

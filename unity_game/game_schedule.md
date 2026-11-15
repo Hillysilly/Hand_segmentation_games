@@ -294,8 +294,8 @@ Sketchfab needs a login to download. If you grab G1 as glTF into `assets/models/
 |---|---|---|---|---|
 | LAN room code + join | ✅ | ✅ | | UDP. The host shows its IP; the joiner types it (or the 4-digit code, which only works when both addresses share their first three numbers). Last address remembered |
 | Colocation | ✅ manual | | | both touch the same 2 real points; shared anchors not tried |
-| Player sync (pose, aura, shield, attacks) | ✅ | | | HP bar, level, shield, powerup glow, an aura stand-in (body shell), head and palm markers, blasts |
-| Co-op PVE | ✅ | ✅ both sides on PC | | host runs enemies and waves, client sees copies and its hits count; ends when both are out. PC tests: the game as host with a test client, and as client with a test host; enemies, hits and start all go through |
+| Player sync (pose, aura, shield, attacks) | ✅ | | | HP bar, level, body-sized shield, powerup glow, their real aura and wind/stone aura, head and palm markers; every shot in its look (ki ball, arrow, bolt, rock, web, comet), held attacks (laser, flames, blades, lightning), dragon fist, fire pillar, gust, tornado, rock spikes, snap explosions, smoke. Not shown: bow/crossbow in hand, their level 3 hand aura, thrown furniture |
+| Co-op PVE | ✅ | ✅ both sides on PC | | GOLIATH (11/15): the host tells the client each move; the client plays it on its copy and checks its own player (swing, slam, shockwave). | host runs enemies and waves, client sees copies and its hits count; ends when both are out. PC tests: the game as host with a test client, and as client with a test host; enemies, hits and start all go through |
 | PVP (best of 3, friendly fire toggle) | ✅ | ✅ host side on PC | | victim's headset applies hits; levels reset each round; co-op friendly fire toggle in pause |
 
 ### Submission

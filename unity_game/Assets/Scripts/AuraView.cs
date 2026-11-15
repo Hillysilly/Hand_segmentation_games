@@ -46,6 +46,9 @@ namespace Repulsor
 
         public void UseSuits(SuitView suitView) => suits = suitView;
 
+        /// <summary>A style's own object (null for suits or out of range), to copy for the other player's aura.</summary>
+        public GameObject StyleObject(int index) => index >= 0 && index < styles.Length ? styles[index] : null;
+
         /// <summary>Colours every style, and remembers the colour for next time if asked to.</summary>
         public void SetTint(Color tint, bool remember)
         {

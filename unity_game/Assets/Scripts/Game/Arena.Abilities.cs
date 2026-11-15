@@ -193,6 +193,7 @@ namespace Repulsor
                     direction = Aim.Assist(kiCharge.Center, direction);
                     Vector3 from = kiCharge.Center + direction * 0.15f;
                     float size = Mathf.Lerp(BallMinSize, BallMaxSize, power);
+                    NextShot(ShotLook.KiBall, PickedBall);
                     Blast ball = game.FireBlast(from, direction, 1f, size, Mathf.Lerp(0.8f, 0.55f, power),
                         player.Outgoing(12f + 18f * power), 0.6f + 0.6f * power);
                     DecorateBall(ball.Head, PickedBall, AttackColor);
@@ -208,6 +209,7 @@ namespace Repulsor
                     if (kiPunch[i].Step(hand, body, dt, out Vector3 origin, out Vector3 punch))
                     {
                         IHittable locked = DragonFist.Launch(game, PickedDragon, origin + punch * 0.1f, punch, player.Outgoing(10f));
+                        SendEffect(NetEffect.DragonFist, origin + punch * 0.1f, punch, 0f, AttackColor, PickedDragon);
                         Log($"Dragon fist at {hand.Velocity.magnitude:0.0} m/s, {(locked != null ? $"locked on {Vector3.Angle(punch, locked.Center - origin):0} deg off" : "nothing to lock on")}");
                     }
                 }
@@ -282,6 +284,7 @@ namespace Repulsor
         {
             if (player.Level >= 2 && bow.Step(input.Left, input.Right, body, dt, out Vector3 from, out Vector3 aim, out float draw))
             {
+                NextShot(ShotLook.Arrow);
                 Blast arrow = game.FireBlast(from + aim * 0.1f, aim, 0.3f, 0.4f, Mathf.Lerp(1.2f, 2.2f, draw), player.Outgoing(6f + 10f * draw), 0f);
                 arrow.Pierce = player.Level >= 3;
                 ArcherGear.Dress(arrow, "Arrow", AttackColor);
@@ -307,6 +310,7 @@ namespace Repulsor
                     {
                         smokeReady = matchTime + SmokeCooldown;
                         SmokeCloud.Throw(from2, velocity, foes);
+                        SendEffect(NetEffect.Smoke, from2, velocity.normalized, velocity.magnitude);
                         Log("Smoke bomb");
                     }
                 }
@@ -319,6 +323,7 @@ namespace Repulsor
                 if (TickGun(i, hand, dt, out Vector3 origin, out Vector3 direction) && reload[i] <= 0f)
                 {
                     reload[i] = CrossbowReload;
+                    NextShot(ShotLook.Bolt);
                     Blast bolt = game.FireBlast(origin, direction, 0.4f, 0.5f, 2f, player.Outgoing(7f), 0f);
                     ArcherGear.Dress(bolt, "Bolt", AttackColor);
                 }
@@ -336,6 +341,7 @@ namespace Repulsor
                 handsBusyFor = 0.8f;
                 game.Explode(target + Vector3.up * 0.6f, 1.1f, player.Outgoing(25f), AttackColor);
                 FirePillar.Spawn(target, AttackColor, PickedPillar, foes);
+                SendEffect(NetEffect.FirePillar, target, Vector3.up, 0f, AttackColor, PickedPillar);
                 Log($"Fire pillar {Vector3.Distance(Flat(head.position), Flat(target)):0.0} m away");
             }
             if (triangle.Aiming)
@@ -567,6 +573,7 @@ namespace Repulsor
                     LiftBox(box, i, color);
                     return;
                 }
+                NextShot(ShotLook.Web, black ? 1 : 0);
                 Blast shot = game.FireBlast(origin, aimed, 0.3f, 0.35f, 1.6f, player.Outgoing(black ? 7f : 5f), 0f, color);
                 WebStrand.Attach(shot, origin, black ? new Color(0.25f, 0.2f, 0.3f) : Color.white, foes);
             }
