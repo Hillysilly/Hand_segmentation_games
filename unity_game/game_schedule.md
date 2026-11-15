@@ -86,8 +86,9 @@ The APK is built; install it with `build_and_run.ps1 -NoBuild` when the headset 
     Body: The Morser 16 (B3), its blade arm swinging and gun arm aiming in code. Does the swing read as a swing?
 27. **Gunner back, brawler out** (11/15 pm): the laser-shooting robot is back from round 1 (it was removed by mistake;
     the yellow melee one is the brawler, now never sent). The boss's helpers are drones, gunners and dashers.
-28. **Fingers** (11/15 pm): the hand models' bones were off-centre in the fingers, so even straight gloves drew
-    curled 16-29 degrees. Each finger's bones now follow the curl that best fits its own mesh. Straighter now?
+28. **Hand aura** (11/15 pm, replacing the level 3 gloves): at level 3 every character's hands glow in its attack
+    colour, an outline plus flickering energy, your real hand visible through it, fading out at the wrist. It's
+    the XR Hands sample hand posed like yours, so the fingers should match. Does it lag or sit off your fingers?
 29. **Life-size select figure** (11/15 pm): the mannequin acting out each move stands life size on the floor to the
     right of the menu; the panel's box is now just the big hand sign. Is it in a sensible spot in your room?
 30. **Saber slash** (11/15 pm): a swing through an enemy deals 9-20 damage by blade speed (once per 0.35 s per

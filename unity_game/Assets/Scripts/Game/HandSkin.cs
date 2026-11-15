@@ -4,10 +4,10 @@ using UnityEngine;
 namespace Repulsor
 {
     /// <summary>
-    /// A character's hand model worn over a tracked hand: gauntlets, gloves. Every model is fitted (in the editor, see
-    /// HandSkins) onto the XR Hands sample hand's skeleton, whose bones are named after the game's <see cref="Joint"/>s;
-    /// each frame the bones are turned to point where your tracked joints point, so the fingers bend with yours.
-    /// Bone lengths stay the model's; the whole hand is scaled to the size of yours.
+    /// A hand model posed like a tracked hand (the level 3 aura is the XR Hands sample hand, drawn glowing). The model
+    /// uses the XR Hands sample skeleton, whose bones are named after the game's <see cref="Joint"/>s; each frame the
+    /// bones are turned to point where your tracked joints point, so the fingers bend with yours. Bone lengths stay
+    /// the model's; the whole hand is scaled to the size of yours.
     /// </summary>
     public sealed class HandSkin
     {

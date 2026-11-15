@@ -220,7 +220,7 @@ namespace Repulsor
             Ui.Box(s, WellCentre, WellSize, Ui.Well);
             Ui.Label(s, "HAND SIGN", SignBoxCentre + new Vector2(-SignBoxSize.x * 0.5f + 44f, SignBoxSize.y * 0.5f - 11f), new Vector2(80f, 16f), 10,
                 TextAnchor.MiddleLeft, FontStyle.Bold).color = Ui.Muted;
-            Ui.Label(s, "WATCH THE MOVE ON YOUR RIGHT  >", SignBoxCentre + new Vector2(SignBoxSize.x * 0.5f - 84f, SignBoxSize.y * 0.5f - 11f), new Vector2(160f, 16f), 9,
+            Ui.Label(s, "WATCH THE MOVE ON YOUR RIGHT  >", SignBoxCentre + new Vector2(SignBoxSize.x * 0.5f - 99f, SignBoxSize.y * 0.5f - 11f), new Vector2(190f, 16f), 9,
                 TextAnchor.MiddleRight).color = Ui.Muted;
             signCaption = Ui.Label(s, "", SignBoxCentre - new Vector2(0f, SignBoxSize.y * 0.5f - 12f), new Vector2(SignBoxSize.x - 12f, 18f), 11,
                 TextAnchor.MiddleCenter, FontStyle.Bold);

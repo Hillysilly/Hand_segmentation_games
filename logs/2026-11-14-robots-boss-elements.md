@@ -278,3 +278,10 @@ EditMode 175/175, PlayMode 23/23. Installed.
   looping animation (93 s, started at a random time in game), `Repulsor/CloudModel` shader (its texture, unlit,
   see-through, edges fade side-on), alpha 0.5, scaled (1, 1.9, 1) x size. Previews Logs/preview_tornado_*.png.
   EditMode 175/175, PlayMode 23/23. Installed.
+- Gloves removed (the user: still don't look good). Deleted Resources/HandSkins, Characters/HandSkins (5 GLBs),
+  HandSkinBuilder/HandSkins/HandSkinViews/HandSkinCheck and their credits; APK 222 -> 193 MB. Level 3 now shows a
+  hand aura for every character (`Arena.HandAura.cs`): the XR sample hand (Showcase/Left|RightHand) driven by
+  `HandSkin`, drawn with `Repulsor/HandAura` (two additive shells pushed out 3 mm and 11 mm along normals: a
+  silhouette outline and rising value-noise flicker; fades out past the wrist via _WristPos/_WristFwd), tinted
+  AttackColor. Technoman's old ellipsoid hand glow is gone. Capture test `HandAuraCaptureTests` (Logs/play_aura_*).
+  Select screen hint label widened (its ">" wrapped). EditMode 175/175, PlayMode 23/23. Installed.
