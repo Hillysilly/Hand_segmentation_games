@@ -40,6 +40,9 @@ namespace Repulsor
         ShieldView shield;
         DeathView death;
         HurtFlash hurtFlash;
+        RoomLight roomLight;
+        float lightSampleIn;
+        float lightLogged = -1f;
         DamageNumbers damageNumbers;
         AudioClip enemyShotSound;
         AudioClip spawnSound;
@@ -73,6 +76,7 @@ namespace Repulsor
             shield = new ShieldView(transform) { Occlude = false };
             death = new DeathView(eye);
             hurtFlash = new HurtFlash(transform, head);
+            roomLight = new RoomLight(transform);
             damageNumbers = new DamageNumbers(transform, head);
             enemyShotSound = Sfx.EnemyShot();
             spawnSound = Sfx.Spawn();
@@ -162,6 +166,9 @@ namespace Repulsor
             death.Tick(playing && player.IsDead, dt);
             ShowBossBar();
             TrackStanding(dt);
+            TickRoomLight(Time.unscaledDeltaTime);
+            if (phase == Phase.Playing)
+                TickBuried(dt);
             hurtFlash.Tick(dt);
             damageNumbers.Tick(dt);
             TickGestureLab(dt);

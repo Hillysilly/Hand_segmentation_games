@@ -269,6 +269,7 @@ namespace Repulsor
         float age;
         bool landed;
         LineRenderer ring;
+        FloorMark mark;
         LaserBeamView beam;
 
         public static void Drop(Arena arena, Vector3 floorPoint, Transform parent)
@@ -295,13 +296,10 @@ namespace Repulsor
             if (age < Warning)
             {
                 float t = age / Warning;
-                float radius = Mathf.Lerp(Radius * 1.6f, Radius, t);
-                Tint.Line(ring, Color.Lerp(Red * 0.6f, new Color(1f, 0.6f, 0.4f), t * (0.7f + 0.3f * Mathf.Sin(age * 40f))));
-                for (int i = 0; i < 33; i++)
-                {
-                    float angle = i / 32f * Mathf.PI * 2f;
-                    ring.SetPosition(i, centre + new Vector3(Mathf.Cos(angle), 0.01f, Mathf.Sin(angle)) * radius);
-                }
+                float radius = Radius;
+                ring.enabled = false;
+                mark ??= new FloorMark(transform.parent, Red);
+                mark.Show(centre + Vector3.up * 0.01f, Vector3.forward, Radius, 180f, t);
                 if (arena != null && arena.PlayerStandsWithin(centre, radius))
                     arena.WarnPlayer(Mathf.Lerp(0.2f, 0.45f, t));
                 return;
@@ -310,6 +308,7 @@ namespace Repulsor
             {
                 landed = true;
                 ring.enabled = false;
+                mark?.Hide();
                 if (arena != null)
                 {
                     beam = arena.Game.MakeLaserBeam(transform, Red);
@@ -322,7 +321,10 @@ namespace Repulsor
             if (age < Warning + 0.25f)
                 beam?.Aim(centre + Vector3.up * 3f, centre, true, Vector3.up);
             if (age > Warning + 0.7f)
+            {
+                mark?.Destroy();
                 Destroy(gameObject);
+            }
         }
     }
 }

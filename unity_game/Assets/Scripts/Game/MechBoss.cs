@@ -47,7 +47,7 @@ namespace Repulsor
         bool summoned;
         bool justSwung;
         Vector3 jumpFrom, jumpTo;
-        LineRenderer marker;
+        FloorMark marker;
         readonly List<Shock> waves = new List<Shock>();
 
         sealed class Shock
@@ -268,10 +268,11 @@ namespace Repulsor
         // ------------------------------------------------------------------ swing
 
         Vector3 swingFacing;
+        float windUp = SwingWindUp;
 
         void StartSwing()
         {
-            timer = SwingWindUp * (Enraged ? 0.8f : 1f);
+            timer = windUp = SwingWindUp * (Enraged ? 0.8f : 1f);
             Vector3 target = arena.NearestPlayerHead(body.Center);
             swingFacing = Vector3.ProjectOnPlane(target - body.Center, Vector3.up).normalized;
             if (swingFacing.sqrMagnitude < 0.5f)
@@ -290,8 +291,8 @@ namespace Repulsor
             body.Face(body.Center + swingFacing, dt, 6f);
             if (timer > 0f)
             {
-                float t = 1f - timer / SwingWindUp;
-                DrawSector(Floor(body.Center), swingFacing, SwingReach, SwingDegrees, 0.6f + 0.4f * Mathf.Sin(t * 40f) * t);
+                float t = Mathf.Clamp01(1f - timer / windUp);
+                Mark(Floor(body.Center), swingFacing, SwingReach, SwingDegrees * 0.5f, t);
                 if (InSwing(target))
                     arena.WarnPlayer(Mathf.Lerp(0.25f, 0.5f, t));
                 return;
@@ -313,7 +314,7 @@ namespace Repulsor
             if (count < swings && distance < SwingReach + 0.5f)
             {
                 StartSwing();
-                timer *= 0.75f;
+                timer = windUp = windUp * 0.75f;
                 return;
             }
             RestThen(Move.Approach);
@@ -325,25 +326,20 @@ namespace Repulsor
             return flat.magnitude < SwingReach + 0.2f && Vector3.Angle(flat, swingFacing) < SwingDegrees * 0.5f + 8f;
         }
 
-        /// <summary>A bright arc swept through the air at chest height: the arm going round.</summary>
+        /// <summary>The blade's sweep: two wide soft arcs at chest and waist height that fade out behind it.</summary>
         void SweepTrail(Vector3 facing)
         {
-            var go = new GameObject("Mech Swing", typeof(LineRenderer));
-            go.transform.SetParent(body.transform.parent, false);
-            var line = go.GetComponent<LineRenderer>();
-            line.sharedMaterial = Resources.Load<Material>("AimLine");
-            line.positionCount = 24;
-            line.useWorldSpace = true;
-            line.widthMultiplier = 0.18f;
-            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            Tint.Line(line, new Color(1f, 0.6f, 0.3f));
-            Vector3 centre = body.Center + Vector3.up * 0.2f;
-            for (int i = 0; i < 24; i++)
+            for (int layer = 0; layer < 2; layer++)
             {
-                float a = Mathf.Lerp(-SwingDegrees * 0.5f, SwingDegrees * 0.5f, i / 23f);
-                line.SetPosition(i, centre + Quaternion.AngleAxis(a, Vector3.up) * facing * (SwingReach * 0.85f));
+                LineRenderer line = LineFade.Make("Mech Swing", body.transform.parent,
+                    layer == 0 ? new Color(1f, 0.75f, 0.45f, 0.85f) : new Color(1f, 0.4f, 0.15f, 0.55f), layer == 0 ? 0.3f : 0.5f, 28, 0.3f);
+                Vector3 centre = body.Center + Vector3.up * (layer == 0 ? 0.1f : -0.25f);
+                for (int i = 0; i < 28; i++)
+                {
+                    float a = Mathf.Lerp(-SwingDegrees * 0.5f, SwingDegrees * 0.5f, i / 27f);
+                    line.SetPosition(i, centre + Quaternion.AngleAxis(a, Vector3.up) * facing * (SwingReach * (layer == 0 ? 0.9f : 0.75f)));
+                }
             }
-            Object.Destroy(go, 0.18f);
         }
 
         // ------------------------------------------------------------------ arm lasers
@@ -411,7 +407,7 @@ namespace Repulsor
                 // Crouching: it sinks a little and the landing ring appears.
                 body.Face(jumpTo, dt, 4f);
                 body.transform.position = new Vector3(jumpFrom.x, FloorY + middle - 0.25f * (1f - timer / CrouchSeconds), jumpFrom.z);
-                DrawRing(land, SlamRadius * 1.4f);
+                Mark(land, Vector3.forward, SlamRadius, 180f, (1f - timer / CrouchSeconds) * CrouchSeconds / (CrouchSeconds + AirSeconds));
                 WarnIfInside(target, land, 0.25f);
                 return;
             }
@@ -428,7 +424,7 @@ namespace Repulsor
                 float height = 4f * JumpHeight * t * (1f - t);
                 body.transform.position = new Vector3(flat.x, FloorY + middle + height, flat.z);
                 body.Face(jumpTo + (jumpTo - jumpFrom), dt, 4f);
-                DrawRing(land, Mathf.Lerp(SlamRadius * 1.4f, SlamRadius, t));
+                Mark(land, Vector3.forward, SlamRadius, 180f, (CrouchSeconds + t * AirSeconds) / (CrouchSeconds + AirSeconds));
                 WarnIfInside(target, land, Mathf.Lerp(0.3f, 0.55f, t));
                 return;
             }
@@ -436,6 +432,7 @@ namespace Repulsor
             body.transform.position = new Vector3(jumpTo.x, FloorY + middle, jumpTo.z);
             ShowMarker(false);
             arena.Game.Explode(land + Vector3.up * 0.2f, 0f, 0f, new Color(1f, 0.5f, 0.2f));
+            TransformWave.SpawnRing(land + Vector3.up * 0.05f, new Color(1f, 0.6f, 0.3f), body.transform.parent);
             arena.Game.PlayAt(land, arena.Game.BoomSound);
             if (arena.PlayerStandsWithin(land, SlamRadius))
             {
@@ -465,7 +462,7 @@ namespace Repulsor
             shock.Line.positionCount = 49;
             shock.Line.loop = true;
             shock.Line.useWorldSpace = true;
-            shock.Line.widthMultiplier = 0.14f;
+            shock.Line.widthMultiplier = 0.2f;
             shock.Line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             shock.Disc = Bubble.Create("Shockwave Disc", body.transform.parent);
             shock.Disc.transform.position = centre;
@@ -482,6 +479,7 @@ namespace Repulsor
                 w.Radius += WaveSpeed * dt;
                 float fade = Mathf.Clamp01((WaveRange - w.Radius) / 1.2f);
                 Tint.Line(w.Line, new Color(1f, 0.55f, 0.2f) * (0.5f + fade));
+                w.Line.widthMultiplier = Mathf.Lerp(0.06f, 0.22f, fade);
                 for (int k = 0; k < 49; k++)
                 {
                     float a = k / 48f * Mathf.PI * 2f;
@@ -512,58 +510,24 @@ namespace Repulsor
             }
         }
 
-        // ------------------------------------------------------------------ floor markers
+        // ------------------------------------------------------------------ floor warnings
 
         void ShowMarker(bool on)
         {
-            if (marker == null)
-            {
-                if (!on)
-                    return;
-                var go = new GameObject("Mech Marker", typeof(LineRenderer));
-                go.transform.SetParent(body.transform.parent, false);
-                marker = go.GetComponent<LineRenderer>();
-                marker.sharedMaterial = Resources.Load<Material>("AimLine");
-                marker.useWorldSpace = true;
-                marker.widthMultiplier = 0.035f;
-                marker.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                Tint.Line(marker, Red);
-            }
-            marker.enabled = on;
+            if (!on)
+                marker?.Hide();
         }
 
-        void DrawRing(Vector3 centre, float radius)
+        /// <summary>Where an attack will land: a disc or fan on the floor that fills as the attack comes.</summary>
+        void Mark(Vector3 centre, Vector3 facing, float radius, float halfArc, float fill)
         {
-            ShowMarker(true);
-            marker.loop = true;
-            marker.positionCount = 33;
-            for (int i = 0; i < 33; i++)
-            {
-                float a = i / 32f * Mathf.PI * 2f;
-                marker.SetPosition(i, centre + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * radius);
-            }
-        }
-
-        /// <summary>The swing's reach: a fan on the floor in front of it.</summary>
-        void DrawSector(Vector3 centre, Vector3 facing, float radius, float degrees, float brightness)
-        {
-            ShowMarker(true);
-            marker.loop = true;
-            const int Arc = 20;
-            marker.positionCount = Arc + 2;
-            marker.SetPosition(0, centre);
-            for (int i = 0; i <= Arc; i++)
-            {
-                float a = Mathf.Lerp(-degrees * 0.5f, degrees * 0.5f, i / (float)Arc);
-                marker.SetPosition(i + 1, centre + Quaternion.AngleAxis(a, Vector3.up) * facing * radius);
-            }
-            Tint.Line(marker, Red * brightness);
+            marker ??= new FloorMark(body.transform.parent, Red);
+            marker.Show(centre, facing, radius, halfArc, fill);
         }
 
         public void Stop()
         {
-            if (marker != null)
-                Object.Destroy(marker.gameObject);
+            marker?.Destroy();
             foreach (Shock w in waves)
             {
                 if (w.Line != null)

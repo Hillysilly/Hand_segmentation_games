@@ -37,7 +37,7 @@ namespace Repulsor
             look.renderers = go.GetComponentsInChildren<Renderer>();
             look.animation = go.GetComponentInChildren<Animation>();
             look.flashBlock = new MaterialPropertyBlock();
-            look.flashBlock.SetColor(BaseColorId, new Color(3f, 3f, 3f, 1f));
+            look.flashBlock.SetColor(BaseColorId, new Color(1.7f, 1.7f, 1.7f, 1f));
             look.plainBlock = new MaterialPropertyBlock();
             foreach (EnemyEye eye in go.GetComponentsInChildren<EnemyEye>())
             {

@@ -12,6 +12,14 @@ namespace Repulsor
     ///    where they hit something standing (a wall, a sofa) as blocked. It runs all through a match and on the
     ///    SCAN ROOM screen, so the map fills in as you look around. It needs no Space Setup.
     /// Spawn points are open floor with room around them, as far from the players as possible.
+    ///
+    /// Keeping enemies out of walls (11/15). A spawn spot has to pass, in order of strictness:
+    /// - strict: the floor itself was seen there (a depth ray landed on it), every cell within the enemy's radius
+    ///   plus 25 cm was seen open and nothing solid was seen in them, the spot connects to a player across open
+    ///   floor, and the straight line to the nearest player crosses nothing solid (so it can walk in, and be shot);
+    /// - relaxed (small rooms, when strict finds nothing): clearance of just the enemy's radius, no floor-seen or
+    ///   line rule, and it may appear closer.
+    /// Enemies also can't walk, dash or be pushed into cells seen solid, or off Space Setup's floor (see Walled).
     /// Lines tagged [Room] go to the headset log.
     /// </summary>
     public sealed class RoomMap
@@ -23,6 +31,10 @@ namespace Repulsor
 
         readonly byte[] open = new byte[Size * Size];
         readonly byte[] blocked = new byte[Size * Size];
+        /// <summary>Cells where a depth ray landed on the floor itself: the strongest sign a robot can stand there.</summary>
+        readonly byte[] floorSeen = new byte[Size * Size];
+        readonly byte[] reach = new byte[Size * Size];
+        readonly Queue<int> frontier = new Queue<int>();
         readonly List<Vector2> floorOutline = new List<Vector2>();
         readonly List<Vector3> candidates = new List<Vector3>();
         int nextRay;
@@ -52,6 +64,7 @@ namespace Repulsor
         {
             System.Array.Clear(open, 0, open.Length);
             System.Array.Clear(blocked, 0, blocked.Length);
+            System.Array.Clear(floorSeen, 0, floorSeen.Length);
             openCells = 0;
         }
 
@@ -67,9 +80,11 @@ namespace Repulsor
             flat.Normalize();
             for (int i = 0; i < RaysPerFrame; i++)
             {
+                // Each ray is jittered inside its slot of the fan, so over time the floor is sampled everywhere
+                // rather than along fixed rings.
                 int ray = nextRay++ % 48;
-                float yaw = Mathf.Lerp(-45f, 45f, (ray % 8) / 7f);
-                float pitch = Mathf.Lerp(8f, 60f, (ray / 8) / 5f);
+                float yaw = Mathf.Lerp(-45f, 45f, ((ray % 8) + Random.value - 0.5f) / 7f);
+                float pitch = Mathf.Lerp(8f, 60f, Mathf.Clamp01(((ray / 8) + Random.value - 0.5f) / 5f));
                 Vector3 direction = Quaternion.AngleAxis(yaw, Vector3.up) * Quaternion.AngleAxis(pitch, Vector3.Cross(Vector3.up, flat)) * flat;
                 // Start a little out so your own hands and arms don't count as walls.
                 Vector3 start = head + direction * 0.4f;
@@ -82,7 +97,7 @@ namespace Repulsor
                 for (float along = 0.3f; along < clearTo; along += Cell * 0.7f)
                     MarkOpen(start + direction * along);
                 if (floorHit)
-                    MarkOpen(hit);
+                    MarkFloor(hit);
                 else if (hit.y < floorY + 2.2f)
                     MarkBlocked(hit);
             }
@@ -97,6 +112,54 @@ namespace Repulsor
                 openCells++;
             if (open[i] < 250)
                 open[i]++;
+        }
+
+        /// <summary>The floor was seen here: open, and it outweighs an earlier solid sighting (someone walked by).</summary>
+        void MarkFloor(Vector3 point)
+        {
+            MarkOpen(point);
+            if (!ToCell(point, out int x, out int z))
+                return;
+            int i = Index(x, z);
+            if (floorSeen[i] < 250)
+                floorSeen[i]++;
+            if (blocked[i] >= 2)
+                blocked[i] -= 2;
+        }
+
+        /// <summary>For tests: marks a square of floor as seen (open, floor seen) or a cell as solid.</summary>
+        public void TestMarkFloor(Vector3 centre, float half)
+        {
+            for (float x = -half; x <= half; x += Cell * 0.5f)
+                for (float z = -half; z <= half; z += Cell * 0.5f)
+                {
+                    MarkFloor(centre + new Vector3(x, 0f, z));
+                    MarkFloor(centre + new Vector3(x, 0f, z));
+                }
+        }
+
+        public void TestMarkSolid(Vector3 point)
+        {
+            for (int i = 0; i < 4; i++)
+                MarkBlocked(point);
+        }
+
+        /// <summary>Something solid was seen in this cell more than open floor was: a wall, a sofa.</summary>
+        bool Solid(int i) => blocked[i] >= 4 && blocked[i] > open[i];
+
+        /// <summary>
+        /// A robot shouldn't be here: the scan saw something solid in this cell, or (with Space Setup) it's off the
+        /// floor outline. Unknown cells count as fine, so a thin map never freezes anyone.
+        /// </summary>
+        public bool Walled(Vector3 point, float margin = 0.1f)
+        {
+            if (HasFloorOutline)
+            {
+                var p = new Vector2(point.x, point.z);
+                if (!Inside(p) || EdgeDistance(p) < margin)
+                    return true;
+            }
+            return ToCell(point, out int x, out int z) && Solid(Index(x, z));
         }
 
         void MarkBlocked(Vector3 point)
@@ -145,36 +208,64 @@ namespace Repulsor
         }
 
         /// <summary>
-        /// The best place for an enemy to appear: open floor with clearance, outside furniture, far from every player
-        /// and from other enemies, between <paramref name="minDistance"/> and <paramref name="maxDistance"/> away.
+        /// The best place for an enemy of this <paramref name="radius"/> to appear: open floor with clearance, outside
+        /// furniture, far from every player and from other enemies, between <paramref name="minDistance"/> and
+        /// <paramref name="maxDistance"/> away. Strict rules first, relaxed ones if they find nothing (small rooms).
         /// False if the map knows too little yet.
         /// </summary>
         public bool TryPick(IReadOnlyList<Vector3> players, IReadOnlyList<Vector3> others, float minDistance, float maxDistance,
-            System.Func<Vector3, bool> insideFurniture, out Vector3 point, out string source)
+            System.Func<Vector3, bool> insideFurniture, float radius, out Vector3 point, out string source)
         {
-            candidates.Clear();
-            float floorY = players.Count > 0 ? 0f : 0f;
-            if (HasFloorOutline)
+            for (int tier = 0; tier < 2; tier++)
             {
-                source = "Space Setup floor";
-                // Random points inside the floor outline, kept 0.4 m off its edges.
-                Bounds bounds = OutlineBounds();
-                for (int i = 0; i < 160 && candidates.Count < 60; i++)
+                bool strict = tier == 0;
+                Gather(players, radius, strict);
+                float min = strict ? minDistance : Mathf.Max(1.2f, minDistance * 0.6f);
+                if (Best(players, others, min, maxDistance, insideFurniture, strict, out point))
                 {
-                    var p = new Vector2(Random.Range(bounds.min.x, bounds.max.x), Random.Range(bounds.min.z, bounds.max.z));
-                    if (Inside(p) && EdgeDistance(p) > 0.4f)
-                        candidates.Add(new Vector3(p.x, floorOutlineY, p.y));
+                    source = (HasFloorOutline ? "Space Setup floor" : "depth scan") + (strict ? "" : ", tight room");
+                    return true;
                 }
             }
-            else
-            {
-                source = "depth scan";
-                for (int z = 1; z < Size - 1; z++)
-                    for (int x = 1; x < Size - 1; x++)
-                        if (Clear(x, z))
-                            candidates.Add(CellCentre(x, z, 0f) + new Vector3(Random.Range(-0.08f, 0.08f), 0f, Random.Range(-0.08f, 0.08f)));
-            }
+            point = Vector3.zero;
+            source = "none";
+            return false;
+        }
 
+        void Gather(IReadOnlyList<Vector3> players, float radius, bool strict)
+        {
+            candidates.Clear();
+            if (HasFloorOutline)
+            {
+                // Random points inside the floor outline, kept off its edges by the enemy's size.
+                float margin = strict ? radius + 0.25f : Mathf.Max(0.2f, radius * 0.6f);
+                Bounds bounds = OutlineBounds();
+                for (int i = 0; i < 200 && candidates.Count < 70; i++)
+                {
+                    var p = new Vector2(Random.Range(bounds.min.x, bounds.max.x), Random.Range(bounds.min.z, bounds.max.z));
+                    if (Inside(p) && EdgeDistance(p) > margin)
+                        candidates.Add(new Vector3(p.x, floorOutlineY, p.y));
+                }
+                return;
+            }
+            float clearance = strict ? radius + 0.25f : radius;
+            int cells = Mathf.Max(1, Mathf.CeilToInt(clearance / Cell));
+            if (strict)
+                FloodFrom(players);
+            for (int z = cells; z < Size - cells; z++)
+                for (int x = cells; x < Size - cells; x++)
+                {
+                    if (!Clear(x, z, cells, strict))
+                        continue;
+                    if (strict && reach[Index(x, z)] == 0)
+                        continue;
+                    candidates.Add(CellCentre(x, z, 0f) + new Vector3(Random.Range(-0.08f, 0.08f), 0f, Random.Range(-0.08f, 0.08f)));
+                }
+        }
+
+        bool Best(IReadOnlyList<Vector3> players, IReadOnlyList<Vector3> others, float minDistance, float maxDistance,
+            System.Func<Vector3, bool> insideFurniture, bool strict, out Vector3 point)
+        {
             point = Vector3.zero;
             float best = float.MinValue;
             foreach (Vector3 candidate in candidates)
@@ -182,8 +273,16 @@ namespace Repulsor
                 if (insideFurniture != null && insideFurniture(candidate))
                     continue;
                 float nearest = float.MaxValue;
+                Vector3 nearestPlayer = candidate;
                 foreach (Vector3 player in players)
-                    nearest = Mathf.Min(nearest, Flat(candidate - player));
+                {
+                    float d = Flat(candidate - player);
+                    if (d < nearest)
+                    {
+                        nearest = d;
+                        nearestPlayer = player;
+                    }
+                }
                 if (nearest < minDistance || nearest > maxDistance)
                     continue;
                 float crowd = float.MaxValue;
@@ -193,27 +292,98 @@ namespace Repulsor
                     continue;
                 // As far as possible, with a little randomness so they don't all come from one corner.
                 float score = nearest + Mathf.Min(crowd, 2f) * 0.3f + Random.Range(0f, 0.9f);
-                if (score > best)
-                {
-                    best = score;
-                    point = candidate;
-                }
+                if (score <= best)
+                    continue;
+                // Nothing solid between it and you: it can walk in, and your shots can reach it.
+                if (strict && !HasFloorOutline && !LineClear(candidate, nearestPlayer))
+                    continue;
+                best = score;
+                point = candidate;
             }
             return best > float.MinValue;
         }
 
+        /// <summary>Marks every cell that connects to a player across floor seen open (and not solid).</summary>
+        void FloodFrom(IReadOnlyList<Vector3> players)
+        {
+            System.Array.Clear(reach, 0, reach.Length);
+            frontier.Clear();
+            foreach (Vector3 player in players)
+            {
+                if (!ToCell(player, out int px, out int pz))
+                    continue;
+                // You stand on floor the rays never look at (they start ahead of you): seed with what's around you.
+                for (int dz = -4; dz <= 4; dz++)
+                    for (int dx = -4; dx <= 4; dx++)
+                    {
+                        int x = px + dx, z = pz + dz;
+                        if (x < 0 || z < 0 || x >= Size || z >= Size)
+                            continue;
+                        int i = Index(x, z);
+                        if (reach[i] == 0 && !Solid(i))
+                        {
+                            reach[i] = 1;
+                            frontier.Enqueue(i);
+                        }
+                    }
+            }
+            while (frontier.Count > 0)
+            {
+                int i = frontier.Dequeue();
+                int x = i % Size, z = i / Size;
+                for (int k = 0; k < 4; k++)
+                {
+                    int nx = x + (k == 0 ? 1 : k == 1 ? -1 : 0), nz = z + (k == 2 ? 1 : k == 3 ? -1 : 0);
+                    if (nx < 0 || nz < 0 || nx >= Size || nz >= Size)
+                        continue;
+                    int n = Index(nx, nz);
+                    if (reach[n] != 0 || open[n] == 0 || Solid(n))
+                        continue;
+                    reach[n] = 1;
+                    frontier.Enqueue(n);
+                }
+            }
+        }
+
+        /// <summary>No solid cell on the straight line between two points.</summary>
+        bool LineClear(Vector3 from, Vector3 to)
+        {
+            float length = Flat(to - from);
+            int steps = Mathf.Max(1, Mathf.CeilToInt(length / (Cell * 0.5f)));
+            for (int i = 0; i <= steps; i++)
+            {
+                Vector3 p = Vector3.Lerp(from, to, i / (float)steps);
+                if (ToCell(p, out int x, out int z) && Solid(Index(x, z)))
+                    return false;
+            }
+            return true;
+        }
+
         static float Flat(Vector3 v) => new Vector2(v.x, v.z).magnitude;
 
-        /// <summary>Seen open at least twice, nothing solid in it or next to it.</summary>
-        bool Clear(int x, int z)
+        /// <summary>
+        /// Seen open at least twice, and nothing solid within <paramref name="cells"/> of it. Strict: the floor was
+        /// seen in it or right beside it, and every cell in that clearance was itself seen open (no unknown floor).
+        /// </summary>
+        bool Clear(int x, int z, int cells, bool strict)
         {
             if (open[Index(x, z)] < 2)
                 return false;
-            for (int dz = -1; dz <= 1; dz++)
-                for (int dx = -1; dx <= 1; dx++)
-                    if (blocked[Index(x + dx, z + dz)] > open[Index(x + dx, z + dz)])
+            bool floor = false;
+            for (int dz = -cells; dz <= cells; dz++)
+                for (int dx = -cells; dx <= cells; dx++)
+                {
+                    int i = Index(x + dx, z + dz);
+                    if (blocked[i] > open[i])
                         return false;
-            return true;
+                    if (!strict)
+                        continue;
+                    if (open[i] == 0)
+                        return false;
+                    if (floorSeen[i] > 0 && Mathf.Abs(dx) <= 1 && Mathf.Abs(dz) <= 1)
+                        floor = true;
+                }
+            return floor || !strict;
         }
 
         Bounds OutlineBounds()

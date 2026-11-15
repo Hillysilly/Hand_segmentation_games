@@ -66,7 +66,7 @@ namespace Repulsor
             target = lockedOn;
             Frame();
             damage = hitDamage;
-            if (target == null && game.Room.TryDistance(center, direction, out float wall))
+            if (target == null && game.WallAhead(center, direction, out float wall))
                 wallAt = wall;
             strands = new Blast[3];
             for (int i = 0; i < strands.Length; i++)

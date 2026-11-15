@@ -53,6 +53,9 @@ namespace Repulsor
         /// <summary>Smoothed palm velocity, m/s.</summary>
         public Vector3 Velocity;
 
+        readonly GestureHold hold = new GestureHold();
+        float analyzedAt;
+
         public float Index, Middle, Ring, Little;
         public float ThumbOut;
         public float Pinch;
@@ -96,6 +99,7 @@ namespace Repulsor
             if (!Tracked)
             {
                 Gesture = HandGesture.None;
+                hold.Reset();
                 Ok = Gun = SpiderSign = Cup = false;
                 return;
             }
@@ -107,7 +111,10 @@ namespace Repulsor
             float size = Mathf.Max(Size, 0.001f);
             ThumbOut = Vector3.Distance(this[Joint.ThumbTip], this[Joint.IndexProximal]) / size;
             Pinch = Vector3.Distance(this[Joint.ThumbTip], this[Joint.IndexTip]);
-            Gesture = GestureClassifier.Classify(Index, Middle, Ring, Little);
+            // Sticky (the thresholds lean toward the shape it's in) and held through a moment of "neither".
+            float sinceLast = Mathf.Clamp(Time - analyzedAt, 0f, 0.1f);
+            analyzedAt = Time;
+            Gesture = hold.Step(GestureClassifier.Classify(Index, Middle, Ring, Little, hold.Shown), sinceLast);
 
             bool othersUp = Middle > OpenAbove && Ring > OpenAbove && Little > OpenAbove;
             Ok = othersUp && Pinch < (Ok ? PinchRelease : PinchEngage);

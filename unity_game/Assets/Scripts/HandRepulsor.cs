@@ -28,6 +28,10 @@ namespace Repulsor
         RepulsorGame game;
         Transform trackingSpace;
         HandGesture gesture = HandGesture.None;
+        readonly GestureHold gestureHold = new GestureHold();
+        /// <summary>How long a hand can be lost before its weapons stop.</summary>
+        public const float LostGraceSeconds = 0.3f;
+        float lostFor;
         Weapon weapon;
         bool lasing;
         Vector3 laserDirection;
@@ -89,10 +93,18 @@ namespace Repulsor
 
             if (!IsTracked || !TryReadHand(hand, dt, out Vector3 palm, out Vector3 palmNormal, out HandGesture next))
             {
+                // Tracking drops out for a moment all the time (on the headset: 260 times in 26 minutes, most under
+                // 0.3 s). A charge, a beam or flames carry over a short one instead of being lost.
+                lostFor += dt;
+                if (lostFor < LostGraceSeconds)
+                    return;
                 gesture = HandGesture.None;
+                gestureHold.Reset();
                 StopWeapons();
                 return;
             }
+            lostFor = 0f;
+            next = gestureHold.Step(next, dt);
 
             if (next != gesture)
             {
@@ -244,7 +256,11 @@ namespace Repulsor
 
             bool surface = game.Room.TryHit(start, laserDirection, out float distance, out Vector3 normal);
             if (surface)
+            {
                 surfaceNormal = normal;
+                // An enemy in or behind that wall can still be burnt.
+                distance = RepulsorGame.ReachPast(start, laserDirection, distance);
+            }
 
             float reach = beamLength.Step(surface, distance, dt);
             bool onTarget = game.BurnWithLaser(start, laserDirection, reach, dt, out float length, game.LaserDps);
@@ -280,7 +296,7 @@ namespace Repulsor
             if (pinch.Step(thumbToIndex, middle, ring, little, dt))
                 game.OkSign();
 
-            result = GestureClassifier.Classify(index, middle, ring, little);
+            result = GestureClassifier.Classify(index, middle, ring, little, gestureHold.Shown);
             palm = trackingSpace.TransformPoint(palmPose.position);
             // XR Hands defines a hand's palm direction as local -Y (see XRHandAxis.PalmDirection).
             palmNormal = trackingSpace.TransformDirection(palmPose.rotation * Vector3.down);

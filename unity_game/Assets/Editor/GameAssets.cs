@@ -25,6 +25,8 @@ public static class GameAssets
             m.SetColor("_Color", new Color(1f, 0.08f, 0.05f));
             m.SetFloat("_Amount", 0f);
         });
+        Save("BlobShadow", "Repulsor/Blob Shadow", m => m.SetFloat("_Alpha", 0.5f));
+        Save("FloorMark", "Repulsor/Floor Mark", m => m.SetColor("_Color", new Color(1f, 0.15f, 0.08f)));
         SaveMesh("SphereMesh", PrimitiveType.Sphere);
         SaveMesh("QuadMesh", PrimitiveType.Quad);
         SaveMesh("CubeMesh", PrimitiveType.Cube);

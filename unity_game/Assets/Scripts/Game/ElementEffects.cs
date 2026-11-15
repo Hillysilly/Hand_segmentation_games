@@ -21,8 +21,8 @@ namespace Repulsor
     }
 
     /// <summary>
-    /// The Elementalist's gust: a fist-sized ball of whirling wind (rings spinning round a pale core, like a wind
-    /// charge) that flies straight, widening, hits each enemy once and shoves it back.
+    /// The Elementalist's gust: a blade of wind (three pale crescents bowed forward, turning about the line of
+    /// flight, with streaks trailing) that flies straight, widening, hits each enemy once and shoves it back.
     /// </summary>
     public sealed class WindGust : MonoBehaviour
     {
@@ -46,18 +46,32 @@ namespace Repulsor
             gust.game = game;
             gust.direction = direction.normalized;
             gust.damage = damage;
-            if (game.Room.TryDistance(from, gust.direction, out float distance))
+            if (game.WallAhead(from, gust.direction, out float distance))
                 gust.wall = distance;
             Color pale = new Color(0.85f, 0.97f, 1f);
-            BallLook.Sprite("Core", go.transform, "FxGlow", 0.22f, pale * 0.8f).Set(billboard: true, pulse: 0.15f);
-            BallLook.Sprite("Ring A", go.transform, "FxRing", 0.32f, pale).Set(tumble: new Vector3(40f, 520f, 0f));
-            BallLook.Sprite("Ring B", go.transform, "FxRing", 0.26f, pale).Set(tumble: new Vector3(300f, 60f, 90f));
-            BallLook.Sprite("Ring C", go.transform, "FxRing", 0.38f, pale * 0.6f).Set(tumble: new Vector3(0f, 0f, 700f));
+            BallLook.Sprite("Core", go.transform, "FxGlow", 0.16f, pale * 0.5f).Set(billboard: true, pulse: 0.15f);
+            // Crescents: arcs bowed toward where it's going, one flat and two tilted, each a different size.
+            for (int i = 0; i < 3; i++)
+            {
+                LineRenderer arc = LineFade.Make("Crescent " + i, go.transform, new Color(pale.r, pale.g, pale.b, i == 0 ? 0.9f : 0.6f),
+                    i == 0 ? 0.07f : 0.05f, 16, 0f);
+                arc.useWorldSpace = false;
+                arc.transform.localRotation = Quaternion.Euler(0f, 0f, i == 0 ? 0f : i == 1 ? 62f : -62f);
+                arc.transform.localPosition = Vector3.back * (i * 0.07f);
+                float radius = 0.2f + i * 0.035f;
+                for (int k = 0; k < 16; k++)
+                {
+                    float a = Mathf.Lerp(-75f, 75f, k / 15f) * Mathf.Deg2Rad;
+                    arc.SetPosition(k, new Vector3(Mathf.Sin(a) * radius, 0f, (Mathf.Cos(a) - 0.55f) * radius));
+                }
+                gust.crescents.Add(arc.transform);
+            }
             BallLook.Particles("Streaks", go.transform, "FxGlow", pale, new Color(0.7f, 0.9f, 1f, 0f), 0.05f, 0.35f, 60f, 0.3f, 0.5f);
             game.PlayAt(from, game.WhooshSound);
         }
 
         float damage;
+        readonly List<Transform> crescents = new List<Transform>();
 
         void Update()
         {
@@ -66,6 +80,9 @@ namespace Repulsor
             Vector3 to = from + direction * Speed * dt;
             transform.position = to;
             travelled += Speed * dt;
+            // The crescents turn about the line of flight, each at its own rate.
+            for (int i = 0; i < crescents.Count; i++)
+                crescents[i].Rotate(0f, 0f, (i == 0 ? 220f : i == 1 ? -160f : 300f) * dt, Space.Self);
             // Widens as it goes.
             float radius = Mathf.Lerp(0.2f, 0.45f, travelled / Range);
             transform.localScale = Vector3.one * (radius / 0.2f);
@@ -213,7 +230,7 @@ namespace Repulsor
         readonly List<Transform> rings = new List<Transform>();
         Transform funnel;
         /// <summary>How see-through the funnel is (white, this much opacity).</summary>
-        const float FunnelAlpha = 0.45f;
+        const float FunnelAlpha = 0.28f;
 
         public static void Launch(RepulsorGame game, Vector3 from, Vector3 direction, float power, float floorY, float dps, Transform parent)
         {
@@ -233,7 +250,8 @@ namespace Repulsor
             if (model != null)
             {
                 tornado.funnel = Object.Instantiate(model, go.transform, false).transform;
-                tornado.funnel.localScale = Vector3.one * (2f * tornado.size);
+                // Taller than it is wide: the model's mouth is nearly as wide as it's tall.
+                tornado.funnel.localScale = new Vector3(1.25f, 2f, 1.25f) * tornado.size;
                 WebStrand.Tint(tornado.funnel.GetComponentsInChildren<Renderer>(), Color.white, FunnelAlpha);
             }
             for (int i = 0; i < (model != null ? 0 : 9); i++)

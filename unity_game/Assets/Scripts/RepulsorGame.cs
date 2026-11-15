@@ -143,7 +143,7 @@ namespace Repulsor
             blast.Aoe = aoe;
             blast.Color = color;
             Tint.Apply(blast.gameObject, color);
-            if (room.TryDistance(position, direction.normalized, out float wall))
+            if (WallAhead(position, direction.normalized, out float wall))
                 blast.WallDistance = wall;
             PlayAt(position, size > 1.5f ? boom : zap);
             BlastFired?.Invoke(position, direction, size, speed, color);
@@ -458,7 +458,7 @@ namespace Repulsor
             if (WeaponColor != DefaultWeaponColor)
                 Tint.Apply(blast.gameObject, WeaponColor);
             // Walls and furniture stop shots.
-            if (room.TryDistance(position, direction.normalized, out float wall))
+            if (WallAhead(position, direction.normalized, out float wall))
                 blast.WallDistance = wall;
             if (!Legacy)
                 Dress?.Invoke(blast);
@@ -474,11 +474,44 @@ namespace Repulsor
             wave.Launch(this, position, direction, charge);
             if (WeaponColor != DefaultWeaponColor)
                 Tint.Apply(wave.gameObject, WeaponColor);
-            if (room.TryDistance(position, direction.normalized, out float wall))
+            if (WallAhead(position, direction.normalized, out float wall))
                 wave.WallDistance = wall;
             PlayAt(position, whoosh);
             shots++;
             Debug.Log($"[Repulsor] Shockwave {shots}, charge {charge:0.00}");
+        }
+
+        /// <summary>
+        /// How far along a line of fire the nearest real surface is, for stopping your attacks at walls. The fail-safe
+        /// for enemies stuck in or behind a wall: if an enemy's body lies on the line at or past that surface, the
+        /// attack carries on through it far enough to reach the enemy, so nothing can hide where you can't hurt it.
+        /// </summary>
+        public bool WallAhead(Vector3 start, Vector3 direction, out float distance)
+        {
+            if (!room.TryDistance(start, direction, out distance))
+                return false;
+            distance = ReachPast(start, direction, distance);
+            return true;
+        }
+
+        /// <summary>The wall distance, pushed out past any enemy on the line that the wall would have shielded.</summary>
+        public static float ReachPast(Vector3 start, Vector3 direction, float wall)
+        {
+            float reach = wall;
+            List<IHittable> all = Hittables.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                IHittable target = all[i];
+                if (!target.Alive || target.Team != Team.Enemies)
+                    continue;
+                if (!HitTest.Ray(target, start, direction, 30f, 0.2f, out float at))
+                    continue;
+                float far = at + target.Radius * 2f + 0.3f;
+                // Only enemies the wall would have covered: one standing in front of it changes nothing.
+                if (far > wall - 0.05f && far > reach)
+                    reach = far;
+            }
+            return reach;
         }
 
         /// <summary>Hits the first thing the moving blast touches. Returns whether something was hit.</summary>

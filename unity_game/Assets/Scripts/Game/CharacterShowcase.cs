@@ -973,11 +973,11 @@ namespace Repulsor
                     go.transform.localPosition = FloorTarget;
                     Transform funnel = Prop("Tornado", go.transform);
                     Renderer[] parts = funnel.GetComponentsInChildren<Renderer>();
-                    WebStrand.Tint(parts, Color.white, 0.45f);
+                    WebStrand.Tint(parts, Color.white, 0.3f);
                     Add(go, move.Hold, (e, dt) =>
                     {
                         float grow = Mathf.Clamp01(e.Age / 0.4f) * Mathf.Clamp01((e.Life - e.Age) / 0.3f);
-                        funnel.localScale = Vector3.one * (1.9f * Mathf.Max(0.01f, grow));
+                        funnel.localScale = new Vector3(1.2f, 1.9f, 1.2f) * Mathf.Max(0.01f, grow);
                         funnel.localRotation = Quaternion.Euler(Mathf.Sin(e.Age * 2.4f) * 6f, e.Age * 540f, 0f);
                     });
                     break;

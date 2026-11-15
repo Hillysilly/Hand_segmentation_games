@@ -48,24 +48,71 @@ namespace Repulsor
     {
         public static float OpenAbove = 1.5f;
         public static float CurledBelow = 1.3f;
+        /// <summary>
+        /// How far the thresholds lean toward the shape the hand is already in. Tracking wobbles a finger across a
+        /// threshold for a frame or two; on the headset (log of 11/14) four in ten gesture changes were such
+        /// flickers through None, each one dropping a charge or a beam.
+        /// </summary>
+        public static float Give = 0.12f;
 
-        public static HandGesture Classify(float index, float middle, float ring, float little)
+        public static HandGesture Classify(float index, float middle, float ring, float little) =>
+            Classify(index, middle, ring, little, HandGesture.None);
+
+        /// <summary>As above, but sticky: a hand that was open or a fist stays so until its fingers are clearly past the line.</summary>
+        public static HandGesture Classify(float index, float middle, float ring, float little, HandGesture last)
         {
+            float openAbove = OpenAbove + (last == HandGesture.Open ? -Give : last == HandGesture.Fist ? Give : 0f);
+            float curledBelow = CurledBelow + (last == HandGesture.Fist ? Give : last == HandGesture.Open ? -Give : 0f);
             int open = 0, curled = 0;
-            Count(index, ref open, ref curled);
-            Count(middle, ref open, ref curled);
-            Count(ring, ref open, ref curled);
-            Count(little, ref open, ref curled);
+            Count(index, openAbove, curledBelow, ref open, ref curled);
+            Count(middle, openAbove, curledBelow, ref open, ref curled);
+            Count(ring, openAbove, curledBelow, ref open, ref curled);
+            Count(little, openAbove, curledBelow, ref open, ref curled);
 
             if (open >= 3 && curled == 0) return HandGesture.Open;
             if (curled >= 3 && open == 0) return HandGesture.Fist;
             return HandGesture.None;
         }
 
-        static void Count(float extension, ref int open, ref int curled)
+        static void Count(float extension, float openAbove, float curledBelow, ref int open, ref int curled)
         {
-            if (extension > OpenAbove) open++;
-            else if (extension < CurledBelow) curled++;
+            if (extension > openAbove) open++;
+            else if (extension < curledBelow) curled++;
+        }
+    }
+
+    /// <summary>
+    /// Holds an open hand or a fist through a moment of "neither": the shape only lets go after it has been
+    /// neither for <see cref="Seconds"/>. A change straight to the other shape is immediate.
+    /// </summary>
+    public sealed class GestureHold
+    {
+        public static float Seconds = 0.08f;
+        float noneFor;
+
+        public HandGesture Shown { get; private set; }
+
+        public HandGesture Step(HandGesture raw, float dt)
+        {
+            if (raw != HandGesture.None)
+            {
+                Shown = raw;
+                noneFor = 0f;
+            }
+            else
+            {
+                noneFor += dt;
+                // No time passing (a test posing a hand twice in one instant): nothing to hold through.
+                if (noneFor >= Seconds || dt <= 0f)
+                    Shown = HandGesture.None;
+            }
+            return Shown;
+        }
+
+        public void Reset()
+        {
+            Shown = HandGesture.None;
+            noneFor = 0f;
         }
     }
 }

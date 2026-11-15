@@ -214,3 +214,44 @@ Rouker's "glove", M4, not RedRocket's "Leather Gloves", M1; used as is, asked ab
   the blade arm draws back and up through the wind-up and sweeps across at the strike; the gun arm aims at you
   while firing and kicks back per volley; lasers come from its `Gun_FX` bone. With no idle clip, standing still
   holds the walk's pose (EnemyLook). Pictures `Logs/play_mech_*.png`.
+
+## 11/15: lighting, walls, tracking, effects (from the user's list and the headset log)
+
+Pulled `game_log.txt` from the headset (the 26-minute session of 11/14 21:28) and measured it:
+- Hands dropped out 259 times (median 0.2 s; 60% under 0.3 s, 85% under 1 s). The weapon layer reset the charge,
+  beam or flames on every one. Now a hand lost for under 0.3 s coasts: `HandInput.CoastSeconds` keeps the pose
+  (velocity measured over the gap when it returns, so no spike), `HandRepulsor.LostGraceSeconds` keeps the weapons.
+- About 40% of gesture changes were flickers through None lasting 40-60 ms (Open-None-Open 392 times, Fist-None-Fist
+  95). `GestureClassifier.Classify(..., last)` leans its thresholds 0.12 toward the current shape and `GestureHold`
+  keeps a shape through 80 ms of None; both hand readers use them.
+- 38 of 166 spawns used the fallback ("map not ready"); the head position jumped 4 times, clearing the map each time.
+- The camera read costs about 2 ms, so the room-light sample (once a second outside fights) is negligible.
+- Frame rate: median 72 FPS; with the tight aura on the slowest frames doubled (28 ms against 14).
+- The enemy "jumped 5 m at age 0.01" lines are the debug spawn button moving them, not a bug.
+- "Laser off, surface found on 0/N frames" was all flamethrower use (it doesn't look for a surface): not a bug.
+
+Walls. Found: the depth scan cleared cells only 30 cm short of what it hit and checked one cell of clearance whatever
+the enemy's size; the fallback preferred directions the depth couldn't measure (they scored as open) and measured
+one thin ray; dashes, knockback, the tornado's pull and the mech's leap only avoided furniture boxes. Now:
+`RoomMap.TryPick` takes the enemy's radius and has a strict tier (floor seen in or beside the cell, every cell
+within radius + 25 cm seen open and not solid, connected to a player by flood fill, straight line to the player
+clear) and a relaxed tier for small rooms (radius clearance, 60% of the minimum distance). Scan rays are jittered
+so floor hits cover the floor instead of rings. `RoomMap.Walled` (solid cell, or off Space Setup's floor) feeds
+`Arena.Steer`. The fallback uses three rays as wide as the enemy within 40 degrees, treats unmeasured directions as
+short, and stops radius + 30 cm short. `Arena.TickBuried` flags an enemy in a solid cell or hidden behind a
+surface per the depth (middle and top, twice running); it then runs straight at the player. Fail-safe:
+`RepulsorGame.WallAhead/ReachPast` lets shots, lasers, gusts, the dragon fist and thrown furniture carry on
+through a wall to an enemy on the line at or past it. Tests: `RoomSafetyTests`.
+Note: enemies are not hidden by real walls (URP Lit has no occlusion), so one in a wall is visible.
+
+Lighting. The scene had no light at all (default skybox ambient). `RoomLight` adds a directional key light and
+trilight ambient, tinted and scaled from the camera picture's average (`PersonDetector.TrySampleLight`,
+`RoomLight.Estimate`). Blob shadows: `Repulsor/Blob Shadow` on a quad under each enemy, smaller and fainter with
+height. The hit flash went from 3x to 1.7x white (it blew out under the new light).
+
+Effects reviewed in the capture renders and improved: boss warnings (`FloorMark`: filled disc or fan whose inner
+fill reaches the rim at the moment of the hit; mech swing, mech slam, the old boss's strikes), the mech's sword
+sweep (`LineFade` arcs), a second ring and thinner taper on its shockwave, the gust (three crescents turning about
+the line of flight instead of three ring sprites), the tornado (1.25 wide to 2 tall, 28% opacity; it filled the
+view and went opaque). Not changed: dash line, powerups, missiles, smoke, lightning, shields.
+EditMode 175/175, PlayMode 22/22.

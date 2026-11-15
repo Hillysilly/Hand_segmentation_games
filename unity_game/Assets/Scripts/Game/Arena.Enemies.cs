@@ -97,48 +97,68 @@ namespace Repulsor
                 if (Hittables.IsLive(foe))
                     enemySpots.Add(foe.Center);
             float min = EnemySpec.IsBoss(kind) ? 2.6f : SpawnMinDistance;
-            if (roomMap.TryPick(playerSpots, enemySpots, min, SpawnMaxDistance, InsideFurniture, out Vector3 point, out where))
+            float radius = EnemySpec.Of(kind).Radius;
+            if (roomMap.TryPick(playerSpots, enemySpots, min, SpawnMaxDistance, InsideFurniture, radius, out Vector3 point, out where))
                 return point;
-            Vector3 direction = SpawnDirection(out float distance, out bool atWall);
-            where = atWall ? "out of a wall, map not ready" : "ahead, map not ready";
+            Vector3 direction = SpawnDirection(radius, out float distance, out string how);
+            where = how + ", map not ready";
             return head.position + direction * distance;
         }
 
         bool InsideFurniture(Vector3 floorPoint) => room != null && room.Blocks(floorPoint + Vector3.up * 0.3f, 0.3f);
 
         /// <summary>
-        /// The fallback spawn direction: within 80 degrees of where you face, with the most room, so it can walk in from
-        /// a distance. Out of the wall when the wall is in range. Rays start 0.5 m out so your own hands aren't walls.
+        /// The fallback spawn direction, while the map knows too little: within 40 degrees of where you face (the
+        /// headset's depth only covers what's in view), wherever there's the most room. Each direction is measured
+        /// with three depth rays as wide as the enemy, and it appears at least its own radius plus 30 cm short of
+        /// whatever is there. A direction the depth can't measure counts as short, not as open, so a blind spot never
+        /// wins over a measured one. Rays start 0.5 m out so your own hands aren't walls.
         /// </summary>
-        Vector3 SpawnDirection(out float distance, out bool atWall)
+        Vector3 SpawnDirection(float radius, out float distance, out string how)
         {
             Vector3 forward = Vector3.ProjectOnPlane(head.forward, Vector3.up);
             if (forward.sqrMagnitude < 1e-4f)
                 forward = Vector3.forward;
             forward.Normalize();
-            const int Tries = 9;
+            const int Tries = 7;
             const float Far = 4.5f;
+            const float Blind = 1.9f;
             Vector3 bestDirection = forward;
             float bestScore = -1f;
-            float free = Far + 1f;
-            float offset = Random.Range(-10f, 10f);
+            float free = Blind;
+            bool measured = false;
+            float offset = Random.Range(-5f, 5f);
             for (int i = 0; i < Tries; i++)
             {
-                float angle = Mathf.Lerp(-80f, 80f, i / (Tries - 1f)) + offset;
+                float angle = Mathf.Lerp(-40f, 40f, i / (Tries - 1f)) + offset;
                 Vector3 direction = Quaternion.AngleAxis(angle, Vector3.up) * forward;
-                float space = Far + 1f;
-                if (game.Room.TryDistance(head.position + direction * 0.5f, direction, out float wall))
-                    space = wall + 0.5f;
-                float score = Mathf.Min(space, Far + 0.5f) + Random.Range(0f, 1.2f);
+                Vector3 side = Vector3.Cross(Vector3.up, direction) * radius;
+                float space = float.MaxValue;
+                bool known = false;
+                for (int k = -1; k <= 1; k++)
+                {
+                    // Aimed at where its body would be: chest height, and each edge.
+                    Vector3 start = head.position + direction * 0.5f + side * k + Vector3.down * 0.4f;
+                    if (!game.Room.TryDistance(start, direction, out float wall))
+                        continue;
+                    known = true;
+                    space = Mathf.Min(space, wall + 0.5f);
+                }
+                if (!known)
+                    space = Blind;
+                float score = Mathf.Min(space, Far + 0.5f) + Random.Range(0f, 1.2f) + (known ? 1f : 0f);
                 if (score > bestScore)
                 {
                     bestScore = score;
                     bestDirection = direction;
                     free = space;
+                    measured = known;
                 }
             }
-            atWall = free <= Far + 0.4f;
-            distance = atWall ? Mathf.Max(1.2f, free - 0.4f) : Random.Range(2.5f, Far);
+            float margin = radius + 0.3f;
+            bool atWall = measured && free <= Far + margin;
+            distance = !measured ? Blind - 0.2f : atWall ? Mathf.Max(1.2f, free - margin) : Random.Range(2.5f, Far);
+            how = !measured ? "close ahead, no depth there" : atWall ? "short of a wall" : "ahead";
             return bestDirection;
         }
 
@@ -203,6 +223,68 @@ namespace Repulsor
         /// <summary>You're standing within this distance of a floor point (strikes from above).</summary>
         public bool PlayerStandsWithin(Vector3 floorPoint, float radius) =>
             CanBeHit && Vector3.Distance(Flat(head.position), Flat(floorPoint)) < radius + BodyRadius;
+
+        /// <summary>
+        /// Reads the room's light from the camera about once a second while nobody is fighting (menus, the countdown,
+        /// between rounds) and lights the enemies to match. During a fight the last reading stays.
+        /// </summary>
+        void TickRoomLight(float dt)
+        {
+            roomLight.Tick(dt);
+            bool fighting = phase == Phase.Playing && waves != null && waves.State == WaveState.Fighting;
+            lightSampleIn -= dt;
+            if (fighting || lightSampleIn > 0f || game.Person == null)
+                return;
+            lightSampleIn = 1f;
+            if (!game.Person.TrySampleLight(out Color average))
+                return;
+            roomLight.Sample(average);
+            if (Mathf.Abs(roomLight.Level - lightLogged) > 0.15f)
+            {
+                lightLogged = roomLight.Level;
+                Log($"Room light: level {roomLight.Level:0.00}, tint ({roomLight.Tint.r:0.00}, {roomLight.Tint.g:0.00}, {roomLight.Tint.b:0.00})");
+            }
+        }
+
+        float buriedCheck;
+        int buriedNext;
+
+        /// <summary>
+        /// Looks for enemies stuck in or behind a wall, one every 0.15 s: the room map says its spot is solid (or off
+        /// Space Setup's floor), or, while it's in view, the headset's depth sees a real surface well in front of both
+        /// its middle and its top twice running. Those are told to come out (Enemy.Buried).
+        /// </summary>
+        void TickBuried(float dt)
+        {
+            buriedCheck -= dt;
+            if (buriedCheck > 0f || enemies.Count == 0 || game.Room == null)
+                return;
+            buriedCheck = 0.15f;
+            buriedNext = (buriedNext + 1) % enemies.Count;
+            if (!(enemies[buriedNext] is Enemy enemy) || enemy == null || !enemy.Alive || enemy.Spawning || enemy.IsProxy
+                || enemy.Webbed || enemy.IsBoss || enemy.Practice)
+                return;
+            bool was = enemy.Buried;
+            bool walled = roomMap.Walled(enemy.Center, 0f);
+            Vector3 toEnemy = enemy.Center - head.position;
+            float distance = toEnemy.magnitude;
+            if (distance > 0.8f && Vector3.Angle(head.forward, toEnemy) < 35f)
+            {
+                bool hidden = HiddenBehindSurface(enemy.Center, enemy.Radius) && HiddenBehindSurface(enemy.Top, enemy.Radius);
+                enemy.HiddenChecks = hidden ? enemy.HiddenChecks + 1 : 0;
+            }
+            enemy.Buried = walled || enemy.HiddenChecks >= 2;
+            if (enemy.Buried && !was)
+                Log($"{enemy.Kind} {enemy.Id} is in a wall ({(walled ? "room map" : "hidden behind a surface")}); calling it out");
+        }
+
+        /// <summary>The headset's depth finds a real surface on the line to this point, well short of it.</summary>
+        bool HiddenBehindSurface(Vector3 point, float radius)
+        {
+            Vector3 to = point - head.position;
+            float distance = to.magnitude;
+            return game.Room.TryDistance(head.position, to / distance, out float surface) && surface < distance - radius - 0.25f;
+        }
 
         float standingHeadY = float.NaN;
 

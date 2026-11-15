@@ -154,6 +154,48 @@ namespace Repulsor
 #endif
         }
 
+        static float[] toLinear;
+
+        /// <summary>
+        /// The average colour of what the camera sees right now (linear, 0 to 1), from a tiny copy of its picture: for
+        /// lighting the enemies like the room. False when there's no camera picture (no permission, the editor).
+        /// </summary>
+        public bool TrySampleLight(out Color average)
+        {
+            average = Color.gray;
+            if (cameraManager == null || !cameraManager.TryAcquireLatestCpuImage(out XRCpuImage image))
+                return false;
+            using (image)
+            {
+                int width = Mathf.Max(8, image.width / 24), height = Mathf.Max(8, image.height / 24);
+                var conversion = new XRCpuImage.ConversionParams(image, TextureFormat.RGBA32, XRCpuImage.Transformation.None)
+                {
+                    outputDimensions = new Vector2Int(width, height),
+                };
+                var pixels = new NativeArray<byte>(image.GetConvertedDataSize(conversion), Allocator.Temp);
+                image.Convert(conversion, pixels);
+                if (toLinear == null)
+                {
+                    toLinear = new float[256];
+                    for (int i = 0; i < 256; i++)
+                        toLinear[i] = Mathf.GammaToLinearSpace(i / 255f);
+                }
+                double r = 0, g = 0, b = 0;
+                int count = pixels.Length / 4;
+                for (int i = 0; i < count; i++)
+                {
+                    r += toLinear[pixels[i * 4]];
+                    g += toLinear[pixels[i * 4 + 1]];
+                    b += toLinear[pixels[i * 4 + 2]];
+                }
+                pixels.Dispose();
+                if (count == 0)
+                    return false;
+                average = new Color((float)(r / count), (float)(g / count), (float)(b / count), 1f);
+            }
+            return true;
+        }
+
         /// <summary>Starts the camera again. The system can close it at any time, and it won't come back alone.</summary>
         public void RestartCamera()
         {

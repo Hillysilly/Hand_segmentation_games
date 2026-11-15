@@ -67,6 +67,17 @@ The APK is built; install it with `build_and_run.ps1 -NoBuild` when the headset 
     your fingers, and stay out of the way of gestures? Frame rate with Tempest's (47k triangles a hand)?
 19. **Tempest tornado**: now a see-through white funnel model (also on the select screen).
 20. **Credits**: title screen > CREDITS, a page at a time.
+23. **Room lighting and floor shadows** (11/15): enemies are lit by a key light and ambient light matched to the
+    camera's view of your room (sampled in menus and between rounds only), and each has a soft shadow on the floor.
+    Do they look like they're in the room? Try a dim room and a warm lamp. Any frame-rate change?
+24. **Walls** (11/15): enemies need seen floor with clearance to appear, can't walk, dash or be knocked into walls
+    the scan has seen, and one found in or behind a wall heads straight for you. Your attacks pass through a wall
+    to reach an enemy stuck in or behind it. Tell me if you still see one in a wall (the log names the cause).
+25. **Hand tracking** (11/15, from the 11/14 log): open hands and fists are sticky and held through 80 ms of
+    "neither"; a hand lost for under 0.3 s keeps its charge, beam, flames and gesture. Do shots and held
+    attacks (lightning, flames, lasers) drop out less? Any attack firing when you didn't mean it?
+26. **Looks** (11/15): boss attack warnings are filled red shapes that fill up as the hit comes; the gust is a blade
+    of wind; the tornado is slimmer and fainter; the mech's sword leaves a fading sweep.
 21. **Story mode is 10 rounds** (11/15): drones (1), dashers (2), brawlers (3), rocketeers (5), snipers (7), tanks (8),
     each announced as NEW ENEMY in its first round; round 10 is GOLIATH. Too long? Pace right?
 22. **GOLIATH, the mech boss** (also BOSS FIGHT on the mode screen): swing combos with the reach shown red on the

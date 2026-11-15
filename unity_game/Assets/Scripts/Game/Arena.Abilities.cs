@@ -413,7 +413,7 @@ namespace Repulsor
 
         void ThrowHeld(Vector3 handVelocity, Vector3 aim)
         {
-            float wall = game.Room.TryDistance(held.transform.position, aim, out float d) ? d : float.MaxValue;
+            float wall = game.WallAhead(held.transform.position, aim, out float d) ? d : float.MaxValue;
             held.Throw(handVelocity, aim, wall);
             game.PlayAt(held.transform.position, game.WhooshSound);
             Log($"Threw {held.Label} at {handVelocity.magnitude:0.0} m/s");
@@ -434,20 +434,23 @@ namespace Repulsor
             : "Room: no furniture found. Run Space Setup for force powers.";
 
         /// <summary>
-        /// A robot's step toward its target, slid round Space Setup furniture: straight if clear, otherwise the
-        /// nearest clear direction up to 90 degrees off, otherwise no move.
+        /// A robot's step toward its target, slid round Space Setup furniture and walls: straight if clear, otherwise
+        /// the nearest clear direction up to 90 degrees off, otherwise no move. Walks, dashes, knockback, the tornado's
+        /// pull and the mech's leap all go through here, so none of them can put a robot in a wall the game knows of.
         /// </summary>
         public Vector3 Steer(Vector3 from, Vector3 direction, float step)
         {
             const float margin = 0.3f;
-            // Already inside a box (spawned there, or the box is wrong): walk out rather than freeze.
-            if (room.Blocks(from, 0f))
+            // Already inside a box or a wall (spawned there, or the map is wrong): walk out rather than freeze.
+            if (room.Blocks(from, 0f) || roomMap.Walled(from, 0f))
                 return direction * step;
             for (int i = 0; i <= 12; i++)
             {
                 float angle = (i + 1) / 2 * 15f * (i % 2 == 0 ? 1f : -1f);
                 Vector3 tryDirection = Quaternion.AngleAxis(angle, Vector3.up) * direction;
-                if (!room.Blocks(from + tryDirection * (step + margin), margin * 0.5f))
+                Vector3 ahead = from + tryDirection * (step + margin);
+                // Walls too: the cells the depth scan saw solid, and the edge of Space Setup's floor.
+                if (!room.Blocks(ahead, margin * 0.5f) && !roomMap.Walled(ahead))
                     return tryDirection * step;
             }
             return Vector3.zero;

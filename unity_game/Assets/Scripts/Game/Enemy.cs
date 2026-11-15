@@ -26,6 +26,10 @@ namespace Repulsor
         Arena arena;
         Transform head;
         Bubble spawnBubble;
+        Transform shadow;
+        Renderer shadowRenderer;
+        static MaterialPropertyBlock shadowBlock;
+        static readonly int ShadowAlpha = Shader.PropertyToID("_Alpha");
         EnemyLook look;
         IBossBrain boss;
         EnemySpec spec;
@@ -87,6 +91,13 @@ namespace Repulsor
         public bool IsProxy { get; private set; }
         /// <summary>The Variant Lab's practice robot: stands still and never shoots.</summary>
         public bool Practice { get; set; }
+        /// <summary>
+        /// The game thinks it's in or behind a wall (the room map, or the headset's depth seeing a surface in front of
+        /// it). It drops what it's doing and makes straight for you until it's out; your attacks reach it meanwhile.
+        /// </summary>
+        public bool Buried { get; set; }
+        /// <summary>How many depth checks in a row found it hidden behind a real surface.</summary>
+        public int HiddenChecks { get; set; }
         /// <summary>Caught in the Spider's web: it stops thinking and goes where the web puts it.</summary>
         public bool Webbed { get; set; }
         Vector3 netPosition;
@@ -150,6 +161,7 @@ namespace Repulsor
             enemy.weave = Random.value * 10f;
             enemy.weaveSpeed = Random.Range(0.8f, 1.4f);
             enemy.spawnBubble = Bubble.Create("Spawn Bubble", parent);
+            enemy.MakeShadow(parent);
             enemy.lastPosition = position;
             enemy.floorY = position.y - MiddleHeight(kind);
             enemy.look = EnemyLook.Create(spec.Model, go.transform);
@@ -180,11 +192,45 @@ namespace Repulsor
             return taken;
         }
 
+        /// <summary>A soft dark patch on the floor under it, so it looks planted in the room.</summary>
+        void MakeShadow(Transform parent)
+        {
+            var material = Resources.Load<Material>("BlobShadow");
+            if (material == null)
+                return;
+            var go = new GameObject("Enemy Shadow", typeof(MeshFilter), typeof(MeshRenderer));
+            go.transform.SetParent(parent, false);
+            go.GetComponent<MeshFilter>().sharedMesh = Resources.Load<Mesh>("QuadMesh");
+            shadowRenderer = go.GetComponent<MeshRenderer>();
+            shadowRenderer.sharedMaterial = material;
+            shadowRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            shadow = go.transform;
+            shadow.rotation = Quaternion.Euler(90f, 0f, 0f);
+            PlaceShadow();
+        }
+
+        /// <summary>Under its feet on the floor; smaller and fainter the higher it is (drones, a flung robot, the mech's leap).</summary>
+        void PlaceShadow()
+        {
+            if (shadow == null)
+                return;
+            float floor = arena != null ? arena.FloorY : floorY;
+            float height = Mathf.Max(0f, transform.position.y - MiddleHeight(Kind) - floor);
+            float size = Mathf.Max(0.5f, spec.Radius * 3.6f) / (1f + height * 0.5f);
+            shadow.position = new Vector3(transform.position.x, floor + 0.012f, transform.position.z);
+            shadow.localScale = new Vector3(size, size, 1f);
+            float appear = Mathf.Clamp01((age - SpawnSeconds * 0.4f) / (SpawnSeconds * 0.6f));
+            shadowBlock ??= new MaterialPropertyBlock();
+            shadowBlock.SetFloat(ShadowAlpha, 0.6f * appear / (1f + height * 1.1f));
+            shadowRenderer.SetPropertyBlock(shadowBlock);
+        }
+
         void Update()
         {
             float dt = Time.deltaTime;
             age += dt;
             TickSpawnBubble();
+            PlaceShadow();
             flash = Mathf.Max(0f, flash - dt);
             Vector3 step = transform.position - lastPosition;
             moving = Mathf.Lerp(moving, dt > 0f ? step.magnitude / dt : 0f, 1f - Mathf.Exp(-8f * dt));
@@ -241,6 +287,19 @@ namespace Repulsor
             }
 
             running = false;
+            if (Buried)
+            {
+                // Out of the wall first, by the shortest way to where you are.
+                running = true;
+                HideDashLine();
+                dashStep = DashStep.Approach;
+                if (spec.Flies)
+                    transform.position += toward * (spec.Speed * 2f * SpeedScale * dt);
+                else
+                    Walk(dt, toward, spec.Speed * 2f);
+                Face(target, dt);
+                return;
+            }
             switch (Kind)
             {
                 case EnemyKind.Drone:
@@ -595,6 +654,8 @@ namespace Repulsor
                 Destroy(spawnBubble.gameObject);
             if (dashLine != null)
                 Destroy(dashLine.gameObject);
+            if (shadow != null)
+                Destroy(shadow.gameObject);
             boss?.Stop();
         }
     }
