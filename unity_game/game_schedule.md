@@ -61,7 +61,12 @@ The APK is built; install it with `build_and_run.ps1 -NoBuild` when the headset 
     lands or you step out. Enough warning?
 17. **Health bars** (11/14 late): what the current attack took shows orange, held while hits keep landing, then
     drains. On your bar, enemy bars, the boss bar and your partner's.
-18. **Hand models**: shortlist page sent (codes like T1, M2); waiting on picks. Tornado model shortlist is on it too.
+18. **Level 3 hand models** (11/14 night): Technoman energy gauntlets, Emberwitch leather gauntlet (Rouker's
+    "glove", M4 on the shortlist, not M1), Lumen black gloves, Valkyr medieval glove, Tempest Stormcaller gauntlet.
+    Worn over your tracked hands at level 3 (use FILL METER and transform twice). Do they sit on your hands, follow
+    your fingers, and stay out of the way of gestures? Frame rate with Tempest's (47k triangles a hand)?
+19. **Tempest tornado**: now a see-through white funnel model (also on the select screen).
+20. **Credits**: title screen > CREDITS, a page at a time.
 
 ## Status, end of 11/8 session
 

@@ -169,3 +169,24 @@ picked variants) were backed up first and restored with `run-as`. The user's not
 - **Muted tests:** `Tests/PlayMode/Muted.cs` silences every PlayMode test (user's request).
 - Installed on the headset (saved data kept: same signing key now). It was asleep, so no on-device check yet.
 - EditMode 165/165, PlayMode 18/18.
+
+## Level 3 hand models and the tornado (night)
+
+The user picked T2, M1, L1, V2, S1 and N1 and downloaded them as GLBs into `assets/hands` (the "glove.glb" is
+Rouker's "glove", M4, not RedRocket's "Leather Gloves", M1; used as is, asked about it). None are rigged.
+- `HandSkinViews` renders each model face-on with a (u, v) grid; wrist, knuckles, tips and thumb were read off
+  those pictures into `HandSkinBuilder.Specs`. The builder finds each point's depth from the mesh, turns the model
+  into hand space (wrist at 0, fingers +Z, palm -Y, real size), mirrors left-hand sources (the energy gauntlet is a
+  left hand), puts the middle finger joints at the centre of a thin slice of the finger's own vertices, binds each
+  vertex to its nearest bone (blending near joints) with a forearm bone for sleeves (cut to 24 cm), simplifies the
+  Stormcaller by vertex clustering (227k to 47k triangles), and saves `Resources/HandSkins/{Name}_R/_L`.
+  A first attempt fitting from three rough hints (wrist, finger and palm directions) put bones outside the fingers;
+  the hand-read landmarks fixed it.
+- `HandSkin` drives the skeleton from the tracked joints each frame (bone directions, the hand scaled to yours);
+  `Arena.HandSkins` wears them at level 3 for Technoman, Emberwitch, Lumen, Valkyr and Tempest, with a guessed elbow
+  for the sleeve. Renders: `Logs/play_skin_*`; fit pictures `Logs/handskin_fit_*`.
+- Rouker's glove stretches a little in finger-gun and spider poses (its fingers are modelled curled and packed).
+- Tornado: "Animated Tornado" (Anthony Yanez) as `Props/Tornado`, drawn with the web shader in white at 45%,
+  spun and swayed in code; the select screen's tornado too. Render `Logs/play_web_tornado.png`.
+- Credits moved to `Assets/Resources/Credits.txt` and shown in the game (title screen > CREDITS).
+- EditMode 165/165, PlayMode 21/21. Installed on the headset.

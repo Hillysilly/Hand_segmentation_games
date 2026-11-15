@@ -41,8 +41,8 @@ namespace Repulsor
                 Controls = new[]
                 {
                     new[] { "Palm out and hold: hand laser" },
-                    new[] { "Fist, then snap open: repulsor blast", "Lasers get stronger", "Gauntlets form on your hands" },
-                    new[] { "Repulsor blasts explode in an area", "Lasers get stronger", "Blue glow outline" },
+                    new[] { "Fist, then snap open: repulsor blast", "Lasers get stronger" },
+                    new[] { "Repulsor blasts explode in an area", "Lasers get stronger", "Energy gauntlets on your hands" },
                 },
             },
             new CharacterDef
@@ -64,7 +64,7 @@ namespace Repulsor
                 {
                     new[] { "Fist, then snap open: fireball" },
                     new[] { "Palm out and hold: flamethrower", "Rune circle aura" },
-                    new[] { "Triangle with both hands: aim a fire circle, close both fists: fire pillar" },
+                    new[] { "Triangle with both hands: aim a fire circle, close both fists: fire pillar", "Black and gold gloves" },
                 },
             },
             new CharacterDef
@@ -75,7 +75,7 @@ namespace Repulsor
                 {
                     new[] { "Finger gun, flick up: blaster bolt" },
                     new[] { "Make a fist: laser sword", "Light aura" },
-                    new[] { "Cupped hand at an enemy or object: lift it, then throw. Make a fist on a held enemy: crush it", "Brighter aura with a halo" },
+                    new[] { "Cupped hand at an enemy or object: lift it, then throw. Make a fist on a held enemy: crush it", "Brighter aura with a halo", "Black gloves" },
                 },
             },
             new CharacterDef
@@ -85,8 +85,8 @@ namespace Repulsor
                 Controls = new[]
                 {
                     new[] { "Finger gun, flick up: crossbow bolt (reloads)" },
-                    new[] { "Fists together at arm's length: bow. Pull one back, open it to shoot", "Soldier gauntlets" },
-                    new[] { "Underhand throw with a fist: smoke bomb", "Arrows pierce", "Wings" },
+                    new[] { "Fists together at arm's length: bow. Pull one back, open it to shoot" },
+                    new[] { "Underhand throw with a fist: smoke bomb", "Arrows pierce", "Wings", "Plated gloves" },
                 },
             },
             new CharacterDef
@@ -96,8 +96,8 @@ namespace Repulsor
                 Controls = new[]
                 {
                     new[] { "Spider sign (index and little finger out): webs, hold it to keep firing", "Spider sense warns of unseen enemies" },
-                    new[] { "Web an enemy or an object, then swing your arm to smash and fling it", "Webbed gloves" },
-                    new[] { "Black webs, more damage", "Black gloves" },
+                    new[] { "Web an enemy or an object, then swing your arm to smash and fling it" },
+                    new[] { "Black webs, more damage" },
                 },
             },
             new CharacterDef
@@ -108,7 +108,7 @@ namespace Repulsor
                 {
                     new[] { "Push an open palm forward: gust of wind (knocks enemies back)" },
                     new[] { "Both hands out flat: chain lightning, up to 5 s at a time", "Swirling wind aura" },
-                    new[] { "Swirl both hands round in circles to charge, push both forward: tornado that pulls enemies in", "Faster, thicker wind" },
+                    new[] { "Swirl both hands round in circles to charge, push both forward: tornado that pulls enemies in", "Faster, thicker wind", "Storm gauntlets" },
                 },
             },
             new CharacterDef

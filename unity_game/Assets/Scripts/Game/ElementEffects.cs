@@ -211,6 +211,9 @@ namespace Repulsor
         float dps;
         float floorY;
         readonly List<Transform> rings = new List<Transform>();
+        Transform funnel;
+        /// <summary>How see-through the funnel is (white, this much opacity).</summary>
+        const float FunnelAlpha = 0.45f;
 
         public static void Launch(RepulsorGame game, Vector3 from, Vector3 direction, float power, float floorY, float dps, Transform parent)
         {
@@ -225,8 +228,15 @@ namespace Repulsor
             tornado.dps = dps;
             tornado.floorY = floorY;
             Color pale = new Color(0.85f, 0.95f, 1f);
-            // A funnel of spinning rings, narrow at the floor and wide at the top.
-            for (int i = 0; i < 9; i++)
+            // The funnel: a tornado model (spun here), see-through white. Rings stand in if it's missing.
+            var model = Resources.Load<GameObject>("Props/Tornado");
+            if (model != null)
+            {
+                tornado.funnel = Object.Instantiate(model, go.transform, false).transform;
+                tornado.funnel.localScale = Vector3.one * (2f * tornado.size);
+                WebStrand.Tint(tornado.funnel.GetComponentsInChildren<Renderer>(), Color.white, FunnelAlpha);
+            }
+            for (int i = 0; i < (model != null ? 0 : 9); i++)
             {
                 float t = i / 8f;
                 FxSpin ring = BallLook.Sprite("Ring " + i, go.transform, "FxRing", Mathf.Lerp(0.25f, 1.1f, t) * tornado.size, pale * Mathf.Lerp(1f, 0.5f, t))
@@ -256,7 +266,12 @@ namespace Repulsor
                 velocity = Vector3.zero;
             transform.position += step;
             transform.position = new Vector3(transform.position.x, floorY, transform.position.z);
-            // The funnel sways.
+            // The funnel spins and sways.
+            if (funnel != null)
+            {
+                funnel.localRotation = Quaternion.Euler(Mathf.Sin(age * 2.4f) * 6f, age * 540f, Mathf.Cos(age * 3f) * 6f);
+                funnel.localPosition = new Vector3(Mathf.Sin(age * 3f) * 0.05f, 0f, Mathf.Cos(age * 2.4f) * 0.05f);
+            }
             for (int i = 0; i < rings.Count; i++)
             {
                 float t = i / (rings.Count - 1f);

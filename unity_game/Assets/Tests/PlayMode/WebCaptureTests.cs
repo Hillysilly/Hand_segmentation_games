@@ -67,5 +67,25 @@ namespace Repulsor.Tests
             yield return new WaitForSecondsRealtime(1.2f);
             Snap(eye, robot.Center + new Vector3(0.6f, 0.2f, 0f), "black");
         }
+
+        [UnityTest]
+        public IEnumerator TempestsTornadoIsASeeThroughFunnel()
+        {
+            LogAssert.ignoreFailingMessages = true;
+            SceneManager.LoadScene("Main");
+            for (int i = 0; i < 30; i++)
+                yield return null;
+            var arena = Object.FindAnyObjectByType<Arena>();
+            Transform head = Camera.main.transform;
+            arena.TestStart(CharacterId.Elementalist);
+            arena.TestGod(true);
+            yield return null;
+            var game = Object.FindAnyObjectByType<RepulsorGame>();
+            float floor = head.position.y - 1.6f;
+            Tornado.Launch(game, head.position + Vector3.forward * 1.5f, Vector3.forward, 1f, floor, 0f, arena.transform);
+            yield return new WaitForSecondsRealtime(0.8f);
+            Snap(head.position + new Vector3(0.4f, -0.3f, -0.6f), head.position + new Vector3(0f, -0.6f, 2.6f), "tornado");
+            Assert.That(Object.FindAnyObjectByType<Tornado>(), Is.Not.Null);
+        }
     }
 }

@@ -64,6 +64,8 @@ namespace Repulsor.EditorTools
             new Entry { Key = "SpikeC", Model = Rocks + "rock_tallC.fbx", Axis = 1, Size = 1f, Anchor = Anchor.Base },
             // Quaternius cobweb (CC0): flat, facing +Z, 1 m across, origin at its middle; tinted and faded in game.
             new Entry { Key = "Web", Model = "Assets/Props/Web/Cobweb.glb", FlatToZ = true, Axis = 0, Size = 1f, Anchor = Anchor.Centre, Shader = "Repulsor/WebModel" },
+            // Tempest's tornado (Anthony Yanez, CC BY 4.0): a funnel 1 m tall standing on its tip, drawn see-through white.
+            new Entry { Key = "Tornado", Model = "Assets/Props/Tornado/AnimatedTornado.glb", Axis = 1, Size = 1f, Anchor = Anchor.Base, Shader = "Repulsor/WebModel" },
         };
 
         public static string[] Keys => Entries.Select(e => e.Key).ToArray();

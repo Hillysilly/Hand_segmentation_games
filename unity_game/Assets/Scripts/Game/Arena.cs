@@ -166,6 +166,7 @@ namespace Repulsor
             TickGestureLab(dt);
             UpdateArms();
             LogPerformance(dt);
+            TickHandSkins();
             ShowHandAura();
             TickShowcase(Time.unscaledDeltaTime);
         }
@@ -176,7 +177,7 @@ namespace Repulsor
         /// <summary>Technoman level 3's glow outline, as you see it: your own hands glow (your body is out of view).</summary>
         void ShowHandAura()
         {
-            bool on = phase == Phase.Playing && !player.IsDead && character == CharacterId.Technoman && player.Level >= 3;
+            bool on = phase == Phase.Playing && !player.IsDead && character == CharacterId.Technoman && player.Level >= 3 && !HandSkinsShown;
             for (int i = 0; i < 2; i++)
             {
                 HandPose hand = i == 0 ? input.Left : input.Right;
@@ -762,6 +763,7 @@ namespace Repulsor
         public void TestEveryScreen()
         {
             ShowTitle();
+            ShowCredits();
             ShowModes();
             ShowCoop();
             ShowRooms(GameMode.Pvp);

@@ -118,14 +118,19 @@ namespace Repulsor
                 LeaveRoom();
             phase = Phase.Title;
             hud.Visible = false;
-            RectTransform s = OpenScreen(new Vector2(360f, 230f), null);
+            RectTransform s = OpenScreen(new Vector2(360f, 260f), null);
             Ui.Label(s, GameTitle, new Vector2(0f, 62f), new Vector2(340f, 60f), 46, TextAnchor.MiddleCenter, FontStyle.Bold).color = Ui.Accent;
             Ui.Label(s, "Superpowers in your own room", new Vector2(0f, 22f), new Vector2(340f, 24f), 16).color = Ui.Muted;
             Ui.Button(s, "START", new Vector2(-85f, -35f), new Vector2(160f, 52f), ShowModes, 22);
             Ui.Button(s, "SCAN ROOM", new Vector2(85f, -35f), new Vector2(160f, 52f), ShowScan, 18);
-            Ui.Label(s, "Poke buttons with your index finger. Put the controllers down.", new Vector2(0f, -90f),
+            Ui.Button(s, "CREDITS", new Vector2(0f, -78f), new Vector2(110f, 24f), () =>
+            {
+                creditsPage = 0;
+                ShowCredits();
+            }, 11);
+            Ui.Label(s, "Poke buttons with your index finger. Put the controllers down.", new Vector2(0f, -104f),
                 new Vector2(340f, 20f), 11).color = Ui.Muted;
-            Text roomStatus = Ui.Label(s, RoomStatus(), new Vector2(0f, -106f), new Vector2(340f, 16f), 10);
+            Text roomStatus = Ui.Label(s, RoomStatus(), new Vector2(0f, -120f), new Vector2(340f, 16f), 10);
             roomStatus.color = room != null && room.Count > 0 ? Ui.Muted : Ui.Warning;
         }
 

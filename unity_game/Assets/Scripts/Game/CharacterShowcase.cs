@@ -968,24 +968,17 @@ namespace Repulsor
                 }
                 case Fx.Tornado:
                 {
+                    // The same see-through white funnel as in the game.
                     GameObject go = Holder("Tornado");
                     go.transform.localPosition = FloorTarget;
-                    var rings = new FxSpin[6];
-                    for (int i = 0; i < rings.Length; i++)
-                    {
-                        rings[i] = BallLook.Sprite("Wind", go.transform, "FxRing", 0.1f, new Color(0.8f, 0.95f, 1f) * 0.9f);
-                        rings[i].transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                        rings[i].Set(tumble: new Vector3(0f, 0f, 400f + i * 60f));
-                    }
+                    Transform funnel = Prop("Tornado", go.transform);
+                    Renderer[] parts = funnel.GetComponentsInChildren<Renderer>();
+                    WebStrand.Tint(parts, Color.white, 0.45f);
                     Add(go, move.Hold, (e, dt) =>
                     {
                         float grow = Mathf.Clamp01(e.Age / 0.4f) * Mathf.Clamp01((e.Life - e.Age) / 0.3f);
-                        for (int i = 0; i < rings.Length; i++)
-                        {
-                            float height = 0.1f + i * 0.28f;
-                            rings[i].transform.localPosition = new Vector3(0.08f * Mathf.Sin(e.Age * 6f + i), height, 0.08f * Mathf.Cos(e.Age * 6f + i));
-                            rings[i].Size = Vector3.one * (0.25f + i * 0.13f) * grow;
-                        }
+                        funnel.localScale = Vector3.one * (1.9f * Mathf.Max(0.01f, grow));
+                        funnel.localRotation = Quaternion.Euler(Mathf.Sin(e.Age * 2.4f) * 6f, e.Age * 540f, 0f);
                     });
                     break;
                 }
