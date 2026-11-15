@@ -146,7 +146,13 @@ namespace Repulsor
 
             if (pauseGesture.Step(input.Left, input.Right, dt) && (phase == Phase.Playing || phase == Phase.Sandbox))
             {
-                if (paused)
+                if (paused && MultiplayerMatch)
+                {
+                    // In multiplayer the gesture says you're ready (both must be); again to take it back.
+                    pauseReady = !pauseReady;
+                    ShowPause();
+                }
+                else if (paused)
                     Resume();
                 else
                     Pause();
@@ -332,6 +338,9 @@ namespace Repulsor
             smokeReady = 0f;
             phase = Phase.Playing;
             paused = false;
+            pauseReady = false;
+            // Readiness was for this start; character select asks again.
+            localReady = remoteReady = false;
             Time.timeScale = 1f;
             HideMenu();
             hud.Visible = true;
@@ -374,8 +383,10 @@ namespace Repulsor
         void Pause()
         {
             paused = true;
-            if (mode == GameMode.PveSolo || phase == Phase.Sandbox)
-                Time.timeScale = 0f;
+            pauseReady = false;
+            sawRemotePause = false;
+            // Everything stops, in multiplayer too (both headsets pause together, see TickMultiplayerPause).
+            Time.timeScale = 0f;
             ShowPause();
             Log("Paused");
         }
@@ -383,6 +394,8 @@ namespace Repulsor
         void Resume()
         {
             paused = false;
+            pauseReady = false;
+            sinceResume = 0f;
             Time.timeScale = 1f;
             HideMenu();
             Log("Resumed");

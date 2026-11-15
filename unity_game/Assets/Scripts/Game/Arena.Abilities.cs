@@ -208,7 +208,10 @@ namespace Repulsor
                     HandPose hand = i == 0 ? input.Left : input.Right;
                     if (kiPunch[i].Step(hand, body, dt, out Vector3 origin, out Vector3 punch))
                     {
+                        // Its comets are sent as the one effect below, not as shots of their own.
+                        replayingShot = true;
                         IHittable locked = DragonFist.Launch(game, PickedDragon, origin + punch * 0.1f, punch, player.Outgoing(10f));
+                        replayingShot = false;
                         SendEffect(NetEffect.DragonFist, origin + punch * 0.1f, punch, 0f, AttackColor, PickedDragon);
                         Log($"Dragon fist at {hand.Velocity.magnitude:0.0} m/s, {(locked != null ? $"locked on {Vector3.Angle(punch, locked.Center - origin):0} deg off" : "nothing to lock on")}");
                     }

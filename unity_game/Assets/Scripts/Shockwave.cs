@@ -35,6 +35,9 @@ namespace Repulsor
             set => range = Mathf.Min(range, value + 0.15f);
         }
 
+        /// <summary>Drawn only (the other player's, replayed here): it hits nothing.</summary>
+        public bool Harmless { get; set; }
+
         public void Launch(RepulsorGame owner, Vector3 position, Vector3 aim, float charge)
         {
             game = owner;
@@ -55,7 +58,8 @@ namespace Repulsor
             }
 
             ShowAt(distance);
-            game.HitWithShockwave(origin, direction, travelled, hit);
+            if (!Harmless)
+                game.HitWithShockwave(origin, direction, travelled, hit);
         }
 
         /// <summary>Puts the front this far along. Public so the editor preview can pick a moment.</summary>

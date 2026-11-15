@@ -88,6 +88,7 @@ namespace Repulsor
             Vector3 b = frame.DirectionToWorld(e.B);
             Color color = e.Color;
             replayingShot = true;
+            game.Replaying = true;
             switch (e.Kind)
             {
                 case NetEffect.DragonFist:
@@ -113,6 +114,7 @@ namespace Repulsor
                     SmokeCloud.Throw(a, b * e.F, foes);
                     break;
             }
+            game.Replaying = false;
             replayingShot = false;
         }
 

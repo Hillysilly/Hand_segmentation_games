@@ -309,3 +309,15 @@ EditMode 175/175, PlayMode 23/23. Installed.
     swing at the client hurt the host).
   - Tests: NetTests round trip; CoopTests.ClientPlaysTheMechsSwingAndDrawsThePartnersLooks (HP 100 -> 84;
     Logs/play_coop_remote.png). EditMode 177/177, PlayMode 24/24. Built; no headset connected to install.
+- Character select readiness: localReady/remoteReady were never cleared at a match start, so after a match (or the
+  pause menu's CHARACTER SELECT) both were still ready and the first lobby message started the next match. Now
+  cleared at StartMatch and on arriving at character select.
+- Multiplayer pause: Paused/PauseReady/Choosing ride on the player update; `Arena.TickMultiplayerPause` pauses you
+  when the other pauses (a fresh, not-ready pause), resumes when both are ready (READY on the pause screen or the
+  pause gesture again), follows the other to character select. Time stops on both (timeScale 0; the network runs
+  on unscaled time). Test `CoopTests.PausingPausesBothAndBothMustBeReady`.
+- Ryu: the dragon fist was sent twice (as its effect and as the comets it is made of); its shockwave styles did
+  real damage when replayed on the other headset (in PVP, to the puncher). Now one effect, and replayed shockwaves
+  are harmless (`Shockwave.Harmless`, `RepulsorGame.Replaying`). The user's "Ryu starts to break after a bit" is
+  not yet diagnosed: needs the headset log.
+  EditMode 177/177, PlayMode 25/25. Built; no headset connected.

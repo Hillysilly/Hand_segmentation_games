@@ -62,6 +62,10 @@ namespace Repulsor
         public Color32 Color;
         public byte Character;
         public byte Lives;
+        /// <summary>Paused (multiplayer pauses both), ready to go on, or back at character select.</summary>
+        public bool Paused;
+        public bool PauseReady;
+        public bool Choosing;
         /// <summary>What each hand is drawing right now (<see cref="HandBeam"/>), and from where to where.</summary>
         public byte LeftBeam;
         public Vector3 LeftBeamFrom;
@@ -178,6 +182,7 @@ namespace Repulsor
                 WriteColor(w, s.Color);
                 w.Write(s.Character);
                 w.Write(s.Lives);
+                w.Write((byte)((s.Paused ? 1 : 0) | (s.PauseReady ? 2 : 0) | (s.Choosing ? 4 : 0)));
                 w.Write(s.LeftBeam);
                 if (s.LeftBeam != 0)
                 {
@@ -397,6 +402,10 @@ namespace Repulsor
             s.Color = ReadColor(r);
             s.Character = r.ReadByte();
             s.Lives = r.ReadByte();
+            byte more = r.ReadByte();
+            s.Paused = (more & 1) != 0;
+            s.PauseReady = (more & 2) != 0;
+            s.Choosing = (more & 4) != 0;
             s.LeftBeam = r.ReadByte();
             if (s.LeftBeam != 0)
             {

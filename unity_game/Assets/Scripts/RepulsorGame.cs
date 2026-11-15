@@ -457,6 +457,9 @@ namespace Repulsor
             Debug.Log($"[Repulsor] Fired shot {shots}, charge {charge:0.00}");
         }
 
+        /// <summary>True while the other player's attack is being redrawn here (its shockwaves then hit nothing).</summary>
+        public bool Replaying { get; set; }
+
         /// <summary>True while <see cref="BlastFired"/> is telling of a repulsor (comet) shot, in <see cref="CometStyle"/>.</summary>
         public bool FiringComet { get; private set; }
 
@@ -485,6 +488,7 @@ namespace Repulsor
         public void FireShockwave(Vector3 position, Vector3 direction, float charge)
         {
             Shockwave wave = Instantiate(shockwavePrefab, transform);
+            wave.Harmless = Replaying;
             wave.Launch(this, position, direction, charge);
             if (WeaponColor != DefaultWeaponColor)
                 Tint.Apply(wave.gameObject, WeaponColor);

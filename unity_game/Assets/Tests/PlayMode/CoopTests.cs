@@ -289,7 +289,71 @@ namespace Repulsor.Tests
             Assert.That(arena.TestHp, Is.LessThan(before), "the mech's swing didn't reach the client's player");
         }
 
-        static void Snap(Vector3 eye, Vector3 target, string name)
+/// <summary>
+        /// Multiplayer pause (11/15): the other player pausing pauses you; it goes on only when both are ready. And a
+        /// match start leaves nobody ready, so character select afterwards waits for both again.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator PausingPausesBothAndBothMustBeReady()
+        {
+            LogAssert.ignoreFailingMessages = true;
+            SceneManager.LoadScene("Main");
+            yield return null;
+            yield return null;
+            var arena = Object.FindAnyObjectByType<Arena>();
+            using var host = new NetSession();
+            host.Host(Port + 4);
+            Assert.That(arena.TestJoin(Port + 4), Is.True);
+            for (int i = 0; i < 300 && !host.Connected; i++)
+            {
+                host.Poll(Time.unscaledDeltaTime);
+                yield return null;
+            }
+            Assert.That(host.Connected, Is.True);
+            host.SendStart(1, 0);
+            var partner = new PlayerSnapshot { Head = new Vector3(1f, 1.6f, 2f), HeadRotation = Quaternion.identity, Hp = 100f, MaxHp = 100f, Level = 1, Lives = 3 };
+            float until = Time.realtimeSinceStartup + 3f;
+            while (Time.realtimeSinceStartup < until && arena.Phase != Phase.Playing)
+            {
+                host.SendPlayer(partner, 1f);
+                host.Poll(Time.unscaledDeltaTime);
+                yield return null;
+            }
+            Assert.That(arena.Phase, Is.EqualTo(Phase.Playing));
+            Assert.That(arena.TestReady, Is.False, "readiness from before the match carried into it");
+
+            // The host pauses: so do you.
+            partner.Paused = true;
+            yield return Pump(host, partner, 0.5f);
+            Assert.That(arena.TestPaused, Is.True, "the other player's pause didn't pause this headset");
+            // Only they are ready: still paused.
+            partner.PauseReady = true;
+            yield return Pump(host, partner, 0.5f);
+            Assert.That(arena.TestPaused, Is.True, "resumed without this player being ready");
+            // Both ready: on we go.
+            arena.TestPauseReady(true);
+            yield return Pump(host, partner, 0.5f);
+            Assert.That(arena.TestPaused, Is.False, "didn't resume with both ready");
+            // Their last paused-and-ready updates don't pause it again.
+            yield return Pump(host, partner, 0.3f);
+            Assert.That(arena.TestPaused, Is.False);
+            partner.Paused = partner.PauseReady = false;
+            yield return Pump(host, partner, 0.3f);
+            Assert.That(Time.timeScale, Is.EqualTo(1f));
+        }
+
+        static IEnumerator Pump(NetSession host, PlayerSnapshot partner, float seconds)
+        {
+            float until = Time.realtimeSinceStartup + seconds;
+            while (Time.realtimeSinceStartup < until)
+            {
+                host.SendPlayer(partner, 1f);
+                host.Poll(Time.unscaledDeltaTime);
+                yield return null;
+            }
+        }
+
+                static void Snap(Vector3 eye, Vector3 target, string name)
         {
             var cameraObject = new GameObject("Capture Camera", typeof(Camera));
             cameraObject.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(target - eye));

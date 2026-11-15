@@ -168,6 +168,10 @@ namespace Repulsor
 
         void ShowCharacters()
         {
+            // Arriving at character select (not just redrawing it): nobody is ready yet. Readiness from before (the
+            // last match's start) started the next match on the first click (11/15).
+            if (phase != Phase.Characters)
+                localReady = remoteReady = false;
             phase = Phase.Characters;
             CleanUpMatch();
             CharacterDef current = Character;
@@ -262,11 +266,24 @@ namespace Repulsor
 
         void ShowPause()
         {
-            if (paused && (mode == GameMode.PveSolo || phase == Phase.Sandbox))
+            if (paused)
                 Time.timeScale = 0f;
             RectTransform s = OpenScreen(new Vector2(480f, 330f), "PAUSED");
             bool sandbox = phase == Phase.Sandbox;
-            Ui.Button(s, "RESUME", new Vector2(-115f, 95f), new Vector2(210f, 44f), Resume, 18);
+            if (MultiplayerMatch)
+            {
+                // Both headsets are paused; the match goes on when both players are ready.
+                PokeButton ready = Ui.Button(s, pauseReady ? "WAITING" : "READY", new Vector2(-115f, 95f), new Vector2(210f, 44f), () =>
+                {
+                    pauseReady = !pauseReady;
+                    ShowPause();
+                }, 18);
+                ready.Selected = pauseReady;
+                pauseStatus = Ui.Label(s, "", new Vector2(0f, 140f), new Vector2(460f, 18f), 12, TextAnchor.MiddleCenter);
+                pauseStatus.color = Ui.Muted;
+            }
+            else
+                Ui.Button(s, "RESUME", new Vector2(-115f, 95f), new Vector2(210f, 44f), Resume, 18);
             if (sandbox)
             {
                 Ui.Button(s, "LEAVE OLD CONTROLS", new Vector2(-115f, 43f), new Vector2(210f, 44f), () =>

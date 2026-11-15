@@ -45,6 +45,61 @@ namespace Repulsor
         /// <summary>The nearest player's chest, for aiming at bodies rather than heads.</summary>
         public Vector3 NearestPlayerChest(Vector3 from) => NearestPlayerHead(from) + Vector3.down * 0.3f;
 
+        bool pauseReady;
+        bool sawRemotePause;
+        float sinceResume = 99f;
+        Text pauseStatus;
+
+        /// <summary>For tests: paused, say ready on the pause screen, and the character select readiness.</summary>
+        public bool TestPaused => paused;
+        public void TestPauseReady(bool ready) => pauseReady = ready;
+        public bool TestReady => localReady || remoteReady;
+
+        /// <summary>A match with another player in it (pausing then pauses both).</summary>
+        bool MultiplayerMatch => Multiplayer && net.Connected && phase == Phase.Playing;
+
+        /// <summary>
+        /// Multiplayer pause (11/15): when one player pauses, both do; the match goes on when both say they're ready
+        /// (on the pause screen, or the pause gesture again). Character select from the pause takes both there.
+        /// The state rides on the player updates (20 a second), so a lost packet can't leave one headset stuck.
+        /// </summary>
+        void TickMultiplayerPause(float dt)
+        {
+            sinceResume += dt;
+            if (!MultiplayerMatch)
+                return;
+            PlayerSnapshot other = remote.Latest;
+            bool there = remote.Visible;
+            // A fresh pause (not ready yet) from the other player pauses you too. Just after resuming, their last
+            // updates can still say paused-and-ready; those don't count.
+            if (!paused && there && other.Paused && !other.PauseReady && sinceResume > 0.5f)
+            {
+                Log("The other player paused");
+                Pause();
+                return;
+            }
+            if (!paused)
+                return;
+            if (there && other.Paused)
+                sawRemotePause = true;
+            if (there && other.Choosing && sawRemotePause)
+            {
+                Log("The other player went to character select");
+                ShowCharacters();
+                return;
+            }
+            bool theyreReady = !there || other.PauseReady || (sawRemotePause && !other.Paused);
+            if (pauseReady && theyreReady)
+            {
+                Log("Both ready: resuming");
+                Resume();
+                return;
+            }
+            if (pauseStatus != null)
+                pauseStatus.text = !there ? "The other player isn't connected"
+                    : other.PauseReady ? "The other player is ready" : pauseReady ? "Waiting for the other player to be ready" : "Both players must press READY to go on";
+        }
+
         /// <summary>Your own head (for things each headset checks against its own player, like a boss's sweep).</summary>
         public Vector3 LocalHead => head.position;
 
@@ -303,6 +358,9 @@ namespace Repulsor
                 HandBeam rightBeam = BeamOf(1, out Vector3 rightFrom, out Vector3 rightTo);
                 net.SendPlayer(new PlayerSnapshot
                 {
+                    Paused = phase == Phase.Playing && paused,
+                    PauseReady = phase == Phase.Playing && paused && pauseReady,
+                    Choosing = phase == Phase.Characters,
                     LeftBeam = (byte)leftBeam,
                     LeftBeamFrom = frame.ToShared(leftFrom),
                     LeftBeamTo = frame.ToShared(leftTo),
@@ -340,6 +398,7 @@ namespace Repulsor
             remote.FloorY = FloorY;
             remote.Tick(dt);
             TickRemoteLooks(dt);
+            TickMultiplayerPause(dt);
             if (phase == Phase.Playing && Multiplayer && remote.Visible)
             {
                 PlayerSnapshot partner = remote.Latest;
