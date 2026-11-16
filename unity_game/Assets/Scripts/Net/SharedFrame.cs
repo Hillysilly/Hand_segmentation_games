@@ -13,8 +13,33 @@ namespace Repulsor
 
         Vector3 origin;
         Quaternion rotation = Quaternion.identity;
+        Transform anchor;
 
         public bool Calibrated { get; private set; }
+
+        /// <summary>The frame's origin and facing, in this headset's world.</summary>
+        public Pose Pose => new Pose(origin, rotation);
+
+        /// <summary>
+        /// Keeps the frame on a spatial anchor placed at its origin (11/15). When a headset loses tracking for a moment
+        /// and finds itself again, its whole world can shift by a metre or more ("Head jumped" in the log), which threw
+        /// the calibration off; the anchor is kept on the same real spot by the headset, so the frame goes with it.
+        /// </summary>
+        public void Follow(Transform anchorTransform) => anchor = anchorTransform;
+
+        /// <summary>Every frame: the origin and facing from the anchor, if there is one. Returns how far it moved.</summary>
+        public float Tick()
+        {
+            if (anchor == null || !Calibrated)
+                return 0f;
+            Vector3 forward = Vector3.ProjectOnPlane(anchor.rotation * Vector3.forward, Vector3.up);
+            if (forward.sqrMagnitude < 1e-4f)
+                return 0f;
+            float moved = Vector3.Distance(origin, anchor.position);
+            origin = anchor.position;
+            rotation = Quaternion.LookRotation(forward.normalized, Vector3.up);
+            return moved;
+        }
 
         /// <summary>False if the points are too close together to give a direction.</summary>
         public bool Set(Vector3 first, Vector3 second)
@@ -30,6 +55,7 @@ namespace Repulsor
 
         public void Clear()
         {
+            anchor = null;
             origin = Vector3.zero;
             rotation = Quaternion.identity;
             Calibrated = false;

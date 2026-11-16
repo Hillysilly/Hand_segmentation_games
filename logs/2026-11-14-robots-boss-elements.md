@@ -330,3 +330,10 @@ EditMode 175/175, PlayMode 23/23. Installed.
 - PVP lasers/flames sent one PlayerHit per frame (and the victim logged each, 70 lines a second). Now batched about
   ten times a second (`Arena.FlushPvpHits`; hits of 5 or more go at once).
   EditMode 178/178, PlayMode 25/25. Installed on 2G97C5ZH9300P6.
+- Players drift apart after moving (user, 11/15 pm). Logs: calibration was consistent (both headsets measured the
+  same two points 0.82 m apart), but both headsets logged "Head jumped" (0.38-1.81 m: tracking re-found its
+  position), each shifting that headset's whole world and voiding the calibration. Now the calibration is held by a
+  spatial anchor at the shared origin (`Arena.AnchorFrame`, `SharedFrame.Follow/Tick`; ARAnchorManager added in
+  RoomSense; the "Meta Quest: Anchors" OpenXR feature switched on for Android). The log says "Calibration anchored
+  to the room", or why not; "Calibration anchor moved ... still lined up" when it corrects a jump.
+  EditMode 178/178, PlayMode 25/25. Installed on 2G97C5ZH9300P6; untested on the headset.

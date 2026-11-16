@@ -27,9 +27,14 @@ namespace Repulsor
         public ARBoundingBoxManager Boxes { get; private set; }
         /// <summary>Floor, walls and tables from Space Setup, once the room permission is granted.</summary>
         public ARPlaneManager Planes { get; private set; }
+        /// <summary>Spatial anchors: points the headset keeps fixed to the real room (the multiplayer calibration).</summary>
+        public ARAnchorManager Anchors { get; private set; }
 
         void Start()
         {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            Anchors = raycaster.gameObject.AddComponent<ARAnchorManager>();
+#endif
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (Permission.HasUserAuthorizedPermission(ScenePermission))
             {

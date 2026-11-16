@@ -352,6 +352,7 @@ namespace Repulsor
             if (net == null)
                 return;
             net.Poll(dt);
+            TickFrameAnchor();
             if (net.Connected)
             {
                 HandBeam leftBeam = BeamOf(0, out Vector3 leftFrom, out Vector3 leftTo);
@@ -605,6 +606,44 @@ namespace Repulsor
             }, 15);
         }
 
+        UnityEngine.XR.ARFoundation.ARAnchor frameAnchor;
+
+        /// <summary>Puts a spatial anchor at the calibrated origin, so the calibration survives tracking jumps.</summary>
+        async void AnchorFrame()
+        {
+            var anchors = game.Room != null ? game.Room.Anchors : null;
+            if (anchors == null)
+                return;
+            if (frameAnchor != null)
+                anchors.TryRemoveAnchor(frameAnchor);
+            frameAnchor = null;
+            Pose pose = frame.Pose;
+            try
+            {
+                var result = await anchors.TryAddAnchorAsync(pose);
+                if (result.status.IsSuccess() && result.value != null && frame.Calibrated)
+                {
+                    frameAnchor = result.value;
+                    frame.Follow(frameAnchor.transform);
+                    Log("Calibration anchored to the room");
+                }
+                else
+                    Log($"Couldn't anchor the calibration ({result.status}): a tracking jump will throw it off");
+            }
+            catch (System.Exception e)
+            {
+                Log($"Couldn't anchor the calibration: {e.Message}");
+            }
+        }
+
+        /// <summary>Every frame: the shared frame follows its anchor; a big move means tracking re-found itself.</summary>
+        void TickFrameAnchor()
+        {
+            float moved = frame.Tick();
+            if (moved > 0.05f)
+                Log($"Calibration anchor moved {moved:0.00} m with the room (tracking re-found its position); still lined up");
+        }
+
         void TickCalibration(float dt)
         {
             calibrationRing.enabled = false;
@@ -642,6 +681,7 @@ namespace Repulsor
                 return;
             }
             Log($"Calibrated: point 2 at {still.Point}, {Vector3.Distance(calibrationFirst, still.Point):0.00} m apart");
+            AnchorFrame();
             calibrationStep = -1;
             hud.Message("LINED UP", "The other player's markers should sit on their head and hands", 2.5f);
             localReady = false;
