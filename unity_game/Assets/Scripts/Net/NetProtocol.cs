@@ -76,7 +76,12 @@ namespace Repulsor
     }
 
     /// <summary>A held attack drawn from a hand, sent with every player update.</summary>
-    public enum HandBeam : byte { None, Laser, Flames, Blade, Lightning }
+    /// <remarks>
+    /// Also held things that aren't beams: Ryuu's charging ball (from its centre, up by its charge), the Valkyr's
+    /// bow (left: grip to string; right: grip along the aim, as long as the draw) and crossbows (palm along the aim,
+    /// as long as it's loaded).
+    /// </remarks>
+    public enum HandBeam : byte { None, Laser, Flames, Blade, Lightning, KiCharge, Bow, BowAim, Crossbow }
 
     /// <summary>How a shot looks, so the other headset draws the same thing.</summary>
     public enum ShotLook : byte { Plain, KiBall, Arrow, Bolt, Rock, Web, Comet }

@@ -274,6 +274,33 @@ namespace Repulsor.Tests
             Assert.That(arena.TestRemoteAura, Is.True, "the partner's aura isn't drawn");
             Snap(me + new Vector3(0f, 0.1f, -0.6f), partner.Head + Vector3.down * 0.6f, "coop_remote");
 
+            // Ryuu level 2 charging an energy ball, the Valkyr's drawn bow, Terra level 3: pictures of each.
+            Vector3 chest = partner.Head + new Vector3(0f, -0.3f, -0.3f);
+            partner.Character = (byte)CharacterId.KiFighter;
+            partner.Level = 2;
+            partner.RightBeam = 0;
+            partner.LeftBeam = (byte)HandBeam.KiCharge;
+            partner.LeftBeamFrom = chest;
+            partner.LeftBeamTo = chest + Vector3.up * 0.8f;
+            yield return Pump(host, partner, 0.6f);
+            Assert.That(arena.TestRemoteCharge, Is.True, "the partner's charging ball isn't drawn");
+            Assert.That(arena.TestRemoteAura, Is.True, "Ryuu's level 2 aura isn't drawn");
+            Snap(me + new Vector3(0f, 0.1f, -0.6f), partner.Head + Vector3.down * 0.6f, "coop_ryu2");
+            partner.Character = (byte)CharacterId.Archer;
+            partner.LeftBeam = (byte)HandBeam.Bow;
+            partner.LeftBeamFrom = chest + new Vector3(0.1f, 0.1f, -0.35f);
+            partner.LeftBeamTo = chest + new Vector3(0.05f, 0.1f, 0.15f);
+            partner.RightBeam = (byte)HandBeam.BowAim;
+            partner.RightBeamFrom = partner.LeftBeamFrom;
+            partner.RightBeamTo = partner.LeftBeamFrom + new Vector3(0f, 0f, -0.75f);
+            yield return Pump(host, partner, 0.4f);
+            Snap(me + new Vector3(0.6f, 0.1f, -0.2f), partner.Head + Vector3.down * 0.4f, "coop_bow");
+            partner.Character = (byte)CharacterId.Earth;
+            partner.Level = 3;
+            partner.LeftBeam = partner.RightBeam = 0;
+            yield return Pump(host, partner, 0.6f);
+            Snap(me + new Vector3(0f, 0.3f, -0.6f), partner.Head + Vector3.down * 0.9f, "coop_terra3");
+
             float before = arena.TestHp;
             Vector3 facing = Vector3.ProjectOnPlane(me - ahead, Vector3.up).normalized;
             host.SendEnemyMove(new EnemyMoveEvent { Id = 7, Move = MechBrain.SwingMove, A = facing, F = 0.5f });

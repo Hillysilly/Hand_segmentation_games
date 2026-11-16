@@ -346,3 +346,11 @@ EditMode 175/175, PlayMode 23/23. Installed.
   the shield; recharge (0.8 s of shield a second, 7.5 s from empty) waits 0.6 s after a spend. HUD says ENERGY
   / LOW ENERGY in PVP. Tests: PvpEnergyHoldsFourSecondsOfLaserOrSixOfShield, SpendingWaitsBeforeRecharging.
   EditMode 180/180, PlayMode 25/25. Installed on 2G97C5ZH9300P6.
+- The other player's held gear: Ryuu's charging ball (HandBeam.KiCharge), the Valkyr's bow (Bow + BowAim: grip,
+  string, aim, draw) and crossbows (Crossbow), drawn with a second ArcherGear. Terra's level 3 rock orbs stick to
+  the other player in PVP (`StuckRock.AttachTo` on `RemoteBody`, a point following their head) and the snap sets
+  them off. Captures Logs/play_coop_ryu2.png, play_coop_bow.png, play_coop_terra3.png (auras draw in the editor;
+  the user's "Ryu level 2 / Terra rocks don't show" may have been on builds without the remote looks).
+- PVP attack energy at a third (`Arena.AttackEnergyScale` = 1/3): laser 12 s, flames 10 s, lightning 7.5 s, ki
+  ball 10-25%, fire pillar 21%, tornado 14-24%, spikes 12%, arrow 5-13%, web 4-6%; shield unchanged (6 s).
+  EditMode 180/180, PlayMode 25/25. Built; no headset connected. Pushed v1-game.

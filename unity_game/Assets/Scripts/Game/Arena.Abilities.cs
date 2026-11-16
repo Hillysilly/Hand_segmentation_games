@@ -271,7 +271,7 @@ namespace Repulsor
                 {
                     slashedAt[target] = Time.time;
                     float hit = Mathf.Lerp(SlashMinDamage, SlashDamage, Mathf.Clamp01(tipSpeed / SlashFullSpeed));
-                    if (UsesEnergy && !player.Shield.TrySpend(hit * EnergyPerDamage * MeleeDiscount))
+                    if (UsesEnergy && !player.Shield.TrySpend(hit * EnergyPerDamage * MeleeDiscount * AttackEnergyScale))
                         player.Shield.Drain(999f, 1f);
                     game.Strike(target, player.Outgoing(hit), hilt, "Sword slash");
                 }

@@ -260,6 +260,9 @@ namespace Repulsor
                 {
                     if (target is Enemy enemy && enemy != null && enemy.Alive)
                         stuckRocks.Add(StuckRock.Attach(enemy, at, rockHot, foes));
+                    // PVP (11/15): they stick to the other player too, riding on them until the snap.
+                    else if (target == remoteTarget && remoteTarget != null && target.Alive)
+                        stuckRocks.Add(StuckRock.AttachTo(RemoteBody, target, at, rockHot));
                 };
         }
 

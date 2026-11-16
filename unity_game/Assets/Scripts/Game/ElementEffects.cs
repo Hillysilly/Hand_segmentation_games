@@ -441,6 +441,29 @@ namespace Repulsor
         float age;
         Renderer[] renderers;
 
+        /// <summary>
+        /// Stuck to something that isn't an enemy, riding on <paramref name="follow"/> (the other player in PVP, whose
+        /// body is a point that follows their head).
+        /// </summary>
+        public static StuckRock AttachTo(Transform follow, IHittable target, Vector3 at, Material hot)
+        {
+            var prefab = Resources.Load<GameObject>("Props/RockSmallA");
+            Transform rock = prefab != null ? Instantiate(prefab).transform : new GameObject("Rock").transform;
+            rock.name = "Stuck Rock";
+            rock.SetParent(follow, true);
+            Vector3 core = target.Center;
+            Vector3 outward = (at - core).sqrMagnitude > 1e-4f ? (at - core).normalized : Vector3.forward;
+            rock.position = core + outward * target.Radius * 0.9f;
+            rock.rotation = Random.rotation;
+            rock.localScale = Vector3.one * 0.15f;
+            var stuck = rock.gameObject.AddComponent<StuckRock>();
+            stuck.Target = target;
+            stuck.renderers = rock.GetComponentsInChildren<Renderer>();
+            Paint.All(rock, hot);
+            BallLook.Sprite("Glow", rock, "FxGlow", 1.4f, new Color(1f, 0.35f, 0.08f)).Set(billboard: true, flicker: 0.25f);
+            return stuck;
+        }
+
         public static StuckRock Attach(Enemy enemy, Vector3 at, Material hot, Transform parent)
         {
             var prefab = Resources.Load<GameObject>("Props/RockSmallA");

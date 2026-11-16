@@ -36,6 +36,12 @@ namespace Repulsor
         /// <summary>A tornado can catch someone for about two seconds of its damage.</summary>
         public const float TornadoDamageGuess = TornadoDps * 2f;
 
+        /// <summary>
+        /// Every attack's price times this (11/15: at full price everything felt too expensive; a third as the
+        /// baseline for balancing). The shield itself isn't scaled.
+        /// </summary>
+        public static float AttackEnergyScale = 1f / 3f;
+
         float noEnergyShown;
 
         bool UsesEnergy => Pvp && phase == Phase.Playing;
@@ -50,7 +56,7 @@ namespace Repulsor
         {
             if (!UsesEnergy)
                 return true;
-            if (player.Shield.TrySpend(fraction))
+            if (player.Shield.TrySpend(fraction * AttackEnergyScale))
                 return true;
             NoEnergy();
             return false;
@@ -80,7 +86,7 @@ namespace Repulsor
                     HandBeam.Blade => BladeDrain,
                     _ => 0f,
                 };
-                if (rate > 0f && !player.Shield.Drain(rate, dt))
+                if (rate > 0f && !player.Shield.Drain(rate * AttackEnergyScale, dt))
                     NoEnergy();
             }
         }

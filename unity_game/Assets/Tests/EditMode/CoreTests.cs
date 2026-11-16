@@ -255,12 +255,13 @@ namespace Repulsor.Tests
             Assert.That(Arena.LaserDrain, Is.EqualTo(0.25f).Within(0.001f));
             float held = 0f;
             shield.Hold(false);
-            while (shield.Drain(Arena.LaserDrain, Frame) && held < 10f)
+            while (shield.Drain(Arena.LaserDrain, Frame) && held < 20f)
             {
                 shield.Tick(Frame);
                 held += Frame;
             }
-            Assert.That(held, Is.EqualTo(4f).Within(0.1f), "laser seconds on a full gauge");
+            Assert.That(held, Is.EqualTo(4f).Within(0.1f), "laser seconds on a full gauge at full price");
+            Assert.That(Arena.LaserDrain * Arena.AttackEnergyScale, Is.EqualTo(1f / 12f).Within(0.001f), "a third of that: 12 s");
             Assert.That(shield.Broken, Is.False, "running out of energy doesn't break the shield");
 
             var full = new ShieldGauge { Capacity = Arena.PvpGaugeSeconds };

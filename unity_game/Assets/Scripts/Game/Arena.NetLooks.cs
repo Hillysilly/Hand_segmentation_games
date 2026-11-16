@@ -126,6 +126,25 @@ namespace Repulsor
             from = to = Vector3.zero;
             if (phase != Phase.Playing || player.IsDead)
                 return HandBeam.None;
+            if (character == CharacterId.Archer && player.Level >= 2 && bow.Formed)
+            {
+                from = bow.BowPosition;
+                to = i == 0 ? bow.StringPosition : bow.BowPosition + bow.Direction * (0.05f + bow.Draw);
+                return i == 0 ? HandBeam.Bow : HandBeam.BowAim;
+            }
+            if (character == CharacterId.Archer && gun[i].Aiming)
+            {
+                HandPose aiming = i == 0 ? input.Left : input.Right;
+                from = aiming.Palm;
+                to = from + gun[i].Direction * (0.1f + Mathf.Clamp01(1f - reload[i] / CrossbowReload));
+                return HandBeam.Crossbow;
+            }
+            if (character == CharacterId.KiFighter && i == 0 && kiCharge.Holding)
+            {
+                from = kiCharge.Center;
+                to = from + Vector3.up * kiCharge.Charge;
+                return HandBeam.KiCharge;
+            }
             if (lightning != null && lightning[i].ShownNow)
             {
                 from = lightning[i].ShownFrom;
@@ -146,10 +165,80 @@ namespace Repulsor
         ChainLightning[] remoteLightning;
         Color remoteBeamColor;
 
+        ArcherGear remoteArcher;
+        GameObject remoteChargeBall;
+        Transform remoteBody;
+
+        /// <summary>A point riding on the other player's body (things stuck to them hang off it).</summary>
+        Transform RemoteBody
+        {
+            get
+            {
+                if (remoteBody == null)
+                {
+                    remoteBody = new GameObject("Remote Body").transform;
+                    remoteBody.SetParent(transform, false);
+                }
+                return remoteBody;
+            }
+        }
+
+        /// <summary>For tests: the other player's charging ball shows.</summary>
+        public bool TestRemoteCharge => remoteChargeBall != null && remoteChargeBall.activeSelf;
+
+        /// <summary>The other player's bow, crossbows and charging ball.</summary>
+        void TickRemoteGear(bool show)
+        {
+            PlayerSnapshot p = remote.Latest;
+            Color color = p.Color;
+            if (remoteBody != null || show)
+                RemoteBody.position = remote.ShownHead + Vector3.down * 0.35f;
+            var left = (HandBeam)(show ? p.LeftBeam : 0);
+            var right = (HandBeam)(show ? p.RightBeam : 0);
+
+            if (left == HandBeam.Bow || right == HandBeam.Crossbow || left == HandBeam.Crossbow || remoteArcher != null)
+            {
+                remoteArcher ??= new ArcherGear(transform);
+                if (left == HandBeam.Bow && right == HandBeam.BowAim)
+                {
+                    Vector3 aim = p.RightBeamTo - p.RightBeamFrom;
+                    remoteArcher.Bow(true, p.LeftBeamFrom, p.LeftBeamTo, aim.normalized, Mathf.Clamp01(aim.magnitude - 0.05f), color);
+                }
+                else
+                    remoteArcher.Bow(false, default, default, Vector3.forward, 0f, color);
+                for (int i = 0; i < 2; i++)
+                {
+                    bool crossbow = (i == 0 ? left : right) == HandBeam.Crossbow;
+                    Vector3 from = i == 0 ? p.LeftBeamFrom : p.RightBeamFrom;
+                    Vector3 along = (i == 0 ? p.LeftBeamTo : p.RightBeamTo) - from;
+                    remoteArcher.Crossbow(i, crossbow, from, crossbow && along.sqrMagnitude > 1e-6f ? along.normalized : Vector3.forward,
+                        Mathf.Clamp01(along.magnitude - 0.1f), color);
+                }
+            }
+
+            bool charging = left == HandBeam.KiCharge;
+            if (charging && remoteChargeBall == null)
+            {
+                remoteChargeBall = game.MakeEnergyBall(transform);
+                DecorateBall(remoteChargeBall.transform, 0, color);
+            }
+            if (remoteChargeBall != null)
+            {
+                remoteChargeBall.SetActive(charging);
+                if (charging)
+                {
+                    remoteChargeBall.transform.position = p.LeftBeamFrom;
+                    float charge = Mathf.Clamp01((p.LeftBeamTo - p.LeftBeamFrom).magnitude);
+                    remoteChargeBall.transform.localScale = Vector3.one * Mathf.Lerp(0.05f, 0.28f, charge);
+                }
+            }
+        }
+
         void TickRemoteBeams(bool show)
         {
             PlayerSnapshot p = remote.Latest;
             Color color = p.Color;
+            TickRemoteGear(show);
             for (int i = 0; i < 2; i++)
             {
                 var kind = (HandBeam)(show ? (i == 0 ? p.LeftBeam : p.RightBeam) : 0);
