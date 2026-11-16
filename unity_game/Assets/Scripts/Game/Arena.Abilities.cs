@@ -189,7 +189,8 @@ namespace Repulsor
             bool charging = false;
             if (player.Level >= 2)
             {
-                if (kiCharge.Step(input.Left, input.Right, body, dt, out Vector3 direction, out float power))
+                if (kiCharge.Step(input.Left, input.Right, body, dt, out Vector3 direction, out float power)
+                    && SpendFor(12f + 18f * power))
                 {
                     direction = Aim.Assist(kiCharge.Center, direction);
                     Vector3 from = kiCharge.Center + direction * 0.15f;
@@ -207,7 +208,7 @@ namespace Repulsor
                 for (int i = 0; i < 2; i++)
                 {
                     HandPose hand = i == 0 ? input.Left : input.Right;
-                    if (kiPunch[i].Step(hand, body, dt, out Vector3 origin, out Vector3 punch))
+                    if (kiPunch[i].Step(hand, body, dt, out Vector3 origin, out Vector3 punch) && SpendFor(10f, 1.2f))
                     {
                         // Its comets are sent as the one effect below, not as shots of their own.
                         replayingShot = true;
@@ -228,7 +229,7 @@ namespace Repulsor
             for (int i = 0; i < 2; i++)
             {
                 HandPose hand = i == 0 ? input.Left : input.Right;
-                bool sword = player.Level >= 2 && grip[i].Step(hand, dt);
+                bool sword = player.Level >= 2 && grip[i].Step(hand, dt) && HeldEnergy;
                 if (sword)
                 {
                     Vector3 hilt = grip[i].Hilt;
@@ -270,6 +271,8 @@ namespace Repulsor
                 {
                     slashedAt[target] = Time.time;
                     float hit = Mathf.Lerp(SlashMinDamage, SlashDamage, Mathf.Clamp01(tipSpeed / SlashFullSpeed));
+                    if (UsesEnergy && !player.Shield.TrySpend(hit * EnergyPerDamage * MeleeDiscount))
+                        player.Shield.Drain(999f, 1f);
                     game.Strike(target, player.Outgoing(hit), hilt, "Sword slash");
                 }
                 else if (inside)
@@ -286,7 +289,8 @@ namespace Repulsor
 
         void TickArcher(float dt)
         {
-            if (player.Level >= 2 && bow.Step(input.Left, input.Right, body, dt, out Vector3 from, out Vector3 aim, out float draw))
+            if (player.Level >= 2 && bow.Step(input.Left, input.Right, body, dt, out Vector3 from, out Vector3 aim, out float draw)
+                && SpendFor(6f + 10f * draw))
             {
                 NextShot(ShotLook.Arrow);
                 Blast arrow = game.FireBlast(from + aim * 0.1f, aim, 0.3f, 0.4f, Mathf.Lerp(1.2f, 2.2f, draw), player.Outgoing(6f + 10f * draw), 0f);
@@ -310,7 +314,8 @@ namespace Repulsor
                 for (int i = 0; i < 2; i++)
                 {
                     HandPose thrower = i == 0 ? input.Left : input.Right;
-                    if (bomb[i].Step(thrower, body, dt, out Vector3 from2, out Vector3 velocity) && matchTime >= smokeReady)
+                    if (bomb[i].Step(thrower, body, dt, out Vector3 from2, out Vector3 velocity) && matchTime >= smokeReady
+                        && SpendFlat(SmokeCost))
                     {
                         smokeReady = matchTime + SmokeCooldown;
                         SmokeCloud.Throw(from2, velocity, foes);
@@ -340,7 +345,7 @@ namespace Repulsor
         {
             if (player.Level < 3)
                 return;
-            if (triangle.Step(input.Left, input.Right, body, dt, out Vector3 target))
+            if (triangle.Step(input.Left, input.Right, body, dt, out Vector3 target) && SpendFor(25f))
             {
                 handsBusyFor = 0.8f;
                 game.Explode(target + Vector3.up * 0.6f, 1.1f, player.Outgoing(25f), AttackColor);
@@ -457,6 +462,8 @@ namespace Repulsor
 
         void LiftBox(UnityEngine.XR.ARFoundation.ARBoundingBox box, int hand, Color color)
         {
+            if (!SpendFlat(LiftCost))
+                return;
             held = room.Lift(box, color, this);
             heldHand = hand;
             heldFor = 0f;
@@ -577,6 +584,8 @@ namespace Repulsor
                     LiftBox(box, i, color);
                     return;
                 }
+                if (!SpendFor(black ? 7f : 5f))
+                    continue;
                 NextShot(ShotLook.Web, black ? 1 : 0);
                 Blast shot = game.FireBlast(origin, aimed, 0.3f, 0.35f, 1.6f, player.Outgoing(black ? 7f : 5f), 0f, color);
                 WebStrand.Attach(shot, origin, black ? new Color(0.25f, 0.2f, 0.3f) : Color.white, foes);

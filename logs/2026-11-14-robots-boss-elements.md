@@ -337,3 +337,12 @@ EditMode 175/175, PlayMode 23/23. Installed.
   RoomSense; the "Meta Quest: Anchors" OpenXR feature switched on for Android). The log says "Calibration anchored
   to the room", or why not; "Calibration anchor moved ... still lined up" when it corrects a jump.
   EditMode 178/178, PlayMode 25/25. Installed on 2G97C5ZH9300P6; untested on the headset.
+- PVP energy (`Arena.Energy.cs`): the shield gauge is 6 s in PVP and also attack energy. A full gauge = 40 damage
+  (4 s of the level 1 laser), so one-offs cost damage/40 of the gauge: ki ball 30-75%, dragon fist 30% (x1.2 for
+  homing), arrow 15-40%, web shot 12.5/17.5%, fire pillar 62.5%, tornado 42-72%, rock spikes 35%; smoke and
+  furniture lifts 30% flat; slashes pay half their damage rate (melee). Held: laser 0.25/s, flames 0.3/s,
+  lightning 0.4/s, blade out 0.05/s. Free: snap blasts, Tempest's gust, finger guns (blaster, crossbow). An
+  empty gauge stops held attacks (Technoman level 1 then has nothing until it recharges); spending never breaks
+  the shield; recharge (0.8 s of shield a second, 7.5 s from empty) waits 0.6 s after a spend. HUD says ENERGY
+  / LOW ENERGY in PVP. Tests: PvpEnergyHoldsFourSecondsOfLaserOrSixOfShield, SpendingWaitsBeforeRecharging.
+  EditMode 180/180, PlayMode 25/25. Installed on 2G97C5ZH9300P6.

@@ -204,6 +204,8 @@ namespace Repulsor
                 builder.Append("<color=#FF7050>SHIELD BROKEN ").Append(Mathf.CeilToInt(fighter.Shield.BrokenFor)).Append("s</color>  ");
             else if (fighter.Shield.Up)
                 builder.Append("<color=#80F0FF>SHIELD UP</color>  ");
+            else if (fighter.Shield.Capacity > ShieldGauge.HoldSeconds)
+                builder.Append(fighter.Shield.Fraction < 0.15f ? "<color=#FF9050>LOW ENERGY</color>  " : "<color=#80F0FF>ENERGY</color>  ");
             if (fighter.InvincibleFor > 0f)
                 builder.Append("<color=#FFF080>INVINCIBLE ").Append(Mathf.CeilToInt(fighter.InvincibleFor)).Append("s</color>  ");
             if (fighter.BoostFor > 0f)

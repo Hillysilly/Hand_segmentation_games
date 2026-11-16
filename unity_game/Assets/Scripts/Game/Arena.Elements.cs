@@ -76,7 +76,8 @@ namespace Repulsor
             bool charging = false;
             if (player.Level >= 3)
             {
-                if (swirl.Step(input.Left, input.Right, body, dt, out Vector3 direction, out float power))
+                if (swirl.Step(input.Left, input.Right, body, dt, out Vector3 direction, out float power)
+                    && SpendFor(TornadoDamageGuess * Mathf.Lerp(0.7f, 1.2f, power)))
                 {
                     Tornado.Launch(game, swirl.Center, direction, power, FloorY, player.Outgoing(TornadoDps), foes);
                     SendEffect(NetEffect.Tornado, swirl.Center, direction, power);
@@ -90,7 +91,7 @@ namespace Repulsor
             // Level 2 lightning: both hands out flat. Five seconds at most, then it needs a rest.
             bool flat = player.Level >= 2 && !charging && flatHands.Step(input.Left, input.Right, body, dt);
             lightningCooldown = Mathf.Max(0f, lightningCooldown - dt);
-            bool zap = flat && lightningCooldown <= 0f && lightningLeft > 0f;
+            bool zap = flat && lightningCooldown <= 0f && lightningLeft > 0f && HeldEnergy;
             if (zap)
             {
                 lightningLeft -= dt;
@@ -173,7 +174,7 @@ namespace Repulsor
                 for (int i = 0; i < 2; i++)
                 {
                     HandPose hand = i == 0 ? input.Left : input.Right;
-                    if (uppercut[i].Step(hand, body, dt, out Vector3 direction))
+                    if (uppercut[i].Step(hand, body, dt, out Vector3 direction) && SpendFor(RockSpikes.Damage))
                     {
                         Vector3 feet = new Vector3(head.position.x, FloorY, head.position.z);
                         // Toward whatever's ahead, if something is.

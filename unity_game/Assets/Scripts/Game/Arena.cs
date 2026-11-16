@@ -159,7 +159,10 @@ namespace Repulsor
             }
 
             if (phase == Phase.Playing && !paused)
+            {
                 TickMatch(Time.deltaTime);
+                DrainHeldAttacks(Time.deltaTime);
+            }
             UpdateRemoteTarget();
 
             bool playing = phase == Phase.Playing;
@@ -329,6 +332,9 @@ namespace Repulsor
             player.Reset();
             waves = new WaveDirector(settings.Waves, bossFight ? settings.Waves : 1);
             boss = null;
+            // PVP: the shield gauge is also attack energy, and a little bigger (Arena.Energy).
+            player.Shield.Capacity = Pvp ? PvpGaugeSeconds : ShieldGauge.HoldSeconds;
+            player.Shield.Reset();
             if (Pvp)
                 StartPvp();
             announcedWave = -1;
@@ -568,7 +574,7 @@ namespace Repulsor
             bool inPlay = practicing || (phase == Phase.Playing && !paused && waves != null && !CountingDown);
             // Posing only disarms when the meter is full, or holding two fists low (Saber blades) would blink them out.
             bool fighting = inPlay && !player.IsDead && !player.Shield.Up && !xArms.Held && !(powerUp.Posing && player.CanTransform);
-            game.Arm(fighting && handsBusyFor <= 0f ? WeaponFor(character, player.Level) : Weapon.None);
+            game.Arm(fighting && handsBusyFor <= 0f ? WithEnergy(WeaponFor(character, player.Level)) : Weapon.None);
             int level = phase == Phase.Playing || practicing ? player.Level : 1;
             game.LaserDps = Damage.LaserPerSecond * (1f + 0.4f * (level - 1));
             game.RepulsorDamage = Damage.Repulsor * (level >= 2 && character == CharacterId.KiFighter ? 1.3f : 1f);

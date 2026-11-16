@@ -248,6 +248,42 @@ namespace Repulsor.Tests
         }
 
         [Test]
+        public void PvpEnergyHoldsFourSecondsOfLaserOrSixOfShield()
+        {
+            var shield = new ShieldGauge { Capacity = Arena.PvpGaugeSeconds };
+            shield.Reset();
+            Assert.That(Arena.LaserDrain, Is.EqualTo(0.25f).Within(0.001f));
+            float held = 0f;
+            shield.Hold(false);
+            while (shield.Drain(Arena.LaserDrain, Frame) && held < 10f)
+            {
+                shield.Tick(Frame);
+                held += Frame;
+            }
+            Assert.That(held, Is.EqualTo(4f).Within(0.1f), "laser seconds on a full gauge");
+            Assert.That(shield.Broken, Is.False, "running out of energy doesn't break the shield");
+
+            var full = new ShieldGauge { Capacity = Arena.PvpGaugeSeconds };
+            full.Reset();
+            Run(full, true, Arena.PvpGaugeSeconds - 0.1f);
+            Assert.That(full.Up, Is.True, "six seconds of shield");
+        }
+
+        [Test]
+        public void SpendingWaitsBeforeRechargingAndNeedsTheEnergy()
+        {
+            var shield = new ShieldGauge { Capacity = Arena.PvpGaugeSeconds };
+            shield.Reset();
+            Assert.That(shield.TrySpend(0.75f), Is.True);
+            Assert.That(shield.TrySpend(0.5f), Is.False, "only a quarter left");
+            Assert.That(shield.Fraction, Is.EqualTo(0.25f).Within(0.001f), "a failed spend costs nothing");
+            Run(shield, false, ShieldGauge.SpendRechargeDelay * 0.8f);
+            Assert.That(shield.Fraction, Is.EqualTo(0.25f).Within(0.001f), "no recharge right after spending");
+            Run(shield, false, 1f);
+            Assert.That(shield.Fraction, Is.GreaterThan(0.3f));
+        }
+
+        [Test]
         public void RechargesWhenLetGo()
         {
             var shield = new ShieldGauge();
