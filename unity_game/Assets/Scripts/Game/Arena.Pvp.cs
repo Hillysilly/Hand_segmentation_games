@@ -69,7 +69,7 @@ namespace Repulsor
             net.PlayerHitReceived += damage =>
             {
                 if (phase == Phase.Playing && !CountingDown)
-                    HurtPlayer(damage, "other player");
+                    HurtPlayer(damage, "other player", false);
             };
             net.RoundReceived += OnRound;
         }

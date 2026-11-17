@@ -354,3 +354,102 @@ EditMode 175/175, PlayMode 23/23. Installed.
 - PVP attack energy at a third (`Arena.AttackEnergyScale` = 1/3): laser 12 s, flames 10 s, lightning 7.5 s, ki
   ball 10-25%, fire pillar 21%, tornado 14-24%, spikes 12%, arrow 5-13%, web 4-6%; shield unchanged (6 s).
   EditMode 180/180, PlayMode 25/25. Built; no headset connected. Pushed v1-game.
+
+## 11/16: PVE balance pass (`unity_game/balance.md`)
+
+- All the numbers are in `Core/Balance.cs`, and `Arena.Balance.cs` applies them. PVP keeps its 3 levels and old damage.
+- **Rounds:** 20 (`WavePlan.StoryRounds`). TRILOBITE is the round 10 boss and GOLIATH the round 20 boss (`WavePlan.BossRound`).
+  - First rounds: gunner 1, drone 3, dasher 5, rocketeer 8, sniper 12, tank 15.
+  - A kind's first round always opens with it (`KindFor(wave, roll, spawnIndex)`).
+  - Rounds 1-9 keep their size, ±1 at random. Rounds 11-19 have 17 enemies, ±2.
+  - Boss reinforcements can be any kind met so far.
+- **Enemy HP:** base HP in the first round, doubling at rounds 5/10/15/20 after that (gunner 15/30/60/120; tank 200, 400 as reinforcements).
+  - Bases: gunner 15, drone 10, dasher 25, rocketeer 40, sniper 60, tank 200.
+  - TRILOBITE 1500, GOLIATH 3000. Co-op doubles everything, bosses too.
+- **Enemy damage:** x1.15 at each of rounds 5/10/15/20, times difficulty (easy 0.75, normal 1, hard 1.5), applied in `HurtPlayer`.
+- **Wind-ups (`Arena.TellScale`):** easy 2x, normal 1.5x, hard as before.
+  - Covers enemy laser aim lines, the dasher's tell, TRILOBITE's strike rings, GOLIATH's swing and jump crouch.
+  - GOLIATH's jump is higher and slower: 1.6 s in the air (was 1.1), 2.6 m (was 1.8).
+  - The difficulty button is on the mode screen; the host's is sent with the match start (protocol 3).
+- **Levels:** 5 in PVE.
+  - Moves arrive at levels 1, 3 and 5. Level 1 attacks x1.5 from level 2, level 2 moves x1.5 from level 4.
+  - Max HP 100-300.
+  - Meter per level: 400 / 1500 / 6000 / 8500 damage, from the enemy HP up to each target round.
+- **Attack damage:** set so each character's best attack takes 50-75 hits (or seconds, both hands) on TRILOBITE at level 3 and GOLIATH at level 5 (`Logs/balance_boss_hits.md`).
+  - Snap blasts / blaster / gust 8; laser 6/s a hand; crossbow 12.
+  - Repulsor blast, spikes, full ki ball and full slash 27; flames 13.5/s a hand; bow 8-22; lightning 10/s a bolt; fling 27.
+  - Dragon fist 25; fire pillar 80; stuck rocks 20; Technoman's splash 45%.
+  - Webs: 4 per web at a 0.6 s repeat (they keep firing while held; at 8 every 0.3 s they'd be about 4x the others).
+- **Drops:** 5% chance of a +25 HP pack (new `PowerupKind.Health`), 5% chance of a random powerup.
+- **Valkyr's bomb:** a poison bomb against robots, a green cloud doing 25/s for 4 s to each enemy in it, once (`Poison`). PVP keeps smoke.
+- **Simulation:** `BalanceSim`, a scripted player on the game's own waves, HP, meter and levels; report in `Logs/balance_sim.md`.
+  - **What it shows:** rounds 1-9 take about 4 min, with level 2 at round 4 and level 3 at round 7 (on target). Rounds 11-19 kill the player: 5 enemies at 4x HP stay alive and keep shooting, there's no healing in combat, and each death resets to level 1.
+  - **What-if, heal 50% between rounds plus a death costing 1 level:** Technoman, Lumen and Terra win 6/6 in about 12.5 min.
+  - **Still dying:** Ryuu, Emberwitch, Valkyr, Webline and Tempest. Their best damage per second is half or less of the others' (ki ball, bow, lightning and webs are slow).
+  - The attack rates in the simulation are assumptions; headset logs would calibrate them.
+- **Tests:** EditMode 188/188, PlayMode 25/25. Not built.
+
+### 11/16 follow-up: decisions after the simulation
+- **Damage boost fixed:** the 1.5x powerup was applied twice (`player.Outgoing` and `RepulsorGame.DamageScale` in `Strike`), so it gave 2.25x. Removed the 20 `Outgoing` wraps; `Strike` applies it once. Only the poison bomb keeps `Outgoing`, because its ticks go through `Strike` unscaled.
+- **No healing between rounds** (user's call).
+- **PVE death keeps your level** and only empties the meter (`Balance.PveLevelsLostOnDeath = 0`). PVP still goes back to level 1.
+- **Power-up meter:** while holding the power-up pose, the HUD meter fills white-hot with the pose's progress ("POWERING UP n%"). Lightning climbs off the bar, more bolts and taller as the pose completes, then bursts when the level up goes off (`PlayerHud.TickPowerUp`; renders in `Logs/preview_hud_powering_*.png`).
+- **Simulation with the new death rule (normal):** Technoman and Lumen win 3/6 in about 11 min; everyone else 0/6. Ryuu, Emberwitch, Valkyr, Webline and Tempest never reach level 5.
+- **Tests:** EditMode 189/189, PlayMode 25/25. Not built.
+
+### 11/16 evening: first playtest fixes
+- **Robots hide behind real walls:** enemy materials now use `Repulsor/Enemy Lit` (`Shaders/EnemyLit.shader`), URP's Lit copied with the main pass cut by the headset's live depth (`VisibilityQuick`, 10 cm margin so feet stay on the floor). `EnemyModels` builds with it from now on. Before, robots in the hallway showed through the wall.
+- **Drones keep away:** range 2.4 m (was 1.4), and they back off at under 1.8 m (one flew onto the player's head).
+- **Finger gun (Lumen's blaster, Valkyr's crossbow):** the flick is 10° in 0.3 s (was 12° in 0.25 s), the shape holds through 0.35 s of dropout (was 0.2), and it stays a gun with more give once aimed. Looser hand shapes were tried and rejected: a half-curled hand read as a gun.
+- **Smaller first rounds:** 3, 4, 6, 8, 10 enemies (was 4, 6, 7, 9, 11).
+- **Easier early levels:** 250 / 1200 / 5500 / 8500 (was 400 / 1500 / 6000 / 8500). In the sim, level 2 arrives around round 3.5 and level 3 around round 7.
+- **Not yet diagnosed:** robots "not exactly in the hallway". Needs the log from the headset played on (…C1ZF7K09VL).
+- **Tests:** EditMode 189/189, PlayMode 25/25. Built and installed on …C5ZG8V05SS.
+
+### 11/16 evening: second batch (untested until the end-of-batch run)
+- **Webline level 5:** black webs, the swing and the fling do 2.5x their level 1 damage (`Balance.BlackWeb = 2.5 / 1.5`; was 1.4, about 2.1x). Lumen's force throw is unchanged.
+- **GOLIATH's sword:** the wind-up is 1.5 s on normal (base 1.0, was 0.8), 2 s on easy and 1 s on hard. Follow-up swings stay at 85% of the first; before, each shrank by a quarter, down to about 0.5 s. The body's attack clip is stretched over the wind-up (`EnemyLook.PlayOnceOver`), so it no longer swings early.
+- **Select screen:** moves are labelled LEVEL 1/3/5 in PVE (PVP stays 1/2/3). The level 4 message reads "Your level 3 moves hit 1.5x harder".
+- **UI behind your hands:** every `Ui.Box`/`Ui.Label` draws with `Resources/UiOccluded` (`Repulsor/UI Occluded`), UI/Default plus live depth with a 4 cm margin. Menus no longer cover your real hands. Needs `GameAssets.Build` to make the material.
+- **Workflow:** don't test or build after each change during a playtest stream; test once at the end.
+- **Ryuu's ki ball (two hands together, then push):** looser detection.
+  - Hands may be 18 cm apart (was 12), and one hand may be curled. Two fists still don't count.
+  - It fires from 0.3 s of charge (was 0.5).
+  - The push is 0.9 m/s on average, with the slower hand at least 40% of that. Before, both hands had to reach 1.2 m/s.
+  - There's 0.5 s to push after the hands part (was 0.35).
+- **Select screen behind your hands:** the mannequin and hand-sign materials (`Resources/Showcase`) also use `Repulsor/Enemy Lit`, so the 3D figure hides behind your hands like the UI and the robots.
+- **Valkyr's crossbow:** 15 in PVE (was 12). PVP keeps 7.
+- **Names:** Technoman -> Techno, Ryuu -> Brawler, Webline -> Spider Boy (display names only; the `CharacterId`s are unchanged). The " *" work-in-progress stars on the select buttons and the work-in-progress note are gone.
+- **Hallway spawns (from the 20:40 playtest log on …C1ZF7K09VL):** 632 spawns, all on the Space Setup floor (6 corners, 5.2 x 4.5 m), and 721 "in a wall" call-outs: 454 from live depth ("hidden behind a surface"), 267 from the room map. Called-out robots walk straight at you, through walls. Tracking also re-found its position 13 times (head jumps up to 4.2 m), clearing the map each time.
+  - **Suspected cause:** the outline is read flipped or turned relative to the real room.
+  - **Fix:** `RoomMap.ChooseOrientation` scores the outline as read and its 7 flips/quarter turns against the floor cells the scan saw (inside +1, outside -2), uses the best once 30+ cells are seen, and logs the scores (`[Room] Space Setup floor checked against ...`).
+  - With a confirmed outline, a robot on that floor and not in a solid cell is left alone when out of sight (round a corner), instead of being called out through the wall.
+  - Spawn and call-out lines now log positions. The next playtest log will show which orientation won.
+
+### 11/16 late: robots and walls (log 22:13 on …C5ZG8V05SS)
+- **That headset:** no Space Setup (0 furniture boxes, no floor outline) and no SCAN ROOM. Tracking re-found its position 8 times before the match (up to 8 m), clearing the map.
+- **What happened:** relaxed "tight room" spawns appeared 6-7 m away in unseen space (the next room). Live depth then called them "in a wall", and they walked straight through it. Robots shot whenever in range, and the eye glows (FxSprite) ignored depth.
+- **Paths:** `RoomMap.UpdatePaths` (BFS over walkable cells every 0.3 s: inside the Space Setup outline and not solid, or seen open without one) and `PathToward` (furthest clear cell down the path). A robot that can't see you walks the path round the walls.
+- **Line of sight:** `Arena.CanSee` checks the room-map line (no solid cells; stays on the outline) and, in view, live depth. Robots only fire when they see you.
+- **Hidden with no way round:** relocated to a fresh spawn point (`Relocate`, logged) instead of walking through the wall. Drones steer round walls too (`Steer`).
+- **Spawns:** the relaxed tier keeps the clear-line rule.
+- **Eyes:** `FxSprite` has `_Occlude`, set on robot eye glows, so they hide behind walls with the body.
+- **Test:** `RoomSafetyTests.RobotsBehindAWallWalkRoundItNotThroughIt`.
+- Not yet tested or built (batch).
+- **Wall fixes, tested:** EditMode 190/190, PlayMode 25/25. The path's fallback step no longer cuts a wall's corner diagonally (found by the new test). Built and installed on …C5ZG8V05SS.
+- **New name, Tin Can Takedown:** `GameAssets.BuildLogo` makes `Resources/Logo.png` from `unity_game/logo.png` (brightness becomes alpha, cropped). The title screen shows it tinted `Ui.Accent`, with a text fallback. `QuestBuild` sets `PlayerSettings.productName` (the package id is unchanged). Preview: `Logs/preview_menu_title.png`.
+
+### 11/16 night batch (untested until the end-of-batch run)
+- **Lumen level 5 (force grab, then crush):** looser.
+  - Cupped hand: fingers 1.12-1.72 (was 1.2-1.65), average 1.25-1.64 (was 1.3-1.58), thumb out 0.35 (was 0.45), with give once on.
+  - Takes hold after 0.15 s (was 0.25) and lets go after 0.5 s (was 0.4).
+  - Aims within 18° (was the web's 10°).
+- **PVP energy:** `AttackEnergyScale` 0.5 (was 1/3), so every attack costs 1.5x.
+- **PVP Spider Boy:** 20% less damage (`Balance.SpiderPvpDamage`) on webs, swing, fling and thrown furniture.
+- **Lifted furniture seen by the other player:** new `NetEffect`s (appended), `Lift`, `LiftMove` (10 Hz), `LiftThrow` and `LiftDrop`, sent for the web pull and Lumen's lift. The other headset shows a glowing copy (`ThrownObject.MakeReplica`) that follows, flies when thrown, and deals no damage there.
+- **PVP HP x1.5:** `Fighter.HpScale` = `Balance.PvpHpScale` (150 / 225 / 300 by level). MaxHp is sent over the network, so the opponent's bar follows.
+- **Lumen's force, reworked (user's design):** cupped hand = aim (blue line), close into a fist = grab what it aimed at (enemy or furniture), fast swing = throw, open the hand for 0.35 s = let go. The fist-crush is gone.
+  - No laser sword while that hand is aiming, holding, or still a fist after a throw (`forceLock`).
+  - A fist closed on nothing cancels the force, so it lights the sword as usual.
+  - `ForceGrabDetector` was rewritten (0.7 s window from cup to fist; a loose fist counts).
+  - Tests: `CupAimsAFistGrabsAndAFastSwingThrows`, `AFistWithoutACupFirstIsNotAForceGrab`, `OpeningTheHandLetsGo`; the PlayMode crush check became a force-hold check.

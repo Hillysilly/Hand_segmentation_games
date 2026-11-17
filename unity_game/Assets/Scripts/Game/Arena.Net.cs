@@ -292,11 +292,12 @@ namespace Repulsor
                     ShowCharacters();
                 TryStartTogether();
             };
-            net.StartReceived += (seed, hostCharacter) =>
+            net.StartReceived += (seed, hostCharacter, difficulty) =>
             {
                 if (net.Role == NetRole.Client && phase != Phase.Playing)
                 {
-                    Log("Host started the match");
+                    settings.Difficulty = (Difficulty)Mathf.Clamp(difficulty, 0, 2);
+                    Log($"Host started the match ({Balance.NameOf(settings.Difficulty)})");
                     StartMatch();
                 }
             };
@@ -428,7 +429,7 @@ namespace Repulsor
         {
             if (!Multiplayer || net.Role != NetRole.Host || !localReady || !remoteReady || phase != Phase.Characters)
                 return;
-            net.SendStart(Random.Range(0, int.MaxValue), (byte)character);
+            net.SendStart(Random.Range(0, int.MaxValue), (byte)character, (byte)PickedDifficulty);
             Log("Both ready: starting");
             StartMatch();
         }

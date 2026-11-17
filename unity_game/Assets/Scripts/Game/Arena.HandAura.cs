@@ -35,7 +35,7 @@ namespace Repulsor
         void TickHandAura()
         {
             bool inPlay = (phase == Phase.Playing && !player.IsDead) || practicing;
-            bool wear = inPlay && WearsHandAura(player.Level);
+            bool wear = inPlay && WearsHandAura(Tier);
             for (int i = 0; i < 2; i++)
             {
                 if (!wear)

@@ -136,7 +136,7 @@ namespace Repulsor.EditorTools
             var material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
             if (material == null)
             {
-                material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                material = new Material(Shader.Find("Repulsor/Enemy Lit"));
                 AssetDatabase.CreateAsset(material, materialPath);
             }
             material.SetColor("_BaseColor", new Color(0.9f, 0.9f, 0.92f));
@@ -174,7 +174,7 @@ namespace Repulsor.EditorTools
             var material = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (material == null)
             {
-                material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                material = new Material(Shader.Find("Repulsor/Enemy Lit"));
                 AssetDatabase.CreateAsset(material, path);
             }
             Color color = key == "MannequinJoints" ? new Color(0.12f, 0.13f, 0.16f) : new Color(0.85f, 0.87f, 0.9f);

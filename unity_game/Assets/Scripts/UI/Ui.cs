@@ -24,6 +24,25 @@ namespace Repulsor
 
         static Font font;
         static Sprite rounded;
+        static Material material;
+        static bool materialLoaded;
+
+        /// <summary>
+        /// Every panel, label and bar draws with this: like the default UI, but hidden behind your real hands and
+        /// anything else real in front of it (Repulsor/UI Occluded). Null (the default UI) if it isn't built.
+        /// </summary>
+        public static Material Material
+        {
+            get
+            {
+                if (!materialLoaded)
+                {
+                    material = Resources.Load<Material>("UiOccluded");
+                    materialLoaded = true;
+                }
+                return material;
+            }
+        }
 
         public static Font Font => font != null ? font : font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         public static Sprite Rounded => rounded != null ? rounded : rounded = MakeRounded();
@@ -57,6 +76,7 @@ namespace Repulsor
         {
             RectTransform rect = Rect("Box", parent, position, size);
             var image = rect.gameObject.AddComponent<Image>();
+            image.material = Material;
             image.color = color;
             image.raycastTarget = false;
             if (round)
@@ -73,6 +93,7 @@ namespace Repulsor
         {
             RectTransform rect = Rect("Label", parent, position, size);
             var label = rect.gameObject.AddComponent<Text>();
+            label.material = Material;
             label.font = Font;
             label.fontSize = fontSize;
             label.fontStyle = style;

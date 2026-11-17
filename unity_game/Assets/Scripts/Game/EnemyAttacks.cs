@@ -43,8 +43,9 @@ namespace Repulsor
             laser.muzzle = muzzle;
             laser.muzzleFollow = follow;
             laser.direction = direction.normalized;
-            laser.charge = charge;
-            laser.track = track;
+            // Difficulty (11/16): the aim line shows for longer on easier settings; the tracking part too.
+            laser.charge = charge * Arena.TellScale;
+            laser.track = track * Arena.TellScale;
             laser.damage = damage;
             laser.width = width;
 

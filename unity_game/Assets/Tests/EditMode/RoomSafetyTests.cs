@@ -36,6 +36,35 @@ namespace Repulsor.Tests
         }
 
         [Test]
+        public void RobotsBehindAWallWalkRoundItNotThroughIt()
+        {
+            // Floor 6 m square, split by a wall along x = 0 from z = -3 to z = 1.5, with a gap at the top.
+            var map = new RoomMap();
+            map.TestMarkFloor(Vector3.zero, 3f);
+            for (float z = -3f; z <= 1.5f; z += RoomMap.Cell * 0.5f)
+                map.TestMarkSolid(new Vector3(0.1f, 0f, z));
+            var players = new List<Vector3> { new Vector3(-2f, 1.6f, -2f) };
+            map.UpdatePaths(players);
+            var robot = new Vector3(2f, 0f, -2f);
+
+            Assert.That(map.LineClear(robot, players[0]), Is.False, "the wall is in the way");
+            Assert.That(map.HasPath(robot), Is.True);
+            Assert.That(map.PathToward(robot, out Vector3 direction), Is.True);
+            // Toward the gap (up), not straight at the player through the wall (-x).
+            Assert.That(direction.z, Is.GreaterThan(0.5f), $"heads {direction}");
+
+            // Walking the path gets it round to the player's side without ever standing in the wall.
+            Vector3 at = robot;
+            for (int i = 0; i < 400 && at.x > -1f; i++)
+            {
+                Assert.That(map.PathToward(at, out Vector3 step), Is.True, $"lost the way at {at}");
+                at += step * 0.05f;
+                Assert.That(map.Walled(at, 0f), Is.False, $"walked into the wall at {at}");
+            }
+            Assert.That(at.x, Is.LessThan(-1f), "got round");
+        }
+
+        [Test]
         public void SpawnsKeepTheirBodyClearOfWalls()
         {
             RoomMap map = Room();

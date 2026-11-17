@@ -11,6 +11,12 @@ namespace Repulsor
     /// </summary>
     public sealed partial class Arena
     {
+        /// <summary>Webline's black webs (top level, PVE): the swing and fling hit harder too.</summary>
+        float BlackWebBoost => character == CharacterId.Spider && Tier >= 3 ? Balance.BlackWeb : 1f;
+
+        /// <summary>Spider Boy hits 20% softer in PVP.</summary>
+        float SpiderPvpScale => Pvp && character == CharacterId.Spider ? Balance.SpiderPvpDamage : 1f;
+
         /// <summary>How far the webbed enemy hangs from your hand, and how hard swings and landings hit.</summary>
         public static float WebLength = 1.1f;
         public static float WebSwingDamage = 6f;
@@ -19,6 +25,8 @@ namespace Repulsor
         public static float WebFlingBoost = 2.5f;
         /// <summary>Webs within this many degrees of an enemy grab it.</summary>
         public static float WebGrabDegrees = 10f;
+        /// <summary>Lumen's force grab aims wider than a web (11/16: it was hard to land).</summary>
+        public static float ForceGrabDegrees = 18f;
         const float WebHoldSeconds = 6f;
         const float FlingGravity = 6f;
 
@@ -41,14 +49,14 @@ namespace Repulsor
         /// <summary>The enemy a web from here would grab, if any (level 2 and up, local enemies only).</summary>
         Enemy WebGrabTarget(Vector3 origin, Vector3 direction)
         {
-            if (player.Level < 2)
+            if (Tier < 2)
                 return null;
             return Grabbable(origin, direction);
         }
 
         /// <summary>An enemy within reach of a grab along this line: not the boss, not a copy, not already held.</summary>
-        static Enemy Grabbable(Vector3 origin, Vector3 direction) =>
-            Aim.Target(origin, direction, WebGrabDegrees, 8f) is Enemy enemy && !enemy.IsProxy && !enemy.Spawning
+        static Enemy Grabbable(Vector3 origin, Vector3 direction, float degrees = -1f) =>
+            Aim.Target(origin, direction, degrees > 0f ? degrees : WebGrabDegrees, 8f) is Enemy enemy && !enemy.IsProxy && !enemy.Spawning
                 && !enemy.Webbed && !enemy.IsBoss ? enemy : null;
 
         void WebEnemy(Enemy enemy, int hand, bool byForce = false)
@@ -86,7 +94,7 @@ namespace Repulsor
                 enemy.transform.position = next;
                 ShowAim(swingingHand, hand.Wrist, next);
                 // Swung into another enemy: that one gets hurt, once each.
-                Smash(swinging, position, next, player.Outgoing(WebSwingDamage));
+                Smash(swinging, position, next, Dmg(WebSwingDamage * SpiderPvpScale, Balance.WebSwing * BlackWebBoost, 2));
 
                 if (swinging.Age > 0.3f && hand.Velocity.magnitude > ForceGrabDetector.ThrowSpeed
                     && Vector3.Dot(hand.Velocity.normalized, arm) > 0.3f)
@@ -133,14 +141,15 @@ namespace Repulsor
                 bool landed = to.y < FloorY + thrown.Enemy.Radius || thrown.Age > 1.6f;
                 if (!landed && step.sqrMagnitude > 1e-8f && game.Room.TryDistance(from, step.normalized, out float wall))
                     landed = wall < step.magnitude + thrown.Enemy.Radius;
-                bool hitSomeone = Smash(thrown, from, to, player.Outgoing(WebFlingDamage * 0.6f));
+                float fling = Dmg(WebFlingDamage * (thrown.Force ? 1f : SpiderPvpScale), Balance.WebFling * (thrown.Force ? 1f : BlackWebBoost), 2);
+                bool hitSomeone = Smash(thrown, from, to, fling * 0.6f);
                 thrown.Enemy.transform.position = to;
                 PlaceCocoon(thrown);
                 if (!landed && !hitSomeone)
                     continue;
                 Log($"Flung {thrown.Enemy.Kind} {(hitSomeone ? "hit another enemy" : "landed")}");
-                game.Strike(thrown.Enemy, player.Outgoing(WebFlingDamage), to, thrown.Force ? "Force throw" : "Web fling");
-                game.Explode(to, 0.6f, player.Outgoing(WebFlingDamage * 0.4f), thrown.Force ? AttackColor : new Color(0.9f, 0.92f, 1f));
+                game.Strike(thrown.Enemy, fling, to, thrown.Force ? "Force throw" : "Web fling");
+                game.Explode(to, 0.6f, fling * 0.4f, thrown.Force ? AttackColor : new Color(0.9f, 0.92f, 1f));
                 ReleaseWebbed(thrown);
                 flung.RemoveAt(i);
             }

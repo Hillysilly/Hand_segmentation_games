@@ -55,8 +55,7 @@ namespace Repulsor
                 Text text = Ui.Label(abilityContent, "", Vector2.zero, new Vector2(244f, 10f), 11, TextAnchor.UpperLeft);
                 text.lineSpacing = 1.05f;
                 text.text = i < def.Controls.Length ? AbilityBlock(def, i, false)
-                    : (def.Ready ? "" : "<color=#FFC040>* Work in progress: some of these aren't built yet.</color>\n")
-                      + "<b>EVERYONE</b>\nCross wrists in an X: shield.\nMeter full: clench both fists at your sides to power up.\n"
+                    : "<b>EVERYONE</b>\nCross wrists in an X: shield.\nMeter full: clench both fists at your sides to power up.\n"
                       + "Both hands OK sign for 2 s: pause.";
                 var rect = (RectTransform)text.transform;
                 rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 1f);
@@ -72,9 +71,15 @@ namespace Repulsor
             abilityScroll = abilityScrollGoal = 0f;
         }
 
+        /// <summary>
+        /// The player level a move arrives at: its ability level in PVP (1, 2, 3), and 1, 3, 5 in PVE, where the levels
+        /// between make the moves stronger.
+        /// </summary>
+        int ShownLevel(int abilityLevel) => Pvp ? abilityLevel : abilityLevel * 2 - 1;
+
         string AbilityBlock(CharacterDef def, int level, bool current)
         {
-            string head = $"LEVEL {level + 1}  ·  {CharacterShowcase.MoveName(def.Id, level + 1).ToUpperInvariant()}";
+            string head = $"LEVEL {ShownLevel(level + 1)}  ·  {CharacterShowcase.MoveName(def.Id, level + 1).ToUpperInvariant()}";
             string colour = current ? "#" + ColorUtility.ToHtmlStringRGB(PlayerColor) : "#9AAABB";
             string body = "• " + string.Join("\n• ", def.Controls[level]);
             return current
@@ -131,7 +136,8 @@ namespace Repulsor
                 CharacterDef def = Character;
                 if (showcaseLevel != null)
                 {
-                    showcaseLevel.text = $"LV {level}  ·  {CharacterShowcase.MoveName(def.Id, level).ToUpperInvariant()}";
+                    // PVE has five levels (11/16): a character's moves arrive at levels 1, 3 and 5.
+                    showcaseLevel.text = $"LV {ShownLevel(level)}  ·  {CharacterShowcase.MoveName(def.Id, level).ToUpperInvariant()}";
                     showcaseLevel.color = PlayerColor;
                 }
                 if (abilityBlocks != null)

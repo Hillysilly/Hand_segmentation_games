@@ -37,7 +37,8 @@ namespace Repulsor
 
         public event Action<PlayerSnapshot> PlayerReceived;
         public event Action<LobbyState> LobbyReceived;
-        public event Action<int, byte> StartReceived;
+        /// <summary>The host started: seed, the host's character, the difficulty.</summary>
+        public event Action<int, byte, byte> StartReceived;
         public event Action<ShotEvent> ShotReceived;
         public event Action<WaveNet, List<EnemyNet>> EnemiesReceived;
         public event Action<ushort, float> EnemyHitReceived;
@@ -193,8 +194,8 @@ namespace Repulsor
                     case NetMessage.Start:
                         if (!FromPeer(from))
                             return;
-                        NetProtocol.ReadStart(reader, out int seed, out byte character);
-                        StartReceived?.Invoke(seed, character);
+                        NetProtocol.ReadStart(reader, out int seed, out byte character, out byte difficulty);
+                        StartReceived?.Invoke(seed, character, difficulty);
                         break;
                     case NetMessage.Shot:
                         if (!FromPeer(from))
@@ -325,10 +326,10 @@ namespace Repulsor
                 Send(NetProtocol.Lobby(state));
         }
 
-        public void SendStart(int seed, byte character)
+        public void SendStart(int seed, byte character, byte difficulty = (byte)Difficulty.Normal)
         {
             if (Connected)
-                Send(NetProtocol.Start(seed, character));
+                Send(NetProtocol.Start(seed, character, difficulty));
         }
 
         public void SendShot(in ShotEvent shot)

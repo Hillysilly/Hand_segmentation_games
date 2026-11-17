@@ -32,6 +32,8 @@ namespace Repulsor
         public float Aoe { get; set; }
         public Color Color { get; set; }
         public float Damage { get => damage; set => damage = value; }
+        /// <summary>Share of its damage the explosion does, when it has one (<see cref="Aoe"/>).</summary>
+        public float Splash { get; set; } = 0.6f;
         /// <summary>Flies through enemies, hitting each once, instead of stopping at the first.</summary>
         public bool Pierce { get; set; }
         /// <summary>An enemy this shot steers toward while it lives (the dragon fist's lock-on).</summary>
@@ -110,7 +112,7 @@ namespace Repulsor
             if (hit || age > LifeSeconds || wall)
             {
                 if (Aoe > 0f && (hit || wall))
-                    game.Explode(to, Aoe, damage * 0.6f, Color);
+                    game.Explode(to, Aoe, damage * Splash, Color);
                 Destroy(gameObject);
             }
         }

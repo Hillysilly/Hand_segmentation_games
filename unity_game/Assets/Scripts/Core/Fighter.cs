@@ -2,7 +2,8 @@ using System;
 
 namespace Repulsor
 {
-    public enum PowerupKind { Charge, Invincible, DamageBoost }
+    /// <summary>Sent as a byte; only add to the end. Health only comes from enemy drops (11/16).</summary>
+    public enum PowerupKind { Charge, Invincible, DamageBoost, Health }
 
     /// <summary>
     /// One player's health, transformation meter, level and lives. Plain C# with no Unity calls, so the
@@ -11,10 +12,9 @@ namespace Repulsor
     public sealed class Fighter
     {
         public const float BaseHp = 100f;
-        public const int MaxLevel = 3;
         public const float HealDelaySeconds = 5f;
         public const float HealPerSecond = 3f;
-        public const float MeterPerLevel = 60f;          // damage dealt to fill the meter once
+        public const float MeterPerLevel = 60f;          // damage dealt to fill the meter once (PVP; PVE uses Balance)
         public const float TransformHealFraction = 0.5f; // of the new max HP
         public const float InvincibleSeconds = 8f;
         public const float DamageBoostSeconds = 10f;
@@ -30,6 +30,13 @@ namespace Repulsor
         }
 
         public int StartingLives { get; set; }
+        /// <summary>The top level: 3 in PVP, 5 in PVE (11/16, <see cref="Balance"/>).</summary>
+        public int MaxLevel { get; set; } = Balance.PvpMaxLevel;
+        /// <summary>Damage to fill the meter for each level up (the last entry repeats).</summary>
+        public float[] LevelCosts { get; set; } = { MeterPerLevel };
+        public float MeterCost => LevelCosts[Math.Min(Level - 1, LevelCosts.Length - 1)];
+        /// <summary>Levels a death takes away: all of them in PVP, none in PVE (<see cref="Balance.PveLevelsLostOnDeath"/>).</summary>
+        public int LevelsLostOnDeath { get; set; } = 99;
         public float RespawnSeconds { get; set; }
 
         public float Hp { get; private set; }
@@ -52,13 +59,22 @@ namespace Repulsor
 
         public ShieldGauge Shield { get; } = new ShieldGauge();
 
-        public float MaxHp => MaxHpAt(Level);
+        public float MaxHp => MaxHpAt(Level) * HpScale;
+        /// <summary>Times every level's max HP (PVP: 1.5, <see cref="Balance.PvpHpScale"/>).</summary>
+        public float HpScale { get; set; } = 1f;
         public bool CanTransform => !IsDead && Level < MaxLevel && Meter >= 1f;
         public bool Invincible => God || InvincibleFor > 0f;
         public float DamageMultiplier => BoostFor > 0f ? DamageBoost : 1f;
         public bool Healing => !IsDead && SinceCombat >= HealDelaySeconds && Hp < MaxHp;
 
         public static float MaxHpAt(int level) => BaseHp * (1f + 0.5f * (level - 1));
+
+        /// <summary>Heals this much (a health pack), up to max HP.</summary>
+        public void Heal(float amount)
+        {
+            if (!IsDead && amount > 0f)
+                Hp = Math.Min(MaxHp, Hp + amount);
+        }
 
         public event Action<float> Damaged;
         public event Action Died;
@@ -99,7 +115,10 @@ namespace Repulsor
             return lost;
         }
 
-        /// <summary>Damage this player's attack will do, after powerups.</summary>
+        /// <summary>
+        /// Damage after powerups, for damage dealt outside RepulsorGame.Strike's own scaling (poison). Hits through
+        /// Strike get the boost there (RepulsorGame.DamageScale), so don't apply it twice.
+        /// </summary>
         public float Outgoing(float baseDamage) => baseDamage * DamageMultiplier;
 
         /// <summary>Records damage this player dealt: it fills the transformation meter.</summary>
@@ -110,7 +129,7 @@ namespace Repulsor
             SinceCombat = 0f;
             DamageDealt += amount;
             if (Level < MaxLevel)
-                Meter = Math.Min(1f, Meter + amount / MeterPerLevel);
+                Meter = Math.Min(1f, Meter + amount / MeterCost);
         }
 
         /// <summary>Spends a full meter to go up a level. Heals half the new max HP.</summary>
@@ -138,6 +157,9 @@ namespace Repulsor
                     break;
                 case PowerupKind.DamageBoost:
                     BoostFor = DamageBoostSeconds;
+                    break;
+                case PowerupKind.Health:
+                    Heal(Balance.HealthPack);
                     break;
             }
         }
@@ -182,8 +204,9 @@ namespace Repulsor
             Hp = 0f;
             IsDead = true;
             Lives--;
-            // Dying throws away the transformations: back to level 1 with an empty meter.
-            Level = 1;
+            // Dying empties the meter. In PVP it also throws away the transformations (back to level 1); in PVE you
+            // keep your level (LevelsLostOnDeath 0, set by the Arena from Balance).
+            Level = Math.Max(1, Level - LevelsLostOnDeath);
             Meter = 0f;
             BoostFor = 0f;
             Shield.Reset();

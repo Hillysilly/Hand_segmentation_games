@@ -65,6 +65,22 @@ namespace Repulsor
         }
 
         /// <summary>Tells the other headset about a one-off effect: a point, a direction, a number, a colour, a style.</summary>
+        /// <summary>The other player's lifted furniture, as shown here.</summary>
+        ThrownObject remoteHeld;
+        float heldSyncTimer;
+
+        /// <summary>While you hold furniture, where it is, ten times a second, so the other player sees it follow you.</summary>
+        void SyncHeld(float dt)
+        {
+            if (held == null || !Multiplayer)
+                return;
+            heldSyncTimer -= dt;
+            if (heldSyncTimer > 0f)
+                return;
+            heldSyncTimer = 0.1f;
+            SendEffect(NetEffect.LiftMove, held.transform.position, Vector3.up);
+        }
+
         void SendEffect(NetEffect kind, Vector3 a, Vector3 direction, float f = 0f, Color color = default, int style = 0)
         {
             if (replayingShot || !Multiplayer || !net.Connected)
@@ -111,7 +127,37 @@ namespace Repulsor
                     game.Explode(a, e.F, 0f, color);
                     break;
                 case NetEffect.Smoke:
-                    SmokeCloud.Throw(a, b * e.F, foes);
+                    SmokeCloud.Throw(a, b * e.F, foes, e.Style == 1);
+                    break;
+                case NetEffect.Lift:
+                    if (remoteHeld != null)
+                        Destroy(remoteHeld.gameObject);
+                    remoteHeld = ThrownObject.Create(a, Quaternion.LookRotation(b.sqrMagnitude > 1e-4f ? b : Vector3.forward),
+                        Vector3.one * Mathf.Clamp(e.F, 0.2f, 1.2f), color, "remote", this, foes);
+                    remoteHeld.MakeReplica();
+                    game.PlayAt(a, game.WhooshSound);
+                    break;
+                case NetEffect.LiftMove:
+                    if (remoteHeld != null)
+                        remoteHeld.MoveReplica(a);
+                    break;
+                case NetEffect.LiftThrow:
+                    if (remoteHeld != null)
+                    {
+                        remoteHeld.transform.position = a;
+                        Vector3 velocity = b.normalized * e.F;
+                        float wall = game.WallAhead(a, b.normalized, out float d) ? d : float.MaxValue;
+                        remoteHeld.Fly(velocity, wall);
+                        game.PlayAt(a, game.WhooshSound);
+                        remoteHeld = null;
+                    }
+                    break;
+                case NetEffect.LiftDrop:
+                    if (remoteHeld != null)
+                    {
+                        remoteHeld.Drop();
+                        remoteHeld = null;
+                    }
                     break;
             }
             game.Replaying = false;
@@ -126,7 +172,7 @@ namespace Repulsor
             from = to = Vector3.zero;
             if (phase != Phase.Playing || player.IsDead)
                 return HandBeam.None;
-            if (character == CharacterId.Archer && player.Level >= 2 && bow.Formed)
+            if (character == CharacterId.Archer && Tier >= 2 && bow.Formed)
             {
                 from = bow.BowPosition;
                 to = i == 0 ? bow.StringPosition : bow.BowPosition + bow.Direction * (0.05f + bow.Draw);
@@ -310,7 +356,7 @@ namespace Repulsor
             PlayerSnapshot p = remote.Latest;
             var id = (CharacterId)Mathf.Clamp(p.Character, 0, CharacterDef.All.Length - 1);
             CharacterDef def = CharacterDef.Get(id);
-            int level = Mathf.Clamp(p.Level, 1, 3);
+            int level = Mathf.Clamp(TierFor(p.Level), 1, 3);
             int style = show && !p.Dead ? def.AuraStyle[level - 1] : 0;
 
             remoteAuraPower = Mathf.MoveTowards(remoteAuraPower, style > 0 ? 1f : 0f, dt / (style > 0 ? 0.3f : 0.5f));

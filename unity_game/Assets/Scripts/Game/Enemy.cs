@@ -59,7 +59,9 @@ namespace Repulsor
         public string DashState => dashStep.ToString();
 
         // The Dasher's routine (seconds): crouch and show the way, dash, skid to a stop, fire twice, catch its breath.
-        public const float DashTellSeconds = 0.5f;
+        public const float DashTellBase = 0.5f;
+        /// <summary>The dasher's tell, longer on easier settings (Arena.TellScale).</summary>
+        public static float DashTellSeconds => DashTellBase * Arena.TellScale;
         public const float DashSeconds = 0.3f;
         public const float DashLength = 1.5f;
         const float DashPlantSeconds = 0.25f;
@@ -98,6 +100,10 @@ namespace Repulsor
         public bool Buried { get; set; }
         /// <summary>How many depth checks in a row found it hidden behind a real surface.</summary>
         public int HiddenChecks { get; set; }
+        float seeCheck;
+        bool seesTarget = true;
+        /// <summary>It has a clear line to the nearest player (checked a few times a second).</summary>
+        public bool SeesTarget => seesTarget;
         /// <summary>Caught in the Spider's web: it stops thinking and goes where the web puts it.</summary>
         public bool Webbed { get; set; }
         Vector3 netPosition;
@@ -125,6 +131,12 @@ namespace Repulsor
 
         void OnEnable() => Hittables.Add(this);
         void OnDisable() => Hittables.Remove(this);
+
+        /// <summary>Sets its health for the round (PVE balance, Arena.Balance), full.</summary>
+        public void SetHealth(float hp)
+        {
+            Hp = MaxHp = Mathf.Max(1f, hp);
+        }
 
         public static Enemy SpawnProxy(ushort id, EnemyKind kind, Vector3 position, float hp, float maxHp, Arena owner,
             Transform head, Transform parent)
@@ -291,6 +303,19 @@ namespace Repulsor
                 return;
             }
 
+            // Can it see you? If not, it takes the way round the walls (and comes on until it can).
+            seeCheck -= dt;
+            if (seeCheck <= 0f)
+            {
+                seeCheck = 0.2f;
+                seesTarget = arena.CanSee(this, target);
+            }
+            if (!seesTarget && arena.PathToward(transform.position, out Vector3 round))
+            {
+                toward = round;
+                distance = Mathf.Max(distance, spec.Range + 0.5f);
+            }
+
             running = false;
             if (Buried)
             {
@@ -338,7 +363,7 @@ namespace Repulsor
             }
             attackTimer -= dt;
             // Smoke blinds them: no shooting from inside it, or through it. The Dasher shoots as part of its routine.
-            if (Kind != EnemyKind.Dasher && attackTimer <= 0f && distance < 7f && !SmokeCloud.Blocks(transform.position, target))
+            if (Kind != EnemyKind.Dasher && attackTimer <= 0f && distance < 7f && seesTarget && !SmokeCloud.Blocks(transform.position, target))
             {
                 attackTimer = Random.Range(spec.AttackMin, spec.AttackMax);
                 Attack(target);
@@ -364,12 +389,21 @@ namespace Repulsor
             transform.position = new Vector3(transform.position.x, y, transform.position.z);
         }
 
+        /// <summary>A drone backs away when closer than its range less this (metres).</summary>
+        public const float DroneBackOff = 0.6f;
+
         void Fly(float dt, Vector3 target, Vector3 toward, float distance)
         {
             weave += dt * weaveSpeed;
             Vector3 side = Vector3.Cross(Vector3.up, toward) * (Mathf.Sin(weave * 2f) * 0.25f);
-            Vector3 move = (distance > spec.Range ? toward * spec.Speed : Vector3.zero) + side;
-            transform.position += move * SpeedScale * dt;
+            // Keeps a bit away (11/16: one flew onto the player's head): comes in to its range, and backs off
+            // quickly if you walk up to it or it drifts too close.
+            Vector3 approach = distance > spec.Range ? toward * spec.Speed
+                : distance < spec.Range - DroneBackOff ? -toward * spec.Speed * 2f : Vector3.zero;
+            Vector3 move = approach + side;
+            float step = move.magnitude * SpeedScale * dt;
+            if (step > 1e-6f)
+                transform.position += arena.Steer(transform.position, move.normalized, step);
             float height = target.y + 0.2f + Mathf.Sin(weave * 1.3f) * 0.25f;
             transform.position = new Vector3(transform.position.x,
                 Mathf.Lerp(transform.position.y, height, 1f - Mathf.Exp(-2f * dt)), transform.position.z);

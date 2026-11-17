@@ -261,7 +261,7 @@ namespace Repulsor.Tests
                 held += Frame;
             }
             Assert.That(held, Is.EqualTo(4f).Within(0.1f), "laser seconds on a full gauge at full price");
-            Assert.That(Arena.LaserDrain * Arena.AttackEnergyScale, Is.EqualTo(1f / 12f).Within(0.001f), "a third of that: 12 s");
+            Assert.That(Arena.LaserDrain * Arena.AttackEnergyScale, Is.EqualTo(1f / 8f).Within(0.001f), "half of that (11/16, was a third): 8 s");
             Assert.That(shield.Broken, Is.False, "running out of energy doesn't break the shield");
 
             var full = new ShieldGauge { Capacity = Arena.PvpGaugeSeconds };
@@ -389,12 +389,13 @@ namespace Repulsor.Tests
             {
                 EnemyKind kind = WavePlan.KindFor(1, roll);
                 Assert.That(kind, Is.EqualTo(EnemyKind.Robot), "round 1 is gunners");
-                Assert.That(WavePlan.KindFor(2, roll) == EnemyKind.Robot || WavePlan.KindFor(2, roll) == EnemyKind.Drone, "round 2 adds drones");
+                Assert.That(WavePlan.KindFor(2, roll), Is.EqualTo(EnemyKind.Robot), "round 2 is still gunners");
+                Assert.That(WavePlan.KindFor(3, roll) == EnemyKind.Robot || WavePlan.KindFor(3, roll) == EnemyKind.Drone, "round 3 adds drones");
                 Assert.That(WavePlan.KindFor(5, roll), Is.Not.EqualTo(EnemyKind.Boss));
             }
             var seen = new System.Collections.Generic.HashSet<EnemyKind>();
             for (double roll = 0; roll < 1; roll += 0.005)
-                seen.Add(WavePlan.KindFor(9, roll));
+                seen.Add(WavePlan.KindFor(19, roll));
             Assert.That(seen, Is.EquivalentTo(new[] { EnemyKind.Robot, EnemyKind.Drone, EnemyKind.Dasher,
                 EnemyKind.Rocketeer, EnemyKind.Sniper, EnemyKind.Tank }));
             // One new kind at a time, spread over the story, never in the boss round.

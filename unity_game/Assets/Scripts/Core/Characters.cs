@@ -36,7 +36,7 @@ namespace Repulsor
         {
             new CharacterDef
             {
-                Id = CharacterId.Technoman, Name = "Technoman", Tagline = "Armoured inventor",
+                Id = CharacterId.Technoman, Name = "Techno", Tagline = "Armoured inventor",
                 Color = "#4FC3FF", AuraStyle = new[] { 0, 0, 0 }, Shield = "Blue hex bubble", Ready = true,
                 Controls = new[]
                 {
@@ -47,7 +47,7 @@ namespace Repulsor
             },
             new CharacterDef
             {
-                Id = CharacterId.KiFighter, Name = "Ryuu", Tagline = "Martial artist",
+                Id = CharacterId.KiFighter, Name = "Brawler", Tagline = "Martial artist",
                 Color = "#FFD23F", AuraStyle = new[] { 0, 2, 2 }, Shield = "Flaming bubble", Ready = true,
                 Controls = new[]
                 {
@@ -75,7 +75,7 @@ namespace Repulsor
                 {
                     new[] { "Finger gun, flick up: blaster bolt" },
                     new[] { "Make a fist: laser sword", "Light aura" },
-                    new[] { "Cupped hand at an enemy or object: lift it, then throw. Make a fist on a held enemy: crush it", "Brighter aura with a halo", "Black gloves" },
+                    new[] { "Cupped hand at an enemy or object: aim. Close it into a fist: grab it with the force. Swing to throw, open to let go", "Brighter aura with a halo", "Black gloves" },
                 },
             },
             new CharacterDef
@@ -86,12 +86,12 @@ namespace Repulsor
                 {
                     new[] { "Finger gun, flick up: crossbow bolt (reloads)" },
                     new[] { "Fists together at arm's length: bow. Pull one back, open it to shoot" },
-                    new[] { "Underhand throw with a fist: smoke bomb", "Arrows pierce", "Wings", "Plated gloves" },
+                    new[] { "Underhand throw with a fist: poison bomb (smoke in PVP)", "Arrows pierce", "Wings", "Plated gloves" },
                 },
             },
             new CharacterDef
             {
-                Id = CharacterId.Spider, Name = "Webline", Tagline = "Web slinger",
+                Id = CharacterId.Spider, Name = "Spider Boy", Tagline = "Web slinger",
                 Color = "#E02030", AuraStyle = new[] { 0, 0, 0 }, Shield = "Web cocoon",
                 Controls = new[]
                 {

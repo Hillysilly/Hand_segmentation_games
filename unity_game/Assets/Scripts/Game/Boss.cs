@@ -260,7 +260,9 @@ namespace Repulsor
     /// </summary>
     public sealed class TrackingStrike : MonoBehaviour
     {
-        public const float Warning = 0.55f;
+        public const float WarningBase = 0.55f;
+        /// <summary>Seconds from the ring appearing to the strike: longer on easier settings (Arena.TellScale).</summary>
+        public static float Warning => WarningBase * Arena.TellScale;
         public const float Radius = 0.6f;
         public const float Damage = 9f;
         static readonly Color Red = new Color(1f, 0.12f, 0.06f);

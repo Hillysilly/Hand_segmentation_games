@@ -122,7 +122,7 @@ namespace Repulsor.Tests
             Assert.That(fighter.Hp, Is.EqualTo(Fighter.MaxHpAt(3)));
             Assert.That(fighter.Meter, Is.EqualTo(0f));
             fighter.SetLevel(9);
-            Assert.That(fighter.Level, Is.EqualTo(Fighter.MaxLevel));
+            Assert.That(fighter.Level, Is.EqualTo(fighter.MaxLevel));
         }
     }
 }

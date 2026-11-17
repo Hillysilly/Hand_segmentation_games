@@ -24,6 +24,8 @@ public static class QuestBuild
     public static void Build()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(ApkPath));
+        // The name in the Quest's app library (11/16). The package id stays, so it installs over older builds.
+        PlayerSettings.productName = Repulsor.Arena.GameTitleCase;
 
         BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
         {

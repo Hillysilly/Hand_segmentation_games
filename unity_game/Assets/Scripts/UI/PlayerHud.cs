@@ -55,6 +55,26 @@ namespace Repulsor
 
         public bool ShowFps { get; set; }
 
+        // Powering up (11/16): while you hold the pose, the meter fills white-hot with it and lightning crackles up off
+        // the bar, taller as the pose completes; it bursts when you level up.
+        const int Bolts = 7;
+        const int BoltSegments = 5;
+        const float BoltFlicker = 0.05f;
+        const float BurstSeconds = 0.7f;
+        static readonly Color BoltColor = new Color(0.6f, 0.95f, 1f);
+        readonly RectTransform powerFill;
+        readonly Image powerFillImage;
+        readonly RectTransform[,] boltSegments = new RectTransform[Bolts, BoltSegments];
+        readonly Image[,] boltImages = new Image[Bolts, BoltSegments];
+        float boltTimer;
+        float burstFor;
+
+        /// <summary>How far through the power-up pose you are (0 when not posing).</summary>
+        public float PowerUpProgress { get; set; }
+
+        /// <summary>The level up went off: one last burst of lightning off the meter.</summary>
+        public void PoweredUp() => burstFor = BurstSeconds;
+
         Text partnerText;
         Bar partnerBar;
         readonly RectTransform bossPanel;
@@ -115,6 +135,19 @@ namespace Repulsor
             partnerBar = Ui.Bar(panel, new Vector2(60f, -62f), new Vector2(150f, 7f), new Color(0.08f, 0.08f, 0.1f, 0.95f), new Color(0.3f, 1f, 0.4f));
             partnerBar.Trail = true;
             Partner(null, 0f);
+
+            powerFillImage = Ui.Box((RectTransform)meter.transform, Vector2.zero, Vector2.zero, Color.white, false);
+            powerFill = powerFillImage.rectTransform;
+            powerFill.gameObject.SetActive(false);
+            for (int b = 0; b < Bolts; b++)
+                for (int s = 0; s < BoltSegments; s++)
+                {
+                    Image segment = Ui.Box(panel, Vector2.zero, Vector2.zero, BoltColor, false);
+                    segment.rectTransform.pivot = new Vector2(0f, 0.5f);
+                    segment.gameObject.SetActive(false);
+                    boltImages[b, s] = segment;
+                    boltSegments[b, s] = segment.rectTransform;
+                }
 
             message = Ui.Canvas("Message", parent, new Vector2(700f, 260f));
             bigText = Ui.Label(message, "", new Vector2(0f, 30f), new Vector2(700f, 120f), 90, TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -184,12 +217,16 @@ namespace Repulsor
             hp.Tick(dt);
             hpText.text = $"{Mathf.CeilToInt(fighter.Hp)} / {fighter.MaxHp:0}";
 
-            meter.Fraction = fighter.Level >= Fighter.MaxLevel ? 1f : fighter.Meter;
+            meter.Fraction = fighter.Level >= fighter.MaxLevel ? 1f : fighter.Meter;
             bool ready = fighter.CanTransform;
             float pulse = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 8f);
             meter.FillImage.color = ready ? Color.Lerp(MeterColor, MeterFull, pulse) : MeterColor;
             meter.Tick(dt);
-            if (fighter.Level >= Fighter.MaxLevel)
+            float powering = ready ? PowerUpProgress : 0f;
+            TickPowerUp(powering, dt);
+            if (powering > 0.02f)
+                meterText.text = $"<b><color=#FFFFFF>POWERING UP {Mathf.FloorToInt(powering * 100f)}%</color></b>";
+            else if (fighter.Level >= fighter.MaxLevel)
                 meterText.text = "MAX POWER";
             else if (ready)
                 meterText.text = "<b><color=#B0FFFF>POWER UP READY: clench both fists at your sides</color></b>";
@@ -213,6 +250,62 @@ namespace Repulsor
             if (fighter.Healing)
                 builder.Append("<color=#80FF90>HEALING</color>");
             statusText.text = builder.ToString();
+        }
+
+        /// <summary>The white-hot fill and the lightning off the meter while powering up, and the burst after.</summary>
+        void TickPowerUp(float progress, float dt)
+        {
+            burstFor = Mathf.Max(0f, burstFor - dt);
+            float burst = burstFor / BurstSeconds;
+            bool posing = progress > 0.02f;
+            powerFill.gameObject.SetActive(posing);
+            if (posing)
+            {
+                powerFill.anchorMin = Vector2.zero;
+                powerFill.anchorMax = new Vector2(progress, 1f);
+                powerFill.offsetMin = new Vector2(2f, 2f);
+                powerFill.offsetMax = new Vector2(-2f, -2f);
+                powerFillImage.color = Color.Lerp(MeterFull, Color.white, 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 30f));
+            }
+
+            // Lightning: more bolts and taller as the pose goes on; all of them, full height, fading, in the burst.
+            float strength = Mathf.Max(posing ? progress : 0f, burst);
+            int shown = strength <= 0f ? 0 : Mathf.Clamp(Mathf.CeilToInt(Bolts * (posing ? 0.3f + 0.7f * progress : 1f)), 1, Bolts);
+            boltTimer -= dt;
+            bool redraw = boltTimer <= 0f;
+            if (redraw)
+                boltTimer = BoltFlicker;
+            var bar = (RectTransform)meter.transform;
+            float left = bar.anchoredPosition.x - bar.sizeDelta.x * 0.5f;
+            float top = bar.anchoredPosition.y + bar.sizeDelta.y * 0.5f;
+            float span = bar.sizeDelta.x * (posing ? progress : 1f);
+            float height = Mathf.Lerp(12f, 60f, strength);
+            for (int b = 0; b < Bolts; b++)
+            {
+                bool on = b < shown;
+                if (!on || redraw)
+                    for (int s = 0; s < BoltSegments; s++)
+                        boltSegments[b, s].gameObject.SetActive(false);
+                if (!on || !redraw)
+                    continue;
+                // A jagged line from a random point on the lit part of the bar, climbing.
+                Vector2 at = new Vector2(left + Random.Range(0.05f, 0.95f) * span, top - 4f);
+                float alpha = posing ? Random.Range(0.8f, 1f) : burst;
+                for (int s = 0; s < BoltSegments; s++)
+                {
+                    Vector2 next = at + new Vector2(Random.Range(-9f, 9f), height / BoltSegments * Random.Range(0.6f, 1.4f));
+                    Vector2 step = next - at;
+                    RectTransform segment = boltSegments[b, s];
+                    segment.anchoredPosition = at;
+                    segment.sizeDelta = new Vector2(step.magnitude + 1f, Mathf.Lerp(4f, 2f, s / (float)(BoltSegments - 1)));
+                    segment.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(step.y, step.x) * Mathf.Rad2Deg);
+                    Color color = Color.Lerp(BoltColor, Color.white, Random.value * 0.6f);
+                    color.a = alpha * (1f - 0.12f * s);
+                    boltImages[b, s].color = color;
+                    segment.gameObject.SetActive(true);
+                    at = next;
+                }
+            }
         }
 
         void Follow(float dt)

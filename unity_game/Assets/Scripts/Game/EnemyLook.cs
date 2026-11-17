@@ -44,6 +44,12 @@ namespace Repulsor
                 float scale = Mathf.Max(1e-5f, eye.transform.lossyScale.x);
                 FxSpin glow = BallLook.Sprite("Eye Glow", eye.transform, "FxGlow", eye.Size / scale, EyeRed).Set(billboard: true, flicker: 0.08f);
                 glow.transform.localPosition = Vector3.zero;
+                // Eyes hide behind walls with the body (11/16 playtest: they glowed through walls).
+                var eyeRenderer = glow.GetComponent<MeshRenderer>();
+                var eyeBlock = new MaterialPropertyBlock();
+                eyeRenderer.GetPropertyBlock(eyeBlock);
+                eyeBlock.SetFloat("_Occlude", 1f);
+                eyeRenderer.SetPropertyBlock(eyeBlock);
             }
             return look;
         }
@@ -90,6 +96,14 @@ namespace Repulsor
         public void Shoot() => PlayOnce("shoot");
 
         /// <summary>Plays one of the model's clips once (shoot, attack, hit), then goes back to walking or idling.</summary>
+        /// <summary>Plays a clip once, stretched to last about this many seconds.</summary>
+        public void PlayOnceOver(string clip, float seconds)
+        {
+            if (animation == null || animation[clip] == null)
+                return;
+            PlayOnce(clip, animation[clip].length / Mathf.Max(0.1f, seconds));
+        }
+
         public void PlayOnce(string clip, float speed = 1f)
         {
             if (animation == null || animation[clip] == null)

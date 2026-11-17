@@ -15,6 +15,7 @@ namespace Repulsor
         public float RespawnSeconds = 5f;
         public int Waves = WavePlan.StoryRounds;
         public int RoundsToWin = 2; // best of 3
+        public Difficulty Difficulty = Difficulty.Normal;
 
         public static MatchSettings For(GameMode mode) => new MatchSettings
         {
@@ -28,7 +29,8 @@ namespace Repulsor
     /// <summary>
     /// PVE: a countdown, then waves that each bring more enemies, then a win. The game spawns what
     /// <see cref="TakeSpawn"/> hands out and reports kills; this class decides when the next wave starts.
-    /// The last wave is the boss (one spawn; it calls in its own helpers, added with <see cref="AddExtra"/>).
+    /// Boss rounds (10 and the last, <see cref="WavePlan.BossRound"/>) are one spawn, the boss; it calls in its own
+    /// helpers, added with <see cref="AddExtra"/>.
     /// </summary>
     public sealed class WaveDirector
     {
@@ -38,11 +40,13 @@ namespace Repulsor
         public const int MaxAlive = 5;
 
         readonly int waveCount;
+        readonly Random random;
         float timer;
         float spawnTimer;
 
-        public WaveDirector(int waves, int firstWave = 1)
+        public WaveDirector(int waves, int firstWave = 1, int seed = 0)
         {
+            random = new Random(seed);
             waveCount = Math.Max(1, waves);
             State = WaveState.Countdown;
             timer = CountdownSeconds;
@@ -50,8 +54,12 @@ namespace Repulsor
             Wave = Math.Max(0, Math.Min(waveCount, firstWave) - 1);
         }
 
-        /// <summary>The last wave, with waves of two or more, is the boss.</summary>
-        public bool BossWave => waveCount >= 2 && Wave == waveCount && State != WaveState.Countdown;
+        /// <summary>A boss round (round 10, and the last), once it's started.</summary>
+        public bool BossWave => State != WaveState.Countdown && WavePlan.BossRound(Wave, waveCount, out _);
+        /// <summary>The boss of this round (when <see cref="BossWave"/>).</summary>
+        public EnemyKind Boss => WavePlan.BossRound(Wave, waveCount, out EnemyKind boss) ? boss : WavePlan.FinalBoss;
+        /// <summary>The last round's boss.</summary>
+        public bool FinalBossWave => BossWave && Wave == waveCount;
 
         public WaveState State { get; private set; }
         /// <summary>1-based wave number; 0 during the first countdown.</summary>
@@ -60,11 +68,28 @@ namespace Repulsor
         public int ToSpawn { get; private set; }
         public int Alive { get; private set; }
         public int Kills { get; private set; }
+        /// <summary>Enemies this wave has sent so far (the first is the round's new kind, if it has one).</summary>
+        public int SpawnedThisWave { get; private set; }
         /// <summary>Seconds left on the countdown or the break between waves.</summary>
         public float Timer => timer;
 
-        /// <summary>4 in the first round, up to 17 in the ninth.</summary>
-        public static int EnemiesInWave(int wave) => 3 + (int)(wave * 1.6f);
+        /// <summary>
+        /// 3 in the first round, up to 17 in the ninth; the rounds after round 10's boss stay at 17 (11/16: longer
+        /// runs, not longer rounds). The first five rounds are a little smaller (3, 4, 6, 8, 10; 11/16 playtest).
+        /// The director adds a little randomness (<see cref="WaveSize"/>).
+        /// </summary>
+        public static int EnemiesInWave(int wave) =>
+            wave >= 1 && wave <= EarlyRounds.Length ? EarlyRounds[wave - 1] : 3 + (int)(Math.Min(wave, 9) * 1.6f);
+
+        static readonly int[] EarlyRounds = { 3, 4, 6, 8, 10 };
+
+        /// <summary>A round's enemy count with a little randomness: none in the first two rounds, then +-1, +-2 after round 10.</summary>
+        public static int WaveSize(int wave, Random random)
+        {
+            int size = EnemiesInWave(wave);
+            int spread = wave <= 2 ? 0 : wave < 10 ? 1 : 2;
+            return Math.Max(3, size + (random != null ? random.Next(-spread, spread + 1) : 0));
+        }
         /// <summary>Of a wave's enemies, how many are drones rather than robots.</summary>
         public static float DroneShare(int wave) => Math.Min(0.6f, 0.15f * wave);
 
@@ -103,6 +128,7 @@ namespace Repulsor
                 return false;
             ToSpawn--;
             Alive++;
+            SpawnedThisWave++;
             spawnTimer = SpawnGapSeconds;
             return true;
         }
@@ -144,7 +170,8 @@ namespace Repulsor
         void StartWave(int wave)
         {
             Wave = wave;
-            ToSpawn = waveCount >= 2 && wave == waveCount ? 1 : EnemiesInWave(wave);
+            SpawnedThisWave = 0;
+            ToSpawn = WavePlan.BossRound(wave, waveCount, out _) ? 1 : WaveSize(wave, random);
             spawnTimer = 0f;
             State = WaveState.Fighting;
         }

@@ -31,6 +31,7 @@ Material:
     m_Floats:
     - _FadeEnds: 0
     - _Hot: 0.7
+    - _Occlude: 0
     - _Scroll: 0
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}

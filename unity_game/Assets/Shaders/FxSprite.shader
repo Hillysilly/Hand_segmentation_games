@@ -10,6 +10,7 @@ Shader "Repulsor/FxSprite"
         _Hot ("White-hot core", Range(0, 2)) = 0.6
         _Scroll ("Scroll V per second (beams)", Float) = 0
         _FadeEnds ("Fade the top and bottom edges", Range(0, 1)) = 0
+        _Occlude ("Hide behind real things (robot eyes)", Range(0, 1)) = 0
     }
 
     SubShader
@@ -23,11 +24,13 @@ Shader "Repulsor/FxSprite"
             Cull Off
 
             HLSLPROGRAM
+            #pragma target 4.5
             #pragma vertex Vertex
             #pragma fragment Fragment
             #pragma multi_compile_instancing
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "EnvironmentDepth.hlsl"
 
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
@@ -38,6 +41,7 @@ Shader "Repulsor/FxSprite"
                 float _Hot;
                 float _Scroll;
                 float _FadeEnds;
+                float _Occlude;
             CBUFFER_END
 
             struct Attributes
@@ -53,6 +57,7 @@ Shader "Repulsor/FxSprite"
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
                 float2 raw : TEXCOORD1;
+                float3 positionWS : TEXCOORD2;
                 float4 color : COLOR;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -62,7 +67,8 @@ Shader "Repulsor/FxSprite"
                 Varyings output;
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
-                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                output.positionCS = TransformWorldToHClip(output.positionWS);
                 output.uv = TRANSFORM_TEX(input.uv, _MainTex) - float2(0.0, _Time.y * _Scroll);
                 output.raw = input.uv;
                 output.color = input.color;
@@ -75,6 +81,8 @@ Shader "Repulsor/FxSprite"
                 half shape = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv).a;
                 half ends = smoothstep(0.0, 0.12, input.raw.y) * smoothstep(1.0, 0.7, input.raw.y);
                 half strength = shape * input.color.a * _Color.a * lerp(1.0, ends, _FadeEnds);
+                if (_Occlude > 0.0)
+                    strength *= lerp(1.0, VisibilityQuick(input.positionWS, 0.1, 0.1), _Occlude);
                 half3 color = _Color.rgb * input.color.rgb * strength + strength * strength * strength * _Hot;
                 return half4(color, 0);
             }

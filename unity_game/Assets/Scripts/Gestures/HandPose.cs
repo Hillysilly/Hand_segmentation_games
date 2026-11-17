@@ -39,8 +39,9 @@ namespace Repulsor
         public static float SpiderLittleAbove = 1.3f;
         public static float SpiderInnerBelow = 1.45f;
         public static float SpiderGap = 0.1f;
-        public static float CupLow = 1.2f;
-        public static float CupHigh = 1.65f;
+        // Loosened 11/16 (Lumen's force grab was hard to make): wider finger range (was 1.2 to 1.65).
+        public static float CupLow = 1.12f;
+        public static float CupHigh = 1.72f;
 
         public readonly Vector3[] Joints = new Vector3[JointCount];
         public readonly bool IsLeft;
@@ -123,7 +124,7 @@ namespace Repulsor
             float slack = 0.08f;
             // Finger gun, kept loose on purpose (a stray shot beats a shot that won't come): the index out and
             // the ring and little fingers in. The middle finger and thumb can be anywhere, so pointing counts.
-            float gunGive = Gun ? 0.1f : 0f;
+            float gunGive = Gun ? 0.15f : 0f; // 11/16: was 0.1; stays a gun through the flick
             Gun = Index > GunIndexAbove - gunGive && Ring < GunOthersBelow + gunGive && Little < GunOthersBelow + gunGive;
 
             // Spider sign, loose like the gun: index and little out, middle and ring clearly more bent than them.
@@ -134,12 +135,15 @@ namespace Repulsor
             SpiderSign = Index > SpiderIndexAbove - spiderGive && Little > SpiderLittleAbove - spiderGive
                 && inner < SpiderInnerBelow + spiderGive && outer - inner > SpiderGap - spiderGive;
 
+            // Cupped hand (force grab): loosened 11/16 (average was 1.3 to 1.58, thumb out 0.45), with a little give
+            // once on so tracking wobble doesn't drop it.
             float average = (Index + Middle + Ring + Little) * 0.25f;
-            Cup = InRange(Index) && InRange(Middle) && InRange(Ring) && InRange(Little)
-                && average > 1.3f && average < 1.58f && Pinch > PinchRelease && ThumbOut > 0.45f;
+            float cupGive = Cup ? slack : 0f;
+            Cup = InRange(Index, cupGive) && InRange(Middle, cupGive) && InRange(Ring, cupGive) && InRange(Little, cupGive)
+                && average > 1.25f - cupGive && average < 1.64f + cupGive && Pinch > PinchRelease && ThumbOut > 0.35f - cupGive;
         }
 
-        static bool InRange(float extension) => extension > CupLow && extension < CupHigh;
+        static bool InRange(float extension, float give = 0f) => extension > CupLow - give && extension < CupHigh + give;
 
         float FingerExtension(Joint knuckle, Joint tip)
         {

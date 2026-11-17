@@ -42,6 +42,30 @@ namespace Repulsor
         float outlineCheck;
         float floorOutlineY;
 
+        // Space Setup's outline, checked against what the depth scan sees (11/16: in a playtest the robots appeared
+        // off from the real hallway and were called out of walls 721 times in 632 spawns, which points at the
+        // outline being read flipped or turned). The plane's corners are tried as read and in the seven other
+        // flips and quarter turns about the plane's centre; the one that best matches floor seen by the scan wins.
+        // Bit 1 flips x, bit 2 flips y, bit 4 swaps x and y (in the plane's own space).
+        static readonly string[] OrientationNames =
+            { "as read", "x flipped", "y flipped", "turned 180", "x and y swapped", "turned 90", "turned -90", "swapped and turned 180" };
+        const int MinEvidenceCells = 30;
+        readonly List<Vector2> rawCorners = new List<Vector2>();
+        readonly List<Vector2> trial = new List<Vector2>();
+        int orientation;
+        bool outlineChecked;
+
+        // Paths (11/16 playtest: robots walked through walls, straight at you). A breadth-first search from the
+        // players over floor a robot can stand on: with Space Setup, everywhere inside the outline that isn't seen
+        // solid; without, only floor the scan has seen open. A robot steps to the neighbouring cell nearer you.
+        readonly short[] pathSteps = new short[Size * Size];
+        readonly byte[] onOutline = new byte[Size * Size];
+        readonly Queue<int> pathQueue = new Queue<int>();
+        bool hasPaths;
+
+        /// <summary>The outline was matched against the scan (so it can be trusted over the headset's live depth).</summary>
+        public bool OutlineConfirmed => HasFloorOutline && outlineChecked;
+
         public int OpenCells => openCells;
         /// <summary>Square metres of floor the scan has seen open.</summary>
         public float ScannedArea => openCells * Cell * Cell;
@@ -197,14 +221,90 @@ namespace Repulsor
             floorOutline.Clear();
             if (best == null)
                 return;
+            rawCorners.Clear();
             foreach (Vector2 corner in best.boundary)
-            {
-                Vector3 world = best.transform.TransformPoint(new Vector3(corner.x, 0f, corner.y));
-                floorOutline.Add(new Vector2(world.x, world.z));
-            }
+                rawCorners.Add(corner);
             floorOutlineY = best.transform.position.y;
+            ChooseOrientation(best.transform);
+            Outline(best.transform, orientation, floorOutline);
+            for (int z = 0; z < Size; z++)
+                for (int x = 0; x < Size; x++)
+                {
+                    Vector3 c = CellCentre(x, z, 0f);
+                    var cell = new Vector2(c.x, c.z);
+                    onOutline[Index(x, z)] = (byte)(Inside(cell) && EdgeDistance(cell) > 0.12f ? 1 : 0);
+                }
             if (before < 3 && floorOutline.Count >= 3)
-                Debug.Log($"[Room] Space Setup floor: {floorOutline.Count} corners, {best.size.x:0.0} x {best.size.y:0.0} m");
+            {
+                Vector3 c = best.transform.position;
+                Debug.Log($"[Room] Space Setup floor: {floorOutline.Count} corners, {best.size.x:0.0} x {best.size.y:0.0} m, "
+                    + $"centre ({c.x:0.00}, {c.y:0.00}, {c.z:0.00}), facing {best.transform.forward.x:0.00},{best.transform.forward.z:0.00}, "
+                    + $"up {best.transform.up.y:0.00}, first corner ({rawCorners[0].x:0.00}, {rawCorners[0].y:0.00})");
+            }
+        }
+
+        /// <summary>The outline in world floor coordinates, with the corners flipped or turned by one orientation.</summary>
+        void Outline(Transform plane, int which, List<Vector2> into)
+        {
+            into.Clear();
+            foreach (Vector2 corner in rawCorners)
+            {
+                Vector2 c = (which & 4) != 0 ? new Vector2(corner.y, corner.x) : corner;
+                if ((which & 1) != 0)
+                    c.x = -c.x;
+                if ((which & 2) != 0)
+                    c.y = -c.y;
+                Vector3 world = plane.TransformPoint(new Vector3(c.x, 0f, c.y));
+                into.Add(new Vector2(world.x, world.z));
+            }
+        }
+
+        /// <summary>
+        /// Scores each orientation by the floor cells the scan saw: inside the outline counts for it, outside counts
+        /// twice against it (floor really is there). Once there's enough evidence the best one is used; it only
+        /// changes again if another beats it clearly. Logged, so the headset log says which it was.
+        /// </summary>
+        void ChooseOrientation(Transform plane)
+        {
+            int seen = 0;
+            for (int i = 0; i < floorSeen.Length; i++)
+                if (floorSeen[i] > 0)
+                    seen++;
+            if (seen < MinEvidenceCells || rawCorners.Count < 3)
+                return;
+            int bestWhich = orientation;
+            float bestScore = float.MinValue, current = 0f;
+            var scores = new System.Text.StringBuilder();
+            for (int which = 0; which < OrientationNames.Length; which++)
+            {
+                Outline(plane, which, trial);
+                float score = 0f;
+                for (int z = 0; z < Size; z++)
+                    for (int x = 0; x < Size; x++)
+                    {
+                        if (floorSeen[Index(x, z)] == 0)
+                            continue;
+                        Vector3 centre = CellCentre(x, z, 0f);
+                        score += InsidePolygon(trial, new Vector2(centre.x, centre.z)) ? 1f : -2f;
+                    }
+                scores.Append($"{OrientationNames[which]} {score / seen:0.00}  ");
+                if (which == orientation)
+                    current = score;
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestWhich = which;
+                }
+            }
+            bool change = bestWhich != orientation && bestScore > current + 0.15f * seen;
+            if (change || !outlineChecked)
+            {
+                if (change)
+                    orientation = bestWhich;
+                Debug.Log($"[Room] Space Setup floor checked against {seen} floor cells seen: using {OrientationNames[orientation]} "
+                    + $"(scores: {scores})");
+            }
+            outlineChecked = true;
         }
 
         /// <summary>
@@ -295,7 +395,7 @@ namespace Repulsor
                 if (score <= best)
                     continue;
                 // Nothing solid between it and you: it can walk in, and your shots can reach it.
-                if (strict && !HasFloorOutline && !LineClear(candidate, nearestPlayer))
+                if (!HasFloorOutline && !LineClear(candidate, nearestPlayer))
                     continue;
                 best = score;
                 point = candidate;
@@ -346,18 +446,173 @@ namespace Repulsor
         }
 
         /// <summary>No solid cell on the straight line between two points.</summary>
-        bool LineClear(Vector3 from, Vector3 to)
+        /// <summary>
+        /// Nothing in the way between two points on the map: no cell seen solid, and (with Space Setup) the line
+        /// stays on the floor outline, so it doesn't cut through a wall between rooms.
+        /// </summary>
+        public bool LineClear(Vector3 from, Vector3 to)
         {
             float length = Flat(to - from);
-            int steps = Mathf.Max(1, Mathf.CeilToInt(length / (Cell * 0.5f)));
+            int steps = Mathf.Max(1, Mathf.CeilToInt(length / (Cell * 0.25f)));
             for (int i = 0; i <= steps; i++)
             {
                 Vector3 p = Vector3.Lerp(from, to, i / (float)steps);
-                if (ToCell(p, out int x, out int z) && Solid(Index(x, z)))
+                if (!ToCell(p, out int x, out int z))
+                    continue;
+                int at = Index(x, z);
+                if (Solid(at))
+                    return false;
+                if (HasFloorOutline && !Inside(new Vector2(p.x, p.z)))
                     return false;
             }
             return true;
         }
+
+        bool Walkable(int x, int z)
+        {
+            int i = Index(x, z);
+            if (Solid(i))
+                return false;
+            return HasFloorOutline ? onOutline[i] != 0 : open[i] > 0;
+        }
+
+        /// <summary>Recomputes the paths to the players (a few times a second is plenty).</summary>
+        public void UpdatePaths(IReadOnlyList<Vector3> players)
+        {
+            for (int i = 0; i < pathSteps.Length; i++)
+                pathSteps[i] = -1;
+            pathQueue.Clear();
+            foreach (Vector3 player in players)
+            {
+                if (!ToCell(player, out int px, out int pz))
+                    continue;
+                // You stand where the rays don't look: start from your cell and the ones around it.
+                for (int dz = -1; dz <= 1; dz++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int x = px + dx, z = pz + dz;
+                        if (x < 0 || z < 0 || x >= Size || z >= Size || pathSteps[Index(x, z)] >= 0)
+                            continue;
+                        pathSteps[Index(x, z)] = 0;
+                        pathQueue.Enqueue(Index(x, z));
+                    }
+            }
+            hasPaths = pathQueue.Count > 0;
+            while (pathQueue.Count > 0)
+            {
+                int i = pathQueue.Dequeue();
+                int x = i % Size, z = i / Size;
+                short next = (short)(pathSteps[i] + 1);
+                for (int dz = -1; dz <= 1; dz++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        if (dx == 0 && dz == 0)
+                            continue;
+                        int nx = x + dx, nz = z + dz;
+                        if (nx < 0 || nz < 0 || nx >= Size || nz >= Size || pathSteps[Index(nx, nz)] >= 0 || !Walkable(nx, nz))
+                            continue;
+                        // No cutting a wall's corner diagonally.
+                        if (dx != 0 && dz != 0 && (!Walkable(x + dx, z) || !Walkable(x, z + dz)))
+                            continue;
+                        pathSteps[Index(nx, nz)] = next;
+                        pathQueue.Enqueue(Index(nx, nz));
+                    }
+            }
+        }
+
+        /// <summary>
+        /// Which way to walk from here to reach the nearest player round the walls: toward the furthest cell ahead
+        /// on the path that's in a straight clear line (so it walks smoothly, not cell by cell). False if this spot
+        /// has no path (unknown floor, or cut off).
+        /// </summary>
+        public bool PathToward(Vector3 from, out Vector3 direction)
+        {
+            direction = Vector3.zero;
+            if (!hasPaths || !ToCell(from, out int x, out int z))
+                return false;
+            int here = Index(x, z);
+            if (pathSteps[here] < 0)
+            {
+                // Just off the known floor (pushed, or standing at the edge): the best neighbour still counts.
+                int best = -1;
+                for (int dz = -1; dz <= 1; dz++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int nx = x + dx, nz = z + dz;
+                        if (nx < 0 || nz < 0 || nx >= Size || nz >= Size)
+                            continue;
+                        int n = Index(nx, nz);
+                        if (pathSteps[n] >= 0 && (best < 0 || pathSteps[n] < pathSteps[best]))
+                            best = n;
+                    }
+                if (best < 0)
+                    return false;
+                here = best;
+            }
+            // Follow the path down a few steps, keeping the furthest cell still in a clear straight line.
+            int cell = here, aim = here;
+            for (int step = 0; step < 8 && pathSteps[cell] > 0; step++)
+            {
+                int cx = cell % Size, cz = cell / Size, nextCell = cell;
+                for (int dz = -1; dz <= 1; dz++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int nx = cx + dx, nz = cz + dz;
+                        if (nx < 0 || nz < 0 || nx >= Size || nz >= Size)
+                            continue;
+                        int n = Index(nx, nz);
+                        if (pathSteps[n] >= 0 && pathSteps[n] < pathSteps[nextCell])
+                            nextCell = n;
+                    }
+                if (nextCell == cell)
+                    break;
+                cell = nextCell;
+                if (CorridorClear(from, CellCentre(cell % Size, cell / Size, from.y), PathHalfWidth))
+                    aim = cell;
+                else
+                    break;
+            }
+            if (aim == here && pathSteps[here] > 0)
+            {
+                // Even the next cell isn't in a clear line (pressed against a wall): step to a neighbour nearer
+                // you, never diagonally across a wall's corner.
+                int hx = here % Size, hz = here / Size;
+                for (int dz = -1; dz <= 1; dz++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int nx = hx + dx, nz = hz + dz;
+                        if (nx < 0 || nz < 0 || nx >= Size || nz >= Size)
+                            continue;
+                        if (dx != 0 && dz != 0 && (!Walkable(hx + dx, hz) || !Walkable(hx, hz + dz)))
+                            continue;
+                        int n = Index(nx, nz);
+                        if (pathSteps[n] >= 0 && pathSteps[n] < pathSteps[aim])
+                            aim = n;
+                    }
+            }
+            Vector3 target = CellCentre(aim % Size, aim / Size, from.y);
+            Vector3 flat = Vector3.ProjectOnPlane(target - from, Vector3.up);
+            if (flat.sqrMagnitude < 1e-4f)
+                return false;
+            direction = flat.normalized;
+            return true;
+        }
+
+        /// <summary>Half the width kept clear along a path, so a robot rounding a corner doesn't clip the wall.</summary>
+        const float PathHalfWidth = 0.18f;
+
+        /// <summary>A straight line with this much room either side of it crosses nothing solid.</summary>
+        bool CorridorClear(Vector3 from, Vector3 to, float halfWidth)
+        {
+            Vector3 along = Vector3.ProjectOnPlane(to - from, Vector3.up);
+            if (along.sqrMagnitude < 1e-6f)
+                return true;
+            Vector3 side = Vector3.Cross(Vector3.up, along.normalized) * halfWidth;
+            return LineClear(from, to) && LineClear(from + side, to + side) && LineClear(from - side, to - side);
+        }
+
+        /// <summary>This spot has a path to a player.</summary>
+        public bool HasPath(Vector3 from) => hasPaths && ToCell(from, out int x, out int z) && pathSteps[Index(x, z)] >= 0;
 
         static float Flat(Vector3 v) => new Vector2(v.x, v.z).magnitude;
 
@@ -394,13 +649,15 @@ namespace Repulsor
             return bounds;
         }
 
-        bool Inside(Vector2 p)
+        bool Inside(Vector2 p) => InsidePolygon(floorOutline, p);
+
+        static bool InsidePolygon(List<Vector2> outline, Vector2 p)
         {
             bool inside = false;
-            for (int i = 0, j = floorOutline.Count - 1; i < floorOutline.Count; j = i++)
+            for (int i = 0, j = outline.Count - 1; i < outline.Count; j = i++)
             {
-                Vector2 a = floorOutline[i];
-                Vector2 b = floorOutline[j];
+                Vector2 a = outline[i];
+                Vector2 b = outline[j];
                 if ((a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x)
                     inside = !inside;
             }

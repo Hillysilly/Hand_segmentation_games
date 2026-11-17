@@ -57,7 +57,7 @@ namespace Repulsor
         void TickElementLooks(bool canFight, float dt)
         {
             bool inPlay = (phase == Phase.Playing && !player.IsDead) || practicing;
-            int level = inPlay ? player.Level : 1;
+            int level = inPlay ? Tier : 1;
             elementAura.Show(inPlay ? character : CharacterId.Technoman, level, head.position, FloorY, dt);
             gauntlets.Tick(inPlay && character == CharacterId.Earth, input.Left, input.Right);
             game.Dress = character == CharacterId.Earth ? (System.Action<Blast>)DressRock : null;
@@ -74,12 +74,12 @@ namespace Repulsor
         {
             // Level 3 tornado: circling hands charge it, a two-handed push throws it.
             bool charging = false;
-            if (player.Level >= 3)
+            if (Tier >= 3)
             {
                 if (swirl.Step(input.Left, input.Right, body, dt, out Vector3 direction, out float power)
                     && SpendFor(TornadoDamageGuess * Mathf.Lerp(0.7f, 1.2f, power)))
                 {
-                    Tornado.Launch(game, swirl.Center, direction, power, FloorY, player.Outgoing(TornadoDps), foes);
+                    Tornado.Launch(game, swirl.Center, direction, power, FloorY, Dmg(TornadoDps, Balance.TornadoPerSecond, 3), foes);
                     SendEffect(NetEffect.Tornado, swirl.Center, direction, power);
                     handsBusyFor = 0.6f;
                     Log($"Tornado, power {power:0.00}");
@@ -89,7 +89,7 @@ namespace Repulsor
             }
 
             // Level 2 lightning: both hands out flat. Five seconds at most, then it needs a rest.
-            bool flat = player.Level >= 2 && !charging && flatHands.Step(input.Left, input.Right, body, dt);
+            bool flat = Tier >= 2 && !charging && flatHands.Step(input.Left, input.Right, body, dt);
             lightningCooldown = Mathf.Max(0f, lightningCooldown - dt);
             bool zap = flat && lightningCooldown <= 0f && lightningLeft > 0f && HeldEnergy;
             if (zap)
@@ -99,7 +99,7 @@ namespace Repulsor
                 {
                     HandPose hand = i == 0 ? input.Left : input.Right;
                     Vector3 aim = Vector3.Slerp(body.ArmDirection(hand.IsLeft, hand.Palm), hand.Forward, 0.4f).normalized;
-                    lightning[i].Strike(game, hand.Palm + aim * 0.05f, aim, player.Outgoing(LightningDps), dt);
+                    lightning[i].Strike(game, hand.Palm + aim * 0.05f, aim, Dmg(LightningDps, Balance.LightningPerBolt, 2), dt);
                 }
                 if (lightningLeft <= 0f)
                 {
@@ -137,7 +137,7 @@ namespace Repulsor
                 if (gust[i].Step(hand, body, dt, out Vector3 origin, out Vector3 direction))
                 {
                     direction = Aim.Assist(origin, direction);
-                    WindGust.Launch(game, origin + direction * 0.1f, direction, player.Outgoing(WindGust.Damage), foes);
+                    WindGust.Launch(game, origin + direction * 0.1f, direction, Dmg(WindGust.Damage, Balance.Snap, 1), foes);
                     SendEffect(NetEffect.Gust, origin + direction * 0.1f, direction);
                 }
             }
@@ -169,7 +169,7 @@ namespace Repulsor
         void TickEarth(float dt)
         {
             // Level 2 spikes: an uppercut from the waist.
-            if (player.Level >= 2)
+            if (Tier >= 2)
             {
                 for (int i = 0; i < 2; i++)
                 {
@@ -181,7 +181,7 @@ namespace Repulsor
                         IHittable target = Aim.Target(head.position, direction, 25f, 4f);
                         if (target != null)
                             direction = Vector3.ProjectOnPlane(target.Center - head.position, Vector3.up).normalized;
-                        RockSpikes.Erupt(game, feet, direction, player.Outgoing(RockSpikes.Damage), rockMaterial, foes);
+                        RockSpikes.Erupt(game, feet, direction, Dmg(RockSpikes.Damage, Balance.Spikes, 2), rockMaterial, foes);
                         SendEffect(NetEffect.RockSpikes, feet, direction);
                         handsBusyFor = 0.5f;
                         Log("Rock spikes");
@@ -189,14 +189,14 @@ namespace Repulsor
                 }
             }
             // Level 3: a snap sets off every rock stuck to an enemy.
-            if (player.Level >= 3 && stuckRocks.Count > 0 && (snap[0].Step(input.Left, dt) | snap[1].Step(input.Right, dt)))
+            if (Tier >= 3 && stuckRocks.Count > 0 && (snap[0].Step(input.Left, dt) | snap[1].Step(input.Right, dt)))
             {
                 int blown = 0;
                 foreach (StuckRock rock in stuckRocks)
                 {
                     if (rock == null)
                         continue;
-                    game.Explode(rock.transform.position, 0.6f, player.Outgoing(12f), new Color(1f, 0.4f, 0.1f));
+                    game.Explode(rock.transform.position, 0.6f, Dmg(12f, Balance.StuckRock, 3), new Color(1f, 0.4f, 0.1f));
                     SendEffect(NetEffect.Explosion, rock.transform.position, Vector3.up, 0.6f, new Color(1f, 0.4f, 0.1f));
                     Destroy(rock.gameObject);
                     blown++;
@@ -255,7 +255,7 @@ namespace Repulsor
         void DressRock(Blast shot)
         {
             DressRockLook(shot);
-            if (player.Level >= 3)
+            if (Tier >= 3)
                 shot.OnHit = (target, at) =>
                 {
                     if (target is Enemy enemy && enemy != null && enemy.Alive)

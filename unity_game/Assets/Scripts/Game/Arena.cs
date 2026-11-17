@@ -192,6 +192,7 @@ namespace Repulsor
         /// <summary>While posing to transform: energy gathering in both fists, growing until it goes off.</summary>
         void ShowPowerUpCharge(float progress)
         {
+            hud.PowerUpProgress = progress;
             for (int i = 0; i < 2; i++)
             {
                 HandPose hand = i == 0 ? input.Left : input.Right;
@@ -259,6 +260,7 @@ namespace Repulsor
             if (powerUp.Step(input.Left, input.Right, body, dt) && player.CanTransform)
                 player.TryTransform();
             ShowPowerUpCharge(player.CanTransform && powerUp.Posing ? powerUp.Progress : 0f);
+            SyncHeld(dt);
 
             // In co-op the host runs the waves and enemies; the client mirrors them (Arena.Net).
             bool client = Multiplayer && net.Role == NetRole.Client;
@@ -281,6 +283,8 @@ namespace Repulsor
             }
 
             TickPowerups();
+            TickDrops();
+            TickBalance();
             Announce();
             if (waves.State == WaveState.Won || waves.State == WaveState.Lost)
                 EndMatch(waves.State == WaveState.Won);
@@ -306,8 +310,10 @@ namespace Repulsor
                         announcedWave = waves.Wave;
                         // A kind's first round introduces it.
                         List<EnemyKind> fresh = WavePlan.NewIn(waves.Wave);
-                        if (waves.BossWave)
+                        if (waves.FinalBossWave)
                             hud.Message("FINAL ROUND", "The boss is coming", 2f);
+                        else if (waves.BossWave)
+                            hud.Message($"ROUND {waves.Wave}: BOSS", EnemySpec.Of(waves.Boss).Name + " is coming", 2f);
                         else if (fresh.Count > 0 && !bossFight)
                             hud.Message($"ROUND {waves.Wave}", $"NEW ENEMY: {EnemySpec.Of(fresh[0]).Name}. {EnemySpec.Of(fresh[0]).Blurb}", 3.5f);
                         else
@@ -329,8 +335,12 @@ namespace Repulsor
             Ui.Clear(foes);
             player.StartingLives = settings.Lives;
             player.RespawnSeconds = settings.RespawnSeconds;
+            // The host's (or solo player's) pick; a co-op client got the host's with the start.
+            if (!(Multiplayer && net.Role == NetRole.Client))
+                settings.Difficulty = PickedDifficulty;
+            ApplyBalance();
             player.Reset();
-            waves = new WaveDirector(settings.Waves, bossFight ? settings.Waves : 1);
+            waves = new WaveDirector(settings.Waves, bossFight ? settings.Waves : 1, Random.Range(0, int.MaxValue));
             boss = null;
             // PVP: the shield gauge is also attack energy, and a little bigger (Arena.Energy).
             player.Shield.Capacity = Pvp ? PvpGaugeSeconds : ShieldGauge.HoldSeconds;
@@ -494,15 +504,21 @@ namespace Repulsor
         {
             if (phase == Phase.Playing && enemies.Remove(target))
                 waves.EnemyKilled();
+            MaybeDrop(target);
             if (target is Enemy enemy && enemy.IsProxy)
                 ForgetProxy(enemy.Id);
         }
 
-        /// <summary>Damage to the local player, from enemies, other players or the debug menu.</summary>
-        public void HurtPlayer(float amount, string source)
+        /// <summary>
+        /// Damage to the local player, from enemies, other players or the debug menu. Enemy damage goes up by round and
+        /// with the difficulty (Arena.Balance); <paramref name="fromEnemy"/> false for the rest.
+        /// </summary>
+        public void HurtPlayer(float amount, string source, bool fromEnemy = true)
         {
             if (phase != Phase.Playing)
                 return;
+            if (fromEnemy && !Pvp)
+                amount *= enemyDamageScale;
             bool shieldUp = player.Shield.Up;
             float lost = player.TakeDamage(amount);
             if (shieldUp)
@@ -537,7 +553,8 @@ namespace Repulsor
             game.PlayAt(head.position, powerUpSound);
             game.PlayAt(head.position, game.BoomSound);
             // Tell the player what the new level unlocked.
-            hud.Message($"LEVEL {level}", Character.Controls[Mathf.Clamp(level - 1, 0, Character.Controls.Length - 1)][0], 2.5f);
+            hud.Message($"LEVEL {level}", LevelUpText(level), 2.5f);
+            hud.PoweredUp();
             UpdateAura();
             Log($"Transformed to level {level}, HP {player.Hp:0}/{player.MaxHp:0}");
         }
@@ -545,15 +562,15 @@ namespace Repulsor
         /// <summary>Lights or puts out your aura for your character and level.</summary>
         void UpdateAura()
         {
-            int style = phase == Phase.Playing && !player.IsDead ? Character.AuraStyle[player.Level - 1] : 0;
+            int style = phase == Phase.Playing && !player.IsDead ? Character.AuraStyle[Tier - 1] : 0;
             if (style <= 0)
             {
                 game.Aura.Extinguish();
                 return;
             }
             // The Saber gets the light aura without its floor halo at level 2, and with it at level 3.
-            Shader.SetGlobalFloat("_AuraFloorHidden", character == CharacterId.Saber && player.Level == 2 ? 1f : 0f);
-            Color tint = character == CharacterId.KiFighter && player.Level >= 3 ? Hex("#3FA8FF") : PlayerColor;
+            Shader.SetGlobalFloat("_AuraFloorHidden", character == CharacterId.Saber && Tier == 2 ? 1f : 0f);
+            Color tint = character == CharacterId.KiFighter && Tier >= 3 ? Hex("#3FA8FF") : PlayerColor;
             if (!game.Aura.IsLit)
                 game.Aura.Ignite(head.position);
             game.Aura.ShowStyle(style - 1);
@@ -574,15 +591,35 @@ namespace Repulsor
             bool inPlay = practicing || (phase == Phase.Playing && !paused && waves != null && !CountingDown);
             // Posing only disarms when the meter is full, or holding two fists low (Saber blades) would blink them out.
             bool fighting = inPlay && !player.IsDead && !player.Shield.Up && !xArms.Held && !(powerUp.Posing && player.CanTransform);
-            game.Arm(fighting && handsBusyFor <= 0f ? WithEnergy(WeaponFor(character, player.Level)) : Weapon.None);
-            int level = phase == Phase.Playing || practicing ? player.Level : 1;
-            game.LaserDps = Damage.LaserPerSecond * (1f + 0.4f * (level - 1));
-            game.RepulsorDamage = Damage.Repulsor * (level >= 2 && character == CharacterId.KiFighter ? 1.3f : 1f);
+            game.Arm(fighting && handsBusyFor <= 0f ? WithEnergy(WeaponFor(character, Tier)) : Weapon.None);
+            int level = phase == Phase.Playing || practicing ? Tier : 1;
+            SetHandWeaponDamage(level);
             game.RepulsorAoe = character == CharacterId.Technoman && level >= 3 ? 0.8f : 0f;
             game.SetWeaponColor(phase == Phase.Playing || practicing ? AttackColor : RepulsorGame.DefaultWeaponColor);
             game.CometStyle = character == CharacterId.KiFighter ? PickedComet : 0;
             game.FlameLaser = character == CharacterId.Mage;
             TickAbilities(fighting, paused ? 0f : Time.deltaTime);
+        }
+
+        /// <summary>
+        /// The hand weapons' damage at an ability level (1-3). PVP: the old numbers (lasers +40% a level, Ryuu's comets
+        /// 1.3x from level 2). PVE (11/16): Technoman's laser per hand and his level 2 repulsor blast, the Emberwitch's
+        /// flames per hand, everyone else's snap blast, each at its level multiplier (Arena.Balance).
+        /// </summary>
+        void SetHandWeaponDamage(int tier)
+        {
+            game.RepulsorSplash = Pvp ? 0.6f : Balance.BlastSplash;
+            if (Pvp)
+            {
+                game.LaserDps = Damage.LaserPerSecond * (1f + 0.4f * (tier - 1));
+                game.RepulsorDamage = Damage.Repulsor * (tier >= 2 && character == CharacterId.KiFighter ? 1.3f : 1f);
+                return;
+            }
+            // Flames are the hand laser drawn as fire, at Flamethrower.DamageScale times the laser.
+            game.LaserDps = character == CharacterId.Mage
+                ? Dmg(0f, Balance.FlamesPerHand, 2) / Flamethrower.DamageScale
+                : Dmg(0f, Balance.LaserPerHand, 1);
+            game.RepulsorDamage = character == CharacterId.Technoman ? Dmg(0f, Balance.RepulsorBlast, 2) : Dmg(0f, Balance.Snap, 1);
         }
 
         static Weapon WeaponFor(CharacterId id, int level)
@@ -776,7 +813,7 @@ namespace Repulsor
         /// <summary>PlayMode smoke test: knock the player out, then run the clock past the respawn.</summary>
         public void TestKnockOutAndRespawn()
         {
-            HurtPlayer(10000f, "test");
+            HurtPlayer(10000f, "test", false);
             player.Tick(settings.RespawnSeconds + 0.1f);
         }
 

@@ -26,7 +26,10 @@ namespace Repulsor
 
         public const float SwingReach = 2.6f;
         public const float SwingDegrees = 130f;
-        public const float SwingWindUp = 0.8f;
+        // 11/16 playtest: 1.0 (was 0.8), so 1.5 s on normal and 2 s on easy; it felt like half a second.
+        public const float SwingWindUpBase = 1.0f;
+        /// <summary>The swing's wind-up, longer on easier settings (Arena.TellScale).</summary>
+        public static float SwingWindUp => SwingWindUpBase * Arena.TellScale;
         public const float SwingDamage = 16f;
         public const float SlamRadius = 1.3f;
         public const float SlamDamage = 20f;
@@ -35,9 +38,11 @@ namespace Repulsor
         public const float WaveDamage = 9f;
         /// <summary>Your head this much above where it usually is counts as jumping over the shockwave.</summary>
         public const float JumpClearance = 0.1f;
-        const float CrouchSeconds = 0.55f;
-        const float AirSeconds = 1.1f;
-        const float JumpHeight = 1.8f;
+        // The jump (11/16: higher and slower, it was too hard to get away from): a crouch that tells it's coming,
+        // then the time in the air, when you can move out of the landing ring.
+        static float CrouchSeconds => 0.55f * Arena.TellScale;
+        const float AirSeconds = 1.6f;
+        const float JumpHeight = 2.6f;
         static readonly Color Red = new Color(1f, 0.15f, 0.08f);
 
         readonly Enemy body;
@@ -87,7 +92,7 @@ namespace Repulsor
                     move = Move.Swing;
                     swingFacing = a.sqrMagnitude > 0.5f ? a.normalized : body.transform.forward;
                     timer = windUp = Mathf.Max(0.1f, f);
-                    body.Look?.PlayOnce("attack", 0.8f);
+                    body.Look?.PlayOnceOver("attack", windUp + 0.2f);
                     arena.Game.PlayAt(body.Center, arena.Game.WhooshSound);
                     break;
                 case Move.Jump:
@@ -342,7 +347,8 @@ namespace Repulsor
             swingFacing = Vector3.ProjectOnPlane(target - body.Center, Vector3.up).normalized;
             if (swingFacing.sqrMagnitude < 0.5f)
                 swingFacing = body.transform.forward;
-            body.Look?.PlayOnce("attack", 0.8f);
+            // The body's attack clip runs over the whole wind-up and the strike, so it doesn't swing early.
+            body.Look?.PlayOnceOver("attack", windup + 0.2f);
             arena.Game.PlayAt(body.Center, arena.Game.WhooshSound);
             Tell(Move.Swing, swingFacing, default, windup);
         }
@@ -392,7 +398,9 @@ namespace Repulsor
             float distance = Vector3.ProjectOnPlane(target - body.Center, Vector3.up).magnitude;
             if (count < swings && distance < SwingReach + 0.5f)
             {
-                StartSwing(windUp * 0.75f);
+                // Follow-up swings wind up a little quicker, but never under 85% of the first (they used to shrink
+                // by a quarter each time, down to about half a second).
+                StartSwing(SwingWindUp * (Enraged ? 0.8f : 1f) * 0.85f);
                 return;
             }
             RestThen(Move.Approach);

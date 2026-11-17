@@ -153,6 +153,30 @@ namespace Repulsor
         float flown;
 
         public string Label { get; private set; }
+        public Vector3 Velocity => velocity;
+        bool replica;
+        Vector3 replicaAt;
+
+        /// <summary>The other player's lifted object, shown here: it does no damage (their headset deals it).</summary>
+        public void MakeReplica()
+        {
+            replica = true;
+            damage = 0f;
+            replicaAt = transform.position;
+        }
+
+        /// <summary>Where the other player's object is held now (it glides there).</summary>
+        public void MoveReplica(Vector3 position) => replicaAt = position;
+
+        /// <summary>The other player threw it: it flies with this velocity.</summary>
+        public void Fly(Vector3 v, float wallDistance)
+        {
+            thrown = true;
+            wallAt = wallDistance;
+            flown = 0f;
+            age = 0f;
+            velocity = v;
+        }
 
         public static ThrownObject Create(Vector3 position, Quaternion rotation, Vector3 size, Color color, string label,
             Arena arena, Transform parent)
@@ -209,7 +233,14 @@ namespace Repulsor
             age += dt;
             shell.Show(color, BubbleStyle.Hex, Mathf.Clamp01(age * 4f) * (thrown ? Mathf.Clamp01((LifeSeconds - age) * 2f) : 1f));
             if (!thrown)
+            {
+                if (replica)
+                {
+                    transform.position = Vector3.Lerp(transform.position, replicaAt, 1f - Mathf.Exp(-10f * dt));
+                    transform.Rotate(Vector3.up, 40f * dt, Space.World);
+                }
                 return;
+            }
 
             velocity += Vector3.down * (Gravity * dt);
             Vector3 from = transform.position;

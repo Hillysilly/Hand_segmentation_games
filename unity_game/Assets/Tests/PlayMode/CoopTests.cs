@@ -274,10 +274,11 @@ namespace Repulsor.Tests
             Assert.That(arena.TestRemoteAura, Is.True, "the partner's aura isn't drawn");
             Snap(me + new Vector3(0f, 0.1f, -0.6f), partner.Head + Vector3.down * 0.6f, "coop_remote");
 
-            // Ryuu level 2 charging an energy ball, the Valkyr's drawn bow, Terra level 3: pictures of each.
+            // Ryuu's level 2 moves (co-op level 3 of 5) charging an energy ball, the Valkyr's drawn bow, Terra's level 3
+            // moves (co-op level 5): pictures of each.
             Vector3 chest = partner.Head + new Vector3(0f, -0.3f, -0.3f);
             partner.Character = (byte)CharacterId.KiFighter;
-            partner.Level = 2;
+            partner.Level = 3;
             partner.RightBeam = 0;
             partner.LeftBeam = (byte)HandBeam.KiCharge;
             partner.LeftBeamFrom = chest;
@@ -296,7 +297,7 @@ namespace Repulsor.Tests
             yield return Pump(host, partner, 0.4f);
             Snap(me + new Vector3(0.6f, 0.1f, -0.2f), partner.Head + Vector3.down * 0.4f, "coop_bow");
             partner.Character = (byte)CharacterId.Earth;
-            partner.Level = 3;
+            partner.Level = 5;
             partner.LeftBeam = partner.RightBeam = 0;
             yield return Pump(host, partner, 0.6f);
             Snap(me + new Vector3(0f, 0.3f, -0.6f), partner.Head + Vector3.down * 0.9f, "coop_terra3");

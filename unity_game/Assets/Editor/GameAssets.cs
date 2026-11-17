@@ -15,6 +15,8 @@ public static class GameAssets
     {
         Directory.CreateDirectory(Folder);
         Save("Bubble", "Repulsor/Bubble", m => m.SetColor("_Color", new Color(0.3f, 0.75f, 1f)));
+        Save("UiOccluded", "Repulsor/UI Occluded", m => { });
+        BuildLogo();
         Save("DeathView", "Repulsor/Room Dim", m =>
         {
             m.SetColor("_Tint", new Color(0.32f, 0.32f, 0.34f));
@@ -223,6 +225,66 @@ public static class GameAssets
         EditorUtility.SetDirty(feature);
         EditorUtility.SetDirty(settings);
         Debug.Log("[Setup] Bounding boxes on");
+    }
+
+    /// <summary>
+    /// The title screen logo from unity_game/logo.png (white art on black): brightness becomes alpha, so it's
+    /// white on clear and the game can tint it; cropped to the art with a small border.
+    /// </summary>
+    public static void BuildLogo()
+    {
+        const string source = "logo.png";
+        const string target = Folder + "/Logo.png";
+        if (!File.Exists(source))
+        {
+            Debug.LogWarning("[Setup] No logo.png in the project folder; the title shows text");
+            return;
+        }
+        var input = new Texture2D(2, 2);
+        input.LoadImage(File.ReadAllBytes(source));
+        Color32[] pixels = input.GetPixels32();
+        int width = input.width, height = input.height;
+        int minX = width, minY = height, maxX = -1, maxY = -1;
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                Color32 c = pixels[y * width + x];
+                if (Mathf.Max(c.r, Mathf.Max(c.g, c.b)) > 24)
+                {
+                    minX = Mathf.Min(minX, x);
+                    maxX = Mathf.Max(maxX, x);
+                    minY = Mathf.Min(minY, y);
+                    maxY = Mathf.Max(maxY, y);
+                }
+            }
+        if (maxX < 0)
+            return;
+        const int border = 12;
+        minX = Mathf.Max(0, minX - border);
+        minY = Mathf.Max(0, minY - border);
+        maxX = Mathf.Min(width - 1, maxX + border);
+        maxY = Mathf.Min(height - 1, maxY + border);
+        int w = maxX - minX + 1, h = maxY - minY + 1;
+        var output = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        var cropped = new Color32[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                Color32 c = pixels[(y + minY) * width + x + minX];
+                byte alpha = (byte)Mathf.Max(c.r, Mathf.Max(c.g, c.b));
+                cropped[y * w + x] = new Color32(255, 255, 255, alpha);
+            }
+        output.SetPixels32(cropped);
+        output.Apply();
+        File.WriteAllBytes(target, output.EncodeToPNG());
+        AssetDatabase.ImportAsset(target);
+        var importer = (TextureImporter)AssetImporter.GetAtPath(target);
+        importer.textureType = TextureImporterType.Sprite;
+        importer.alphaIsTransparency = true;
+        importer.mipmapEnabled = true;
+        importer.maxTextureSize = 1024;
+        importer.SaveAndReimport();
+        Debug.Log($"[Setup] Logo: {w} x {h}");
     }
 
     static void Save(string name, string shaderName, System.Action<Material> configure)

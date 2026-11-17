@@ -40,7 +40,8 @@ namespace Repulsor
         /// Every attack's price times this (11/15: at full price everything felt too expensive; a third as the
         /// baseline for balancing). The shield itself isn't scaled.
         /// </summary>
-        public static float AttackEnergyScale = 1f / 3f;
+        // 11/16: x1.5 (was a third; that buff was too much).
+        public static float AttackEnergyScale = 0.5f;
 
         float noEnergyShown;
 

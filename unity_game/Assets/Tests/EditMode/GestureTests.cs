@@ -371,24 +371,67 @@ namespace Repulsor.Tests
         }
 
         [Test]
-        public void CupGrabsAndAFastSwingThrows()
+        public void CupAimsAFistGrabsAndAFastSwingThrows()
         {
             var hand = new HandPose(false);
             var force = new ForceGrabDetector();
-            GrabEvent seen = GrabEvent.None;
-            for (float t = 0f; t < 0.4f; t += Frame)
+            // A cupped hand only aims: no grab, however long it's held.
+            for (float t = 0f; t < 1f; t += Frame)
             {
                 Pose(hand, new Vector3(0.2f, 1.3f, 0.3f), Vector3.forward, Vector3.up, 0.45f, ThumbPose.Out);
-                GrabEvent e = force.Step(hand, Body, Frame, out _);
-                if (e != GrabEvent.None)
-                    seen = e;
+                Assert.That(force.Step(hand, Body, Frame, out _), Is.EqualTo(GrabEvent.None));
             }
-            Assert.That(seen, Is.EqualTo(GrabEvent.Grab));
-            Assert.That(force.Holding, Is.True);
+            Assert.That(force.Aiming, Is.True, "cupped: the aim line shows");
+            Assert.That(force.Holding, Is.False);
 
+            // Close it into a fist: grabbed.
+            Fist(hand, new Vector3(0.2f, 1.3f, 0.3f));
+            Assert.That(force.Step(hand, Body, Frame, out _), Is.EqualTo(GrabEvent.Grab));
+            Assert.That(force.Holding, Is.True);
+            Assert.That(force.Aiming, Is.False);
+
+            // Held while the fist stays closed, then a fast swing throws it.
+            for (float t = 0f; t < 1f; t += Frame)
+                Assert.That(force.Step(hand, Body, Frame, out _), Is.EqualTo(GrabEvent.None));
             hand.Velocity = new Vector3(0f, 0.5f, 2.5f);
             Assert.That(force.Step(hand, Body, Frame, out Vector3 velocity), Is.EqualTo(GrabEvent.Throw));
             Assert.That(velocity.z, Is.EqualTo(2.5f));
+        }
+
+        [Test]
+        public void AFistWithoutACupFirstIsNotAForceGrab()
+        {
+            // A fist on its own is the laser sword's grip, not the force.
+            var hand = new HandPose(false);
+            var force = new ForceGrabDetector();
+            for (float t = 0f; t < 1f; t += Frame)
+            {
+                Fist(hand, new Vector3(0.2f, 1.3f, 0.3f));
+                Assert.That(force.Step(hand, Body, Frame, out _), Is.EqualTo(GrabEvent.None));
+            }
+            Assert.That(force.Aiming || force.Holding, Is.False);
+        }
+
+        [Test]
+        public void OpeningTheHandLetsGo()
+        {
+            var hand = new HandPose(false);
+            var force = new ForceGrabDetector();
+            for (float t = 0f; t < 0.3f; t += Frame)
+            {
+                Pose(hand, new Vector3(0.2f, 1.3f, 0.3f), Vector3.forward, Vector3.up, 0.45f, ThumbPose.Out);
+                force.Step(hand, Body, Frame, out _);
+            }
+            Fist(hand, new Vector3(0.2f, 1.3f, 0.3f));
+            Assert.That(force.Step(hand, Body, Frame, out _), Is.EqualTo(GrabEvent.Grab));
+            GrabEvent seen = GrabEvent.None;
+            for (float t = 0f; t < 0.6f && seen == GrabEvent.None; t += Frame)
+            {
+                Open(hand, new Vector3(0.2f, 1.3f, 0.3f));
+                seen = force.Step(hand, Body, Frame, out _);
+            }
+            Assert.That(seen, Is.EqualTo(GrabEvent.Drop));
+            Assert.That(force.Holding, Is.False);
         }
 
         [Test]

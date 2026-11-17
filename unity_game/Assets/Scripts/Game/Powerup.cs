@@ -26,6 +26,7 @@ namespace Repulsor
             {
                 case PowerupKind.Invincible: return new Color(1f, 0.85f, 0.25f);
                 case PowerupKind.DamageBoost: return new Color(1f, 0.25f, 0.2f);
+                case PowerupKind.Health: return new Color(0.3f, 1f, 0.4f);
                 default: return new Color(0.3f, 0.75f, 1f);
             }
         }
@@ -36,6 +37,7 @@ namespace Repulsor
             {
                 case PowerupKind.Invincible: return "INVINCIBLE";
                 case PowerupKind.DamageBoost: return "1.5x DAMAGE";
+                case PowerupKind.Health: return "+25 HP";
                 default: return "+30% POWER";
             }
         }

@@ -93,6 +93,8 @@ namespace Repulsor
         /// <summary>The palm laser pours fire instead (the Mage's level 2 flamethrower).</summary>
         public bool FlameLaser { get; set; }
         public float RepulsorDamage { get; set; } = Damage.Repulsor;
+        /// <summary>Share of a blast's damage its explosion does (when <see cref="RepulsorAoe"/> is set).</summary>
+        public float RepulsorSplash { get; set; } = 0.6f;
         /// <summary>Repulsor shots explode over this radius where they land (Technoman level 3). 0 for none.</summary>
         public float RepulsorAoe { get; set; }
         /// <summary>The look of fist-and-release shots: 0 comet, 1 streak (small, long tail), 2 orb (big, short tail, shell).</summary>
@@ -441,6 +443,7 @@ namespace Repulsor
             blast.Launch(this, position, direction, charge, CometSize(style), CometSpeed(style));
             DressComet(blast, style, WeaponColor);
             blast.Aoe = Legacy ? 0f : RepulsorAoe;
+            blast.Splash = RepulsorSplash;
             blast.Color = WeaponColor;
             if (WeaponColor != DefaultWeaponColor)
                 Tint.Apply(blast.gameObject, WeaponColor);

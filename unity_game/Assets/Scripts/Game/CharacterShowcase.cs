@@ -86,7 +86,7 @@ namespace Repulsor
                 new Move("Blaster bolt", "FINGER GUN, FLICK UP", Fx.Bolt, 0.75f, 0f, ShowcasePoses.FingerGunFlick(0.75f)),
                 new Move("Laser sword", "MAKE A FIST", Fx.Saber, 0f, 0f,
                     ShowcasePoses.ShapeOnly(SignShape.Fist, ShowcasePoses.F, ShowcasePoses.In, 2f), "Sword_Attack"),
-                new Move("Force lift and throw", "CUPPED HAND: LIFT, THEN THROW", Fx.ForceThrow, 0.35f, 0f, ShowcasePoses.CupLiftThrow(1.25f)),
+                new Move("Force grab and throw", "CUP TO AIM, FIST TO GRAB, SWING", Fx.ForceThrow, 0.35f, 0f, ShowcasePoses.CupLiftThrow(1.25f)),
             },
             [CharacterId.Archer] = new[]
             {

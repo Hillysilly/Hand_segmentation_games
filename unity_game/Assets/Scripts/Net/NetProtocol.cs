@@ -87,7 +87,8 @@ namespace Repulsor
     public enum ShotLook : byte { Plain, KiBall, Arrow, Bolt, Rock, Web, Comet }
 
     /// <summary>One-off attack effects the other headset draws (no damage there).</summary>
-    public enum NetEffect : byte { DragonFist, FirePillar, Gust, Tornado, RockSpikes, Explosion, Shockwave, Smoke }
+    /// <summary>Only add to the end. Lift..LiftDrop (11/16): furniture lifted by the web pull or the force.</summary>
+    public enum NetEffect : byte { DragonFist, FirePillar, Gust, Tornado, RockSpikes, Explosion, Shockwave, Smoke, Lift, LiftMove, LiftThrow, LiftDrop }
 
     public struct EffectEvent
     {
@@ -138,7 +139,8 @@ namespace Repulsor
         public const int Port = 47777;
         const ushort Magic = 0x5257;   // "RW"
         // 2 (11/15): shot looks, hand beams, effects and boss moves.
-        const byte Version = 2;
+        // 3 (11/16): the match start carries the difficulty.
+        const byte Version = 3;
 
         public static byte[] Hello(string name) => Write(NetMessage.Hello, w => w.Write(name ?? ""));
 
@@ -162,10 +164,11 @@ namespace Repulsor
 
         public static byte[] Bye() => Write(NetMessage.Bye, w => { });
 
-        public static byte[] Start(int seed, byte character) => Write(NetMessage.Start, w =>
+        public static byte[] Start(int seed, byte character, byte difficulty = (byte)Difficulty.Normal) => Write(NetMessage.Start, w =>
         {
             w.Write(seed);
             w.Write(character);
+            w.Write(difficulty);
         });
 
         public static byte[] Player(in PlayerSnapshot p)
@@ -378,10 +381,11 @@ namespace Repulsor
             mode = r.ReadByte();
         }
 
-        public static void ReadStart(BinaryReader r, out int seed, out byte hostCharacter)
+        public static void ReadStart(BinaryReader r, out int seed, out byte hostCharacter, out byte difficulty)
         {
             seed = r.ReadInt32();
             hostCharacter = r.ReadByte();
+            difficulty = r.ReadByte();
         }
 
         public static PlayerSnapshot ReadPlayer(BinaryReader r)

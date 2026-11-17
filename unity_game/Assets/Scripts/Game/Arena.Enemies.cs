@@ -33,13 +33,59 @@ namespace Repulsor
                 return;
             roomMap.Scan(game.Room, head.position, head.forward, FloorY);
             roomMap.ReadPlanes(game.Room.Planes, Time.unscaledTime);
+            pathTimer -= Time.deltaTime;
+            if (pathTimer <= 0f && phase == Phase.Playing)
+            {
+                pathTimer = 0.3f;
+                pathPlayers.Clear();
+                pathPlayers.Add(head.position);
+                if (Multiplayer && remote.Visible && !remote.Latest.Dead)
+                    pathPlayers.Add(remote.Latest.Head);
+                roomMap.UpdatePaths(pathPlayers);
+            }
+        }
+
+        float pathTimer;
+        readonly List<Vector3> pathPlayers = new List<Vector3>();
+
+        /// <summary>
+        /// Whether a robot can see (and shoot) a player: nothing on the room map in the way, and, while it's in your
+        /// view, the headset's depth doesn't find a real surface well in front of it (11/16 playtest: lasers came
+        /// through walls).
+        /// </summary>
+        public bool CanSee(Enemy enemy, Vector3 target)
+        {
+            if (game.Room == null)
+                return true;
+            if (!roomMap.LineClear(enemy.Center, target))
+                return false;
+            Vector3 toEnemy = enemy.Center - head.position;
+            if (Vector3.Distance(target, head.position) < 0.5f && toEnemy.magnitude > 0.8f && Vector3.Angle(head.forward, toEnemy) < 40f)
+                return !(HiddenBehindSurface(enemy.Center, enemy.Radius) && HiddenBehindSurface(enemy.Top, enemy.Radius));
+            return true;
+        }
+
+        /// <summary>The way round the walls to the nearest player, if the map knows one.</summary>
+        public bool PathToward(Vector3 from, out Vector3 direction) => roomMap.PathToward(from, out direction);
+
+        /// <summary>A robot that's out of sight with no way to you is put somewhere it can reach you instead.</summary>
+        void Relocate(Enemy enemy, string why)
+        {
+            Vector3 point = SpawnPoint(enemy.Kind, out string where);
+            point.y = EnemySpec.Of(enemy.Kind).Flies ? head.position.y + 0.2f : FloorY + Enemy.MiddleHeight(enemy.Kind);
+            Vector3 was = enemy.transform.position;
+            enemy.transform.position = point;
+            enemy.Buried = false;
+            enemy.HiddenChecks = 0;
+            game.PlayAt(point, spawnSound);
+            Log($"{enemy.Kind} {enemy.Id} moved from ({was.x:0.0}, {was.z:0.0}) to ({point.x:0.0}, {point.z:0.0}) ({where}): {why}");
         }
 
         void SpawnEnemy()
         {
             EnemyKind kind = waves.BossWave
-                ? (BossAlive ? WavePlan.BossHelper(Random.value) : WavePlan.FinalBoss)
-                : WavePlan.KindFor(Mathf.Max(1, waves.Wave), Random.value);
+                ? (BossAlive ? WavePlan.BossHelper(waves.Wave, Random.value) : waves.Boss)
+                : WavePlan.KindFor(Mathf.Max(1, waves.Wave), Random.value, waves.SpawnedThisWave - 1);
             SpawnEnemy(kind);
         }
 
@@ -50,6 +96,7 @@ namespace Repulsor
             Vector3 point = SpawnPoint(kind, out string where);
             point.y = EnemySpec.Of(kind).Flies ? head.position.y + 0.2f : FloorY + Enemy.MiddleHeight(kind);
             Enemy enemy = Enemy.Spawn(kind, point, this, head, foes, ++nextEnemyId);
+            SetEnemyHealth(enemy);
             enemies.Add(enemy);
             if (EnemySpec.IsBoss(kind))
             {
@@ -61,7 +108,7 @@ namespace Repulsor
                 OverheadBar.Attach(enemy, head, foes, false);
             }
             game.PlayAt(point, spawnSound);
-            Log($"{kind} spawned {Vector3.Distance(Flat(point), Flat(head.position)):0.0} m away ({where}), "
+            Log($"{kind} {enemy.Id} spawned at ({point.x:0.0}, {point.z:0.0}), {enemy.MaxHp:0} HP, {Vector3.Distance(Flat(point), Flat(head.position)):0.0} m away ({where}), "
                 + $"{Vector3.SignedAngle(Vector3.ProjectOnPlane(head.forward, Vector3.up), Vector3.ProjectOnPlane(point - head.position, Vector3.up), Vector3.up):0} deg from where you face");
             return enemy;
         }
@@ -71,7 +118,7 @@ namespace Repulsor
         {
             for (int i = 0; i < count; i++)
             {
-                EnemyKind kind = WavePlan.BossHelper(Random.value);
+                EnemyKind kind = WavePlan.BossHelper(Mathf.Max(1, waves.Wave), Random.value);
                 waves.AddExtra();
                 Enemy helper = SpawnEnemy(kind);
                 Vector3 side = caller.transform.right * (i % 2 == 0 ? -1.3f : 1.3f);
@@ -268,14 +315,28 @@ namespace Repulsor
             bool walled = roomMap.Walled(enemy.Center, 0f);
             Vector3 toEnemy = enemy.Center - head.position;
             float distance = toEnemy.magnitude;
-            if (distance > 0.8f && Vector3.Angle(head.forward, toEnemy) < 35f)
+            // With a Space Setup floor the scan has confirmed, a robot on that floor and not in a solid cell is just
+            // out of sight (the hallway, round a corner), not in a wall: leave it be (11/16 playtest).
+            bool onKnownFloor = roomMap.OutlineConfirmed && !walled;
+            if (!onKnownFloor && distance > 0.8f && Vector3.Angle(head.forward, toEnemy) < 35f)
             {
                 bool hidden = HiddenBehindSurface(enemy.Center, enemy.Radius) && HiddenBehindSurface(enemy.Top, enemy.Radius);
                 enemy.HiddenChecks = hidden ? enemy.HiddenChecks + 1 : 0;
             }
-            enemy.Buried = walled || enemy.HiddenChecks >= 2;
+            if (onKnownFloor)
+                enemy.HiddenChecks = 0;
+            // Out of sight behind a real surface: if the map has a way round to you it walks that way (Enemy uses
+            // PathToward); with no way, it's moved somewhere it can reach you rather than walked through the wall.
+            if (!walled && enemy.HiddenChecks >= 2)
+            {
+                enemy.HiddenChecks = 0;
+                if (!roomMap.HasPath(enemy.transform.position))
+                    Relocate(enemy, "behind a wall with no way round");
+            }
+            enemy.Buried = walled;
             if (enemy.Buried && !was)
-                Log($"{enemy.Kind} {enemy.Id} is in a wall ({(walled ? "room map" : "hidden behind a surface")}); calling it out");
+                Log($"{enemy.Kind} {enemy.Id} is in a wall ({(walled ? "room map" : "hidden behind a surface")}) at "
+                    + $"({enemy.Center.x:0.0}, {enemy.Center.z:0.0}), you at ({head.position.x:0.0}, {head.position.z:0.0}); calling it out");
         }
 
         /// <summary>The headset's depth finds a real surface on the line to this point, well short of it.</summary>

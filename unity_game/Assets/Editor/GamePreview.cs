@@ -187,6 +187,16 @@ public static class GamePreview
         arena.PreviewHud.Tick(player, CharacterDef.Get(CharacterId.Technoman), 0.016f);
         Canvas.ForceUpdateCanvases();
         Save(head.position, Quaternion.identity, 90f, "Logs/preview_hud_ready.png");
+
+        // Holding the power-up pose: the meter fills white-hot and lightning climbs off it.
+        foreach (float progress in new[] { 0.3f, 0.85f })
+        {
+            arena.PreviewHud.PowerUpProgress = progress;
+            arena.PreviewHud.Tick(player, CharacterDef.Get(CharacterId.Technoman), 0.06f);
+            Canvas.ForceUpdateCanvases();
+            Save(head.position, Quaternion.identity, 90f, $"Logs/preview_hud_powering_{Mathf.RoundToInt(progress * 100f)}.png");
+        }
+        arena.PreviewHud.PowerUpProgress = 0f;
     }
 
     public static void RenderShields()

@@ -330,7 +330,7 @@ namespace Repulsor.EditorTools
 
         static Material LitMaterial(Entry entry)
         {
-            var material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            var material = new Material(Shader.Find("Repulsor/Enemy Lit"));
             material.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(entry.Texture));
             material.SetFloat("_Smoothness", 0.35f);
             material.SetFloat("_Metallic", 0.2f);
@@ -352,7 +352,7 @@ namespace Repulsor.EditorTools
             var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (existing != null)
                 return existing;
-            var material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            var material = new Material(Shader.Find("Repulsor/Enemy Lit"));
             Color color = original == null ? Color.grey
                 : original.HasProperty("_BaseColor") ? original.GetColor("_BaseColor")
                 : original.HasProperty("_Color") ? original.color : Color.grey;
@@ -365,7 +365,7 @@ namespace Repulsor.EditorTools
         static Material TexturedMaterial(string key, Material original)
         {
             string path = $"{OutFolder}/Materials/{key}_{(original != null ? original.name : "Plain")}.mat";
-            var material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            var material = new Material(Shader.Find("Repulsor/Enemy Lit"));
             if (original != null)
             {
                 Texture colour = original.HasProperty("baseColorTexture") ? original.GetTexture("baseColorTexture") : null;

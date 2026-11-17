@@ -274,6 +274,7 @@ Sketchfab needs a login to download. If you grab G1 as glTF into `assets/models/
 | Powerups (charge, invincibility, 1.5x damage) | ✅ | | | touch to take; your attacks turn red or gold, and others see a glow |
 | Walls block attacks | ✅ | | | laser, blasts, shockwave and enemy bolts stop at live-depth surfaces |
 | Room objects (proxies, HP, pick up/throw) | ✅ | | | Space Setup furniture boxes; a glowing copy flies and breaks on impact; **needs Space Setup done** |
+| PVE balance pass (11/16, `balance.md`) | ✅ | | | 20 rounds (TRILOBITE 10, GOLIATH 20), 5 levels, enemy HP doubles every 5 rounds, enemy damage x1.15 every 5, EASY/NORMAL/HARD, drops, poison bomb, PVE death keeps level, power-up meter lightning, 2.25x boost bug fixed; numbers in `Core/Balance.cs`; simulation in `Logs/balance_sim.md` |
 
 ### Characters
 

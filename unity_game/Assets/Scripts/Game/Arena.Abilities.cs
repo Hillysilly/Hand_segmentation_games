@@ -76,7 +76,7 @@ namespace Repulsor
             player.BoostFor > 0f ? new Color(1f, 0.15f, 0.1f)          // 1.5x damage: everything you fire turns red
             : player.InvincibleFor > 0f && phase == Phase.Playing && !player.IsDead && player.InvincibleFor > Fighter.SpawnProtectionSeconds
                 ? new Color(1f, 0.85f, 0.3f)                             // invincible powerup: gold
-            : character == CharacterId.KiFighter && player.Level >= 3 ? KiBlue : PlayerColor;
+            : character == CharacterId.KiFighter && Tier >= 3 ? KiBlue : PlayerColor;
 
         void CreateAbilityViews()
         {
@@ -187,7 +187,7 @@ namespace Repulsor
         bool TickKi(float dt)
         {
             bool charging = false;
-            if (player.Level >= 2)
+            if (Tier >= 2)
             {
                 if (kiCharge.Step(input.Left, input.Right, body, dt, out Vector3 direction, out float power)
                     && SpendFor(12f + 18f * power))
@@ -197,13 +197,13 @@ namespace Repulsor
                     float size = Mathf.Lerp(BallMinSize, BallMaxSize, power);
                     NextShot(ShotLook.KiBall, PickedBall);
                     Blast ball = game.FireBlast(from, direction, 1f, size, Mathf.Lerp(0.8f, 0.55f, power),
-                        player.Outgoing(12f + 18f * power), 0.6f + 0.6f * power);
+                        Dmg(12f + 18f * power, Mathf.Lerp(Balance.KiBallMin, Balance.KiBallMax, power), 2), 0.6f + 0.6f * power);
                     DecorateBall(ball.Head, PickedBall, AttackColor);
                     Log($"Energy ball, power {power:0.00}");
                 }
                 charging = kiCharge.Holding;
             }
-            if (player.Level >= 3)
+            if (Tier >= 3)
             {
                 for (int i = 0; i < 2; i++)
                 {
@@ -212,7 +212,7 @@ namespace Repulsor
                     {
                         // Its comets are sent as the one effect below, not as shots of their own.
                         replayingShot = true;
-                        IHittable locked = DragonFist.Launch(game, PickedDragon, origin + punch * 0.1f, punch, player.Outgoing(10f));
+                        IHittable locked = DragonFist.Launch(game, PickedDragon, origin + punch * 0.1f, punch, Dmg(10f, Balance.DragonFist, 3));
                         replayingShot = false;
                         SendEffect(NetEffect.DragonFist, origin + punch * 0.1f, punch, 0f, AttackColor, PickedDragon);
                         Log($"Dragon fist at {hand.Velocity.magnitude:0.0} m/s, {(locked != null ? $"locked on {Vector3.Angle(punch, locked.Center - origin):0} deg off" : "nothing to lock on")}");
@@ -224,12 +224,17 @@ namespace Repulsor
 
         void TickSaber(float dt)
         {
-            if (player.Level >= 3)
+            if (Tier >= 3)
                 TickForce(dt);
             for (int i = 0; i < 2; i++)
             {
                 HandPose hand = i == 0 ? input.Left : input.Right;
-                bool sword = player.Level >= 2 && grip[i].Step(hand, dt) && HeldEnergy;
+                // No laser sword while that hand uses the force (aiming, holding, or still a fist after a throw).
+                if (Tier >= 3 && ForceBusy(i))
+                    forceLock[i] = true;
+                else if (forceLock[i] && hand.Tracked && !ForceGrabDetector.IsFist(hand))
+                    forceLock[i] = false;
+                bool sword = Tier >= 2 && !forceLock[i] && grip[i].Step(hand, dt) && HeldEnergy;
                 if (sword)
                 {
                     Vector3 hilt = grip[i].Hilt;
@@ -240,9 +245,14 @@ namespace Repulsor
                 }
                 bladeWasOut[i] = false;
                 if (TickGun(i, hand, dt, out Vector3 origin, out Vector3 direction))
-                    game.FireBlast(origin, direction, 0.2f, 0.45f, 1.7f, player.Outgoing(4f), 0f, BlasterRed);
+                    game.FireBlast(origin, direction, 0.2f, 0.45f, 1.7f, Dmg(4f, Balance.Snap, 1), 0f, BlasterRed);
             }
         }
+
+        readonly bool[] forceLock = new bool[2];
+
+        bool ForceBusy(int i) => force[i].Aiming || force[i].Holding || (held != null && heldHand == i)
+            || (swinging != null && swingingByForce && swingingHand == i);
 
         void CutWithBlade(int hand, Vector3 hilt, Vector3 tip, float dt)
         {
@@ -270,14 +280,15 @@ namespace Repulsor
                 if (!slashedAt.TryGetValue(target, out float last) || Time.time - last >= SlashCooldown)
                 {
                     slashedAt[target] = Time.time;
-                    float hit = Mathf.Lerp(SlashMinDamage, SlashDamage, Mathf.Clamp01(tipSpeed / SlashFullSpeed));
+                    float speed = Mathf.Clamp01(tipSpeed / SlashFullSpeed);
+                    float hit = Dmg(Mathf.Lerp(SlashMinDamage, SlashDamage, speed), Mathf.Lerp(Balance.SlashMin, Balance.SlashMax, speed), 2);
                     if (UsesEnergy && !player.Shield.TrySpend(hit * EnergyPerDamage * MeleeDiscount * AttackEnergyScale))
                         player.Shield.Drain(999f, 1f);
-                    game.Strike(target, player.Outgoing(hit), hilt, "Sword slash");
+                    game.Strike(target, hit, hilt, "Sword slash");
                 }
                 else if (inside)
                 {
-                    game.Strike(target, player.Outgoing(BladeHoldDps * dt), hilt, "Sword");
+                    game.Strike(target, Dmg(BladeHoldDps, BladeHoldDps, 2) * dt, hilt, "Sword");
                 }
             }
             if (slashedAt.Count > 32)
@@ -289,17 +300,18 @@ namespace Repulsor
 
         void TickArcher(float dt)
         {
-            if (player.Level >= 2 && bow.Step(input.Left, input.Right, body, dt, out Vector3 from, out Vector3 aim, out float draw)
+            if (Tier >= 2 && bow.Step(input.Left, input.Right, body, dt, out Vector3 from, out Vector3 aim, out float draw)
                 && SpendFor(6f + 10f * draw))
             {
                 NextShot(ShotLook.Arrow);
-                Blast arrow = game.FireBlast(from + aim * 0.1f, aim, 0.3f, 0.4f, Mathf.Lerp(1.2f, 2.2f, draw), player.Outgoing(6f + 10f * draw), 0f);
-                arrow.Pierce = player.Level >= 3;
+                Blast arrow = game.FireBlast(from + aim * 0.1f, aim, 0.3f, 0.4f, Mathf.Lerp(1.2f, 2.2f, draw),
+                    Dmg(6f + 10f * draw, Mathf.Lerp(Balance.BowMin, Balance.BowMax, draw), 2), 0f);
+                arrow.Pierce = Tier >= 3;
                 ArcherGear.Dress(arrow, "Arrow", AttackColor);
                 Log($"Arrow, draw {draw:0.00}{(arrow.Pierce ? ", piercing" : "")}");
             }
             // The longbow in the front fist, its string to the drawing hand.
-            archerGear.Bow(player.Level >= 2 && bow.Formed, bow.BowPosition, bow.StringPosition, bow.Direction, bow.Draw, AttackColor);
+            archerGear.Bow(Tier >= 2 && bow.Formed, bow.BowPosition, bow.StringPosition, bow.Direction, bow.Draw, AttackColor);
             if (bow.Formed)
             {
                 // Where the arrow will go.
@@ -309,7 +321,7 @@ namespace Repulsor
                 return;
             }
 
-            if (player.Level >= 3)
+            if (Tier >= 3)
             {
                 for (int i = 0; i < 2; i++)
                 {
@@ -318,9 +330,12 @@ namespace Repulsor
                         && SpendFlat(SmokeCost))
                     {
                         smokeReady = matchTime + SmokeCooldown;
-                        SmokeCloud.Throw(from2, velocity, foes);
-                        SendEffect(NetEffect.Smoke, from2, velocity.normalized, velocity.magnitude);
-                        Log("Smoke bomb");
+                        // PVP: smoke that blocks shots. Against the robots (11/16): a poison bomb.
+                        bool poison = !Pvp;
+                        SmokeCloud.Throw(from2, velocity, foes, poison, poison ? game : null,
+                            poison ? player.Outgoing(Balance.PoisonPerSecond) : 0f);
+                        SendEffect(NetEffect.Smoke, from2, velocity.normalized, velocity.magnitude, default, poison ? 1 : 0);
+                        Log(poison ? "Poison bomb" : "Smoke bomb");
                     }
                 }
             }
@@ -333,7 +348,7 @@ namespace Repulsor
                 {
                     reload[i] = CrossbowReload;
                     NextShot(ShotLook.Bolt);
-                    Blast bolt = game.FireBlast(origin, direction, 0.4f, 0.5f, 2f, player.Outgoing(7f), 0f);
+                    Blast bolt = game.FireBlast(origin, direction, 0.4f, 0.5f, 2f, Dmg(7f, Balance.Crossbow, 1), 0f);
                     ArcherGear.Dress(bolt, "Bolt", AttackColor);
                 }
                 // A crossbow in the finger-gun hand, reloading as it charges.
@@ -343,12 +358,12 @@ namespace Repulsor
 
         void TickMage(float dt)
         {
-            if (player.Level < 3)
+            if (Tier < 3)
                 return;
             if (triangle.Step(input.Left, input.Right, body, dt, out Vector3 target) && SpendFor(25f))
             {
                 handsBusyFor = 0.8f;
-                game.Explode(target + Vector3.up * 0.6f, 1.1f, player.Outgoing(25f), AttackColor);
+                game.Explode(target + Vector3.up * 0.6f, 1.1f, Dmg(25f, Balance.FirePillar, 3), AttackColor);
                 FirePillar.Spawn(target, AttackColor, PickedPillar, foes);
                 SendEffect(NetEffect.FirePillar, target, Vector3.up, 0f, AttackColor, PickedPillar);
                 Log($"Fire pillar {Vector3.Distance(Flat(head.position), Flat(target)):0.0} m away");
@@ -374,17 +389,10 @@ namespace Repulsor
             if (swinging != null && swingingByForce)
             {
                 HandPose holding = swingingHand == 0 ? input.Left : input.Right;
-                // Close the hand into a fist round it: it's crushed.
-                crushFist = holding.Fist ? crushFist + dt : 0f;
-                if (crushFist >= CrushHoldSeconds)
-                {
-                    CrushHeld();
-                    return;
-                }
                 GrabEvent kept = force[swingingHand].Step(holding, body, dt, out _);
-                if (TickWebSwing(dt) && kept == GrabEvent.Drop && swinging != null && !holding.Fist)
+                if (TickWebSwing(dt) && kept == GrabEvent.Drop && swinging != null)
                 {
-                    // Let go of the cup: it drops where it is.
+                    // Open the hand: it drops where it is.
                     ReleaseWebbed(swinging);
                     swinging = null;
                 }
@@ -405,7 +413,7 @@ namespace Repulsor
                 }
                 if (held != null || !(force[i].Forming || force[i].Holding))
                     continue;
-                Enemy foe = Grabbable(force[i].AimOrigin, force[i].AimDirection);
+                Enemy foe = Grabbable(force[i].AimOrigin, force[i].AimDirection, ForceGrabDegrees);
                 if (foe != null)
                 {
                     ShowAim(i, force[i].AimOrigin, foe.Center);
@@ -416,6 +424,7 @@ namespace Repulsor
                     }
                     continue;
                 }
+                bool missed = grab == GrabEvent.Grab;
                 if (room.Count == 0 && matchTime > noFurnitureHint)
                 {
                     noFurnitureHint = matchTime + 15f;
@@ -423,41 +432,19 @@ namespace Repulsor
                 }
                 bool aimed = room.TryAim(force[i].AimOrigin, force[i].AimDirection, out var box);
                 ShowAim(i, force[i].AimOrigin, force[i].AimOrigin + force[i].AimDirection * (aimed ? 1.5f : 3f));
-                if (!aimed)
-                    continue;
-                room.Highlight(box, AttackColor);
-                if (grab == GrabEvent.Grab)
-                    LiftBox(box, i, AttackColor);
+                if (aimed)
+                {
+                    room.Highlight(box, AttackColor);
+                    if (grab == GrabEvent.Grab)
+                    {
+                        LiftBox(box, i, AttackColor);
+                        missed = held == null;
+                    }
+                }
+                // A fist closed on nothing: no force, so it can be the laser sword.
+                if (missed)
+                    force[i].Cancel();
             }
-        }
-
-        /// <summary>Lumen's crush: damage from closing a fist on an enemy held by the force (most die; a tank survives).</summary>
-        public static float CrushDamage = 50f;
-        /// <summary>The fist has to stay closed this long, so a hand passing through a fist on its way to a throw doesn't crush.</summary>
-        const float CrushHoldSeconds = 0.12f;
-        float crushFist;
-
-        void CrushHeld()
-        {
-            Webbed crushed = swinging;
-            swinging = null;
-            crushFist = 0f;
-            Enemy enemy = crushed.Enemy;
-            ReleaseWebbed(crushed);
-            if (enemy == null || !enemy.Alive)
-                return;
-            Vector3 at = enemy.Center;
-            game.Strike(enemy, player.Outgoing(CrushDamage), at, "Force crush");
-            game.Explode(at, 0.35f, 0f, AttackColor);
-            game.PlayAt(at, game.BoomSound);
-            Log($"Crushed a {enemy.Kind} with the force");
-        }
-
-        /// <summary>For tests: crush what the force holds, as closing the fist does.</summary>
-        public void TestCrushHeld()
-        {
-            if (swinging != null && swingingByForce)
-                CrushHeld();
         }
 
         void LiftBox(UnityEngine.XR.ARFoundation.ARBoundingBox box, int hand, Color color)
@@ -467,6 +454,8 @@ namespace Repulsor
             held = room.Lift(box, color, this);
             heldHand = hand;
             heldFor = 0f;
+            if (held != null)
+                SendEffect(NetEffect.Lift, held.transform.position, held.transform.forward, held.transform.localScale.magnitude / 1.732f, color);
             game.PlayAt(box.transform.position, game.WhooshSound);
             Log($"Lifted {held.Label}");
         }
@@ -475,6 +464,7 @@ namespace Repulsor
         {
             float wall = game.WallAhead(held.transform.position, aim, out float d) ? d : float.MaxValue;
             held.Throw(handVelocity, aim, wall);
+            SendEffect(NetEffect.LiftThrow, held.transform.position, held.Velocity, held.Velocity.magnitude);
             game.PlayAt(held.transform.position, game.WhooshSound);
             Log($"Threw {held.Label} at {handVelocity.magnitude:0.0} m/s");
             held = null;
@@ -483,7 +473,10 @@ namespace Repulsor
         void DropHeld()
         {
             if (held != null)
+            {
+                SendEffect(NetEffect.LiftDrop, held.transform.position, Vector3.up);
                 held.Drop();
+            }
             held = null;
         }
 
@@ -526,7 +519,7 @@ namespace Repulsor
         }
 
         public void ThrownBreaks(Vector3 at, float radius, float damage, Color color) =>
-            game.Explode(at, radius, player.Outgoing(damage), color);
+            game.Explode(at, radius, damage * SpiderPvpScale, color);
 
         void TickSpider(float dt)
         {
@@ -551,7 +544,7 @@ namespace Repulsor
 
             // Webs: a strand to a small pale shot and a splat where it lands; darker and stronger at level 3.
             // From level 2 a web grabs the enemy or furniture it's aimed at; what it would grab is shown first.
-            bool black = player.Level >= 3;
+            bool black = Tier >= 3;
             Color color = black ? new Color(0.35f, 0.1f, 0.45f) : new Color(0.9f, 0.92f, 1f);
             for (int i = 0; i < 2; i++)
             {
@@ -561,7 +554,7 @@ namespace Repulsor
                     continue;
                 Enemy grab = WebGrabTarget(origin, direction);
                 UnityEngine.XR.ARFoundation.ARBoundingBox box = null;
-                bool onBox = grab == null && player.Level >= 2 && room.TryAim(origin, direction, out box);
+                bool onBox = grab == null && Tier >= 2 && room.TryAim(origin, direction, out box);
                 Vector3 aimed = Aim.Assist(origin, direction);
                 if (grab != null)
                     ShowAim(i, origin, grab.Center);
@@ -587,7 +580,8 @@ namespace Repulsor
                 if (!SpendFor(black ? 7f : 5f))
                     continue;
                 NextShot(ShotLook.Web, black ? 1 : 0);
-                Blast shot = game.FireBlast(origin, aimed, 0.3f, 0.35f, 1.6f, player.Outgoing(black ? 7f : 5f), 0f, color);
+                Blast shot = game.FireBlast(origin, aimed, 0.3f, 0.35f, 1.6f,
+                    Dmg((black ? 7f : 5f) * SpiderPvpScale, Balance.Web * (black ? Balance.BlackWeb : 1f), 1), 0f, color);
                 WebStrand.Attach(shot, origin, black ? new Color(0.25f, 0.2f, 0.3f) : Color.white, foes);
             }
         }

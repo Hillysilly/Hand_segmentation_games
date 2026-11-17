@@ -6,7 +6,8 @@ namespace Repulsor
     /// <summary>The menus: panels at arm's length that you poke. Each screen is rebuilt when it opens.</summary>
     public sealed partial class Arena
     {
-        public const string GameTitle = "POWER UP";
+        public const string GameTitle = "TIN CAN TAKEDOWN";
+        public const string GameTitleCase = "Tin Can Takedown";
         const float ReplaceAfterTurn = 50f;
         const float LostMenuDegrees = 75f;
         const float LostMenuSeconds = 1.5f;
@@ -118,26 +119,37 @@ namespace Repulsor
                 LeaveRoom();
             phase = Phase.Title;
             hud.Visible = false;
-            RectTransform s = OpenScreen(new Vector2(360f, 260f), null);
-            Ui.Label(s, GameTitle, new Vector2(0f, 62f), new Vector2(340f, 60f), 46, TextAnchor.MiddleCenter, FontStyle.Bold).color = Ui.Accent;
-            Ui.Label(s, "Superpowers in your own room", new Vector2(0f, 22f), new Vector2(340f, 24f), 16).color = Ui.Muted;
-            Ui.Button(s, "START", new Vector2(-85f, -35f), new Vector2(160f, 52f), ShowModes, 22);
-            Ui.Button(s, "SCAN ROOM", new Vector2(85f, -35f), new Vector2(160f, 52f), ShowScan, 18);
-            Ui.Button(s, "CREDITS", new Vector2(0f, -78f), new Vector2(110f, 24f), () =>
+            RectTransform s = OpenScreen(new Vector2(360f, 340f), null);
+            // The Tin Can Takedown logo (Resources/Logo, made from logo.png by GameAssets), in the menus' cyan.
+            Sprite logo = Resources.Load<Sprite>("Logo");
+            if (logo != null)
+            {
+                Image image = Ui.Box(s, new Vector2(0f, 82f), new Vector2(200f, 160f), Ui.Accent, false);
+                image.sprite = logo;
+                image.preserveAspect = true;
+            }
+            else
+            {
+                Ui.Label(s, GameTitle, new Vector2(0f, 82f), new Vector2(340f, 60f), 36, TextAnchor.MiddleCenter, FontStyle.Bold).color = Ui.Accent;
+            }
+            Ui.Label(s, "Superpowers in your own room", new Vector2(0f, -12f), new Vector2(340f, 24f), 16).color = Ui.Muted;
+            Ui.Button(s, "START", new Vector2(-85f, -62f), new Vector2(160f, 52f), ShowModes, 22);
+            Ui.Button(s, "SCAN ROOM", new Vector2(85f, -62f), new Vector2(160f, 52f), ShowScan, 18);
+            Ui.Button(s, "CREDITS", new Vector2(0f, -106f), new Vector2(110f, 24f), () =>
             {
                 creditsPage = 0;
                 ShowCredits();
             }, 11);
-            Ui.Label(s, "Poke buttons with your index finger. Put the controllers down.", new Vector2(0f, -104f),
+            Ui.Label(s, "Poke buttons with your index finger. Put the controllers down.", new Vector2(0f, -134f),
                 new Vector2(340f, 20f), 11).color = Ui.Muted;
-            Text roomStatus = Ui.Label(s, RoomStatus(), new Vector2(0f, -120f), new Vector2(340f, 16f), 10);
+            Text roomStatus = Ui.Label(s, RoomStatus(), new Vector2(0f, -152f), new Vector2(340f, 16f), 10);
             roomStatus.color = room != null && room.Count > 0 ? Ui.Muted : Ui.Warning;
         }
 
         void ShowModes()
         {
             phase = Phase.Modes;
-            RectTransform s = OpenScreen(new Vector2(400f, 360f), "CHOOSE A MODE");
+            RectTransform s = OpenScreen(new Vector2(400f, 400f), "CHOOSE A MODE");
             Ui.Button(s, "SOLO  vs  ROBOTS", new Vector2(0f, 105f), new Vector2(300f, 46f), () =>
             {
                 mode = GameMode.PveSolo;
@@ -160,10 +172,26 @@ namespace Repulsor
                 bossFight = false;
                 ShowRooms(GameMode.Pvp);
             }, 20);
-            Ui.Label(s, "Two-player modes are early tests: both headsets on the same Wi-Fi.", new Vector2(0f, -86f),
+            // Difficulty (11/16): poke to cycle. The host's counts in co-op; PVP doesn't use it.
+            PokeButton difficulty = null;
+            difficulty = Ui.Button(s, "", new Vector2(0f, -94f), new Vector2(300f, 34f), () =>
+            {
+                PickedDifficulty = (Difficulty)(((int)PickedDifficulty + 1) % 3);
+                difficulty.Label.text = DifficultyText();
+                Log($"Difficulty: {Balance.NameOf(PickedDifficulty)}");
+            }, 15);
+            difficulty.Label.text = DifficultyText();
+            Ui.Label(s, "Two-player modes: both headsets on the same Wi-Fi.", new Vector2(0f, -126f),
                 new Vector2(360f, 20f), 12).color = Ui.Muted;
-            Ui.Button(s, "DEBUG", new Vector2(-80f, -132f), new Vector2(140f, 40f), () => ShowDebug(ShowModes), 16);
-            Ui.Button(s, "BACK", new Vector2(80f, -132f), new Vector2(140f, 40f), ShowTitle, 16);
+            Ui.Button(s, "DEBUG", new Vector2(-80f, -162f), new Vector2(140f, 34f), () => ShowDebug(ShowModes), 16);
+            Ui.Button(s, "BACK", new Vector2(80f, -162f), new Vector2(140f, 34f), ShowTitle, 16);
+        }
+
+        string DifficultyText()
+        {
+            Difficulty d = PickedDifficulty;
+            string what = d == Difficulty.Easy ? "slower attacks, less damage" : d == Difficulty.Hard ? "fast attacks, more damage" : "";
+            return $"DIFFICULTY: {Balance.NameOf(d)}" + (what.Length > 0 ? $"  <size=11>({what})</size>" : "");
         }
 
         void ShowCharacters()
@@ -185,7 +213,7 @@ namespace Repulsor
             {
                 CharacterDef def = CharacterDef.All[i];
                 var at = new Vector2(i % 2 == 0 ? -213f : -79f, 122f - (i / 2) * 72f);
-                PokeButton b = Ui.Button(s, def.Name.ToUpperInvariant() + (def.Ready ? "" : " *"), at, new Vector2(126f, 66f), () =>
+                PokeButton b = Ui.Button(s, def.Name.ToUpperInvariant(), at, new Vector2(126f, 66f), () =>
                 {
                     character = def.Id;
                     customColor = false;
@@ -426,8 +454,8 @@ namespace Repulsor
                     waves.AddExtra();
                     SpawnEnemy(WavePlan.KindFor(5, Random.value));
                 }, 14),
-                Ui.Button(s, "HIT ME 10", new Vector2(x[1], Row(1)), size, () => HurtPlayer(10f, "debug"), 14),
-                Ui.Button(s, "KNOCK ME OUT", new Vector2(x[2], Row(1)), size, () => HurtPlayer(10000f, "debug"), 14),
+                Ui.Button(s, "HIT ME 10", new Vector2(x[1], Row(1)), size, () => HurtPlayer(10f, "debug", false), 14),
+                Ui.Button(s, "KNOCK ME OUT", new Vector2(x[2], Row(1)), size, () => HurtPlayer(10000f, "debug", false), 14),
                 Ui.Button(s, "FILL METER", new Vector2(x[0], Row(2)), size, () => player.FillMeter(), 14),
                 Ui.Button(s, "SPAWN POWERUP", new Vector2(x[1], Row(5)), size, () => SpawnPowerup((PowerupKind)Random.Range(0, 3)), 14),
                 Ui.Button(s, "SKIP WAVE", new Vector2(x[2], Row(2)), size, () =>

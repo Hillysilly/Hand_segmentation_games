@@ -132,14 +132,19 @@ namespace Repulsor
     /// </summary>
     public sealed class TwoHandChargeDetector
     {
-        public static float MaxGap = 0.12f;
+        // Loosened 11/16 (Ryuu's ki ball was hard to fire; little else uses two hands): wider gap (was 0.12), a
+        // shorter minimum charge (was 0.25), a slower push (was 1.2, and both hands had to reach it), and more time
+        // to push after the hands part (was 0.35 / 0.6).
+        public static float MaxGap = 0.18f;
         public static float FullSeconds = 2f;
-        public static float MinCharge = 0.25f;
+        public static float MinCharge = 0.15f;
         /// <summary>Seconds the hands must be together before it's a charge.</summary>
         public static float HoldSeconds = 0.5f;
-        public static float PushSpeed = 1.2f;
-        public static float ApartGrace = 0.35f;
-        public static float ApartCancel = 0.6f;
+        public static float PushSpeed = 0.9f;
+        /// <summary>The slower hand need only push this share of <see cref="PushSpeed"/>.</summary>
+        public static float SlowHandShare = 0.4f;
+        public static float ApartGrace = 0.5f;
+        public static float ApartCancel = 0.9f;
 
         float apart = ApartCancel;
 
@@ -154,9 +159,10 @@ namespace Repulsor
         {
             direction = default;
             power = 0f;
-            bool together = left.Tracked && right.Tracked && !left.Fist && !right.Fist
+            // Two fists together is the dragon fist's guard, not a ki ball; one curled hand is fine.
+            bool together = left.Tracked && right.Tracked && !(left.Fist && right.Fist)
                 && Vector3.Distance(left.Palm, right.Palm) < MaxGap
-                && body.Local((left.Palm + right.Palm) * 0.5f).z > 0.1f;
+                && body.Local((left.Palm + right.Palm) * 0.5f).z > 0.05f;
 
             if (together)
             {
@@ -171,8 +177,8 @@ namespace Repulsor
 
             if (Charge >= MinCharge && apart < ApartGrace && left.Tracked && right.Tracked)
             {
-                float push = Mathf.Min(Vector3.Dot(left.Velocity, body.Forward), Vector3.Dot(right.Velocity, body.Forward));
-                if (push > PushSpeed)
+                float pushLeft = Vector3.Dot(left.Velocity, body.Forward), pushRight = Vector3.Dot(right.Velocity, body.Forward);
+                if ((pushLeft + pushRight) * 0.5f > PushSpeed && Mathf.Min(pushLeft, pushRight) > PushSpeed * SlowHandShare)
                 {
                     Vector3 velocity = (left.Velocity + right.Velocity) * 0.5f;
                     direction = Vector3.Slerp(velocity.normalized, body.Forward, 0.3f).normalized;
@@ -359,11 +365,13 @@ namespace Repulsor
     /// </summary>
     public sealed class FingerGunDetector
     {
-        public static float FlickDegrees = 12f;
-        public static float FlickWindow = 0.25f;
+        // Loosened 11/16 (Lumen's shots sometimes didn't fire): 10 degrees in 0.3 s (was 12 in 0.25), so a flick
+        // about 30% slower counts; a slow turn of the wrist still doesn't.
+        public static float FlickDegrees = 10f;
+        public static float FlickWindow = 0.3f;
         public static float Cooldown = 0.25f;
         public static float ArmBlend = 0.5f;
-        const int HistorySize = 24;
+        const int HistorySize = 48;   // covers FlickWindow at 120 fps
 
         struct Sample
         {
@@ -373,7 +381,8 @@ namespace Repulsor
             public float Elevation;
         }
 
-        readonly HoldTimer shape = new HoldTimer(0.1f, 0.2f);
+        // The shape blurs during a quick flick, so it holds through a longer dropout.
+        readonly HoldTimer shape = new HoldTimer(0.08f, 0.35f);
         readonly Sample[] history = new Sample[HistorySize];
         int count;
         int next;
@@ -496,44 +505,79 @@ namespace Repulsor
 
     public enum GrabEvent { None, Grab, Throw, Drop }
 
-    /// <summary>Force pull: a cupped hand pointed at something lifts it; a fast throw launches it.</summary>
+    /// <summary>
+    /// The force (11/16, replacing cup-to-grab and fist-to-crush): a cupped hand aims (the blue line), closing it
+    /// into a fist grabs what it aimed at, a fast swing of the fist throws it, and opening the hand lets go.
+    /// </summary>
     public sealed class ForceGrabDetector
     {
         public static float ThrowSpeed = 1.8f;
-        readonly HoldTimer shape = new HoldTimer(0.25f, 0.4f);
+        /// <summary>After the hand stops being cupped, closing it into a fist still grabs for this long.</summary>
+        public static float FistWindow = 0.7f;
+        /// <summary>Open (not a fist) this long while holding: let go. Tracking dropouts don't count.</summary>
+        public static float LetGoSeconds = 0.35f;
+        readonly HoldTimer cup = new HoldTimer(0.1f, 0.25f);
+        float sinceCup = 99f;
+        float openFor;
 
         public bool Holding { get; private set; }
-        public bool Forming => shape.Held > 0f && !Holding;
+        /// <summary>Cupped, or just was: the aim line shows and a fist will grab.</summary>
+        public bool Aiming => !Holding && sinceCup < FistWindow;
+        public bool Forming => Aiming;
         public Vector3 AimOrigin { get; private set; }
         public Vector3 AimDirection { get; private set; }
+
+        /// <summary>A fist for the force: the usual fist, or a loose one (as the saber's grip).</summary>
+        public static bool IsFist(HandPose hand) => hand.Tracked
+            && (hand.Fist || ((hand.Middle + hand.Ring + hand.Little) / 3f < 1.35f && hand.Index < 1.35f));
+
+        /// <summary>The fist closed on nothing: not holding (so the hand can be a saber instead).</summary>
+        public void Cancel()
+        {
+            Holding = false;
+            sinceCup = 99f;
+        }
 
         public GrabEvent Step(HandPose hand, Stance body, float dt, out Vector3 throwVelocity)
         {
             throwVelocity = default;
-            bool on = shape.Step(hand.Cup, dt);
+            bool cupped = cup.Step(hand.Cup, dt);
+            bool fist = IsFist(hand);
+
+            if (!Holding)
+            {
+                // Aim while cupped; the aim stays where it was as the hand closes.
+                if (hand.Tracked && hand.Cup)
+                {
+                    AimOrigin = hand.Palm;
+                    AimDirection = Vector3.Slerp(hand.PalmNormal, body.ArmDirection(hand.IsLeft, hand.Palm), 0.5f).normalized;
+                }
+                sinceCup = cupped ? 0f : sinceCup + dt;
+                if (fist && sinceCup < FistWindow)
+                {
+                    Holding = true;
+                    openFor = 0f;
+                    cup.Reset();
+                    sinceCup = 99f;
+                    return GrabEvent.Grab;
+                }
+                return GrabEvent.None;
+            }
+
             if (hand.Tracked)
             {
                 AimOrigin = hand.Palm;
                 AimDirection = Vector3.Slerp(hand.PalmNormal, body.ArmDirection(hand.IsLeft, hand.Palm), 0.5f).normalized;
             }
-
-            if (!Holding)
-            {
-                if (!on)
-                    return GrabEvent.None;
-                Holding = true;
-                return GrabEvent.Grab;
-            }
-
             if (hand.Tracked && hand.Velocity.magnitude > ThrowSpeed
                 && Vector3.Dot(hand.Velocity.normalized, body.ArmDirection(hand.IsLeft, hand.Palm)) > 0.3f)
             {
                 Holding = false;
-                shape.Reset();
                 throwVelocity = hand.Velocity;
                 return GrabEvent.Throw;
             }
-            if (!on)
+            openFor = !hand.Tracked || fist ? 0f : openFor + dt;
+            if (openFor >= LetGoSeconds)
             {
                 Holding = false;
                 return GrabEvent.Drop;
