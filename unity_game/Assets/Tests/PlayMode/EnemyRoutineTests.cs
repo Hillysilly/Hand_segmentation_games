@@ -80,6 +80,35 @@ namespace Repulsor.Tests
         }
 
         [UnityTest]
+        public IEnumerator TheMusicFollowsTheGame()
+        {
+            LogAssert.ignoreFailingMessages = true;
+            SceneManager.LoadScene("Main");
+            for (int i = 0; i < 30; i++)
+                yield return null;
+            var arena = Object.FindAnyObjectByType<Arena>();
+            Assert.That(arena.TestMusic, Is.EqualTo(MusicTrack.Menu), "the title plays the menu music");
+            Assert.That(Resources.Load<AudioClip>("Music/Menu"), Is.Not.Null);
+
+            arena.TestStart(CharacterId.Technoman);
+            arena.TestGod(true);
+            yield return null;
+            arena.TestSkipTime(WaveDirector.CountdownSeconds + 0.1f);
+            yield return null;
+            Assert.That(arena.TestMusic, Is.EqualTo(MusicTrack.Gameplay), "fighting the robots");
+
+            Enemy boss = arena.TestSpawn(EnemyKind.Boss);
+            yield return null;
+            Assert.That(arena.TestMusic, Is.EqualTo(MusicTrack.Boss), "TRILOBITE");
+            Object.Destroy(boss.gameObject);
+            arena.TestSpawn(EnemyKind.Mech);
+            yield return null;
+            Assert.That(arena.TestMusic, Is.EqualTo(MusicTrack.FinalBoss), "GOLIATH");
+            foreach (string track in new[] { "Gameplay", "Boss", "FinalBoss", "Pvp" })
+                Assert.That(Resources.Load<AudioClip>("Music/" + track), Is.Not.Null, track);
+        }
+
+        [UnityTest]
         public IEnumerator TheForceGrabsAndFlingsEnemiesButNothingGrabsTheBoss()
         {
             LogAssert.ignoreFailingMessages = true;

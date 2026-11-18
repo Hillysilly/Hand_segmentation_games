@@ -119,7 +119,7 @@ namespace Repulsor
                 LeaveRoom();
             phase = Phase.Title;
             hud.Visible = false;
-            RectTransform s = OpenScreen(new Vector2(360f, 340f), null);
+            RectTransform s = OpenScreen(new Vector2(360f, 380f), null);
             // The Tin Can Takedown logo (Resources/Logo, made from logo.png by GameAssets), in the menus' cyan.
             Sprite logo = Resources.Load<Sprite>("Logo");
             if (logo != null)
@@ -132,17 +132,18 @@ namespace Repulsor
             {
                 Ui.Label(s, GameTitle, new Vector2(0f, 82f), new Vector2(340f, 60f), 36, TextAnchor.MiddleCenter, FontStyle.Bold).color = Ui.Accent;
             }
-            Ui.Label(s, "Superpowers in your own room", new Vector2(0f, -12f), new Vector2(340f, 24f), 16).color = Ui.Muted;
-            Ui.Button(s, "START", new Vector2(-85f, -62f), new Vector2(160f, 52f), ShowModes, 22);
-            Ui.Button(s, "SCAN ROOM", new Vector2(85f, -62f), new Vector2(160f, 52f), ShowScan, 18);
-            Ui.Button(s, "CREDITS", new Vector2(0f, -106f), new Vector2(110f, 24f), () =>
+            Ui.Label(s, "Superpowers in your own room", new Vector2(0f, 0f), new Vector2(340f, 24f), 16).color = Ui.Muted;
+            Ui.Button(s, "START", new Vector2(-85f, -50f), new Vector2(160f, 52f), ShowModes, 22);
+            Ui.Button(s, "SCAN ROOM", new Vector2(85f, -50f), new Vector2(160f, 52f), ShowScan, 18);
+            Ui.Button(s, "CREDITS", new Vector2(0f, -94f), new Vector2(110f, 24f), () =>
             {
                 creditsPage = 0;
                 ShowCredits();
             }, 11);
-            Ui.Label(s, "Poke buttons with your index finger. Put the controllers down.", new Vector2(0f, -134f),
+            MusicVolumeRow(s, new Vector2(0f, -132f));
+            Ui.Label(s, "Poke buttons with your index finger. Put the controllers down.", new Vector2(0f, -164f),
                 new Vector2(340f, 20f), 11).color = Ui.Muted;
-            Text roomStatus = Ui.Label(s, RoomStatus(), new Vector2(0f, -152f), new Vector2(340f, 16f), 10);
+            Text roomStatus = Ui.Label(s, RoomStatus(), new Vector2(0f, -180f), new Vector2(340f, 16f), 10);
             roomStatus.color = room != null && room.Count > 0 ? Ui.Muted : Ui.Warning;
         }
 
@@ -296,7 +297,7 @@ namespace Repulsor
         {
             if (paused)
                 Time.timeScale = 0f;
-            RectTransform s = OpenScreen(new Vector2(480f, 330f), "PAUSED");
+            RectTransform s = OpenScreen(new Vector2(480f, 390f), "PAUSED");
             bool sandbox = phase == Phase.Sandbox;
             if (MultiplayerMatch)
             {
@@ -371,6 +372,35 @@ namespace Repulsor
                 showLives();
             }, 20);
             Ui.Label(s, "Gameplay settings: host only in multiplayer", new Vector2(-115f, -110f), new Vector2(210f, 34f), 11).color = Ui.Muted;
+            MusicVolumeRow(s, new Vector2(0f, -168f));
+        }
+
+        /// <summary>
+        /// MUSIC  [-] ====bar==== [+]  40%: the soundtrack's own volume (VOLUME on the pause screen is everything),
+        /// in steps of 10%, kept between sessions.
+        /// </summary>
+        void MusicVolumeRow(RectTransform s, Vector2 at)
+        {
+            Ui.Label(s, "MUSIC", at + new Vector2(-128f, 0f), new Vector2(70f, 30f), 14, TextAnchor.MiddleLeft, FontStyle.Bold);
+            Bar bar = Ui.Bar(s, at + new Vector2(10f, 0f), new Vector2(110f, 14f), new Color(0.08f, 0.08f, 0.1f, 0.95f), Ui.Accent);
+            Text value = Ui.Label(s, "", at + new Vector2(140f, 0f), new Vector2(50f, 30f), 13, TextAnchor.MiddleLeft);
+            value.color = Ui.Muted;
+            System.Action show = () =>
+            {
+                bar.Fraction = MusicPlayer.Volume;
+                value.text = $"{Mathf.RoundToInt(MusicPlayer.Volume * 100f)}%";
+            };
+            show();
+            Ui.Button(s, "-", at + new Vector2(-68f, 0f), new Vector2(44f, 34f), () =>
+            {
+                MusicPlayer.Volume = MusicPlayer.Volume - MusicPlayer.VolumeStep;
+                show();
+            }, 20);
+            Ui.Button(s, "+", at + new Vector2(88f, 0f), new Vector2(44f, 34f), () =>
+            {
+                MusicPlayer.Volume = MusicPlayer.Volume + MusicPlayer.VolumeStep;
+                show();
+            }, 20);
         }
 
         PokeButton Toggle(RectTransform parent, string name, Vector2 position, System.Func<bool> get, System.Action<bool> set,

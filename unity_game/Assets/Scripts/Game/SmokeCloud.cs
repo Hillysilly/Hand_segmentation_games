@@ -131,6 +131,14 @@ namespace Repulsor
         void Burst()
         {
             burst = true;
+            // The bomb popping open (11/17).
+            var puff = new GameObject("Puff Sound").AddComponent<AudioSource>();
+            puff.transform.position = transform.position;
+            puff.spatialBlend = 1f;
+            puff.minDistance = 0.6f;
+            puff.dopplerLevel = 0f;
+            puff.PlayOneShot(Arena.PuffSfx);
+            Destroy(puff.gameObject, 1f);
             age = 0f;
             Destroy(shell.gameObject);
             transform.position = new Vector3(transform.position.x, Radius * 0.7f, transform.position.z);

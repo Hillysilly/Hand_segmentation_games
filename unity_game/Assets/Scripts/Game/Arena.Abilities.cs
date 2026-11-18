@@ -184,6 +184,14 @@ namespace Repulsor
             }
         }
 
+        // Loops for moves that build up (11/17): made the first time they're needed.
+        LoopSound kiLoop, bowLoop;
+        readonly float[] nextSwingSound = new float[2];
+        static AudioClip chargeSfx, strainSfx, puffSfx;
+        static AudioClip ChargeSfx => chargeSfx != null ? chargeSfx : chargeSfx = Sfx.Charge();
+        static AudioClip StrainSfx => strainSfx != null ? strainSfx : strainSfx = Sfx.Strain();
+        public static AudioClip PuffSfx => puffSfx != null ? puffSfx : puffSfx = Sfx.Puff();
+
         bool TickKi(float dt)
         {
             bool charging = false;
@@ -202,6 +210,10 @@ namespace Repulsor
                     Log($"Energy ball, power {power:0.00}");
                 }
                 charging = kiCharge.Holding;
+                // The ball gathering between the hands: a deeper whine that climbs as it grows.
+                if (kiLoop == null)
+                    kiLoop = LoopSound.Create("Ki Charge", ChargeSfx);
+                kiLoop.Set(kiCharge.Center, kiCharge.Charging ? Mathf.Max(0.05f, kiCharge.Charge) : 0f, 0.55f, 1.25f, 0.7f);
             }
             if (Tier >= 3)
             {
@@ -213,6 +225,7 @@ namespace Repulsor
                         // Its comets are sent as the one effect below, not as shots of their own.
                         replayingShot = true;
                         IHittable locked = DragonFist.Launch(game, PickedDragon, origin + punch * 0.1f, punch, Dmg(10f, Balance.DragonFist, 3));
+                        game.PlayAt(origin, game.WhooshSound);
                         replayingShot = false;
                         SendEffect(NetEffect.DragonFist, origin + punch * 0.1f, punch, 0f, AttackColor, PickedDragon);
                         Log($"Dragon fist at {hand.Velocity.magnitude:0.0} m/s, {(locked != null ? $"locked on {Vector3.Angle(punch, locked.Center - origin):0} deg off" : "nothing to lock on")}");
@@ -254,11 +267,22 @@ namespace Repulsor
         bool ForceBusy(int i) => force[i].Aiming || force[i].Holding || (held != null && heldHand == i)
             || (swinging != null && swingingByForce && swingingHand == i);
 
+        /// <summary>The blade's tip moving this fast (m/s) makes a swing sound.</summary>
+        const float SwingSoundSpeed = 3.5f;
+
         void CutWithBlade(int hand, Vector3 hilt, Vector3 tip, float dt)
         {
             bool was = bladeWasOut[hand];
             Vector3 oldHilt = was ? lastHilt[hand] : hilt, oldTip = was ? lastTip[hand] : tip;
             float tipSpeed = was && dt > 0f ? Vector3.Distance(tip, oldTip) / dt : 0f;
+            // The blade igniting, and a whoosh when it's swung fast (11/17).
+            if (!was)
+                game.PlayLaserIgnite(hilt);
+            else if (tipSpeed > SwingSoundSpeed && Time.time >= nextSwingSound[hand])
+            {
+                nextSwingSound[hand] = Time.time + 0.3f;
+                game.PlayAt(tip, game.WhooshSound);
+            }
             lastHilt[hand] = hilt;
             lastTip[hand] = tip;
             bladeWasOut[hand] = true;
@@ -312,6 +336,9 @@ namespace Repulsor
             }
             // The longbow in the front fist, its string to the drawing hand.
             archerGear.Bow(Tier >= 2 && bow.Formed, bow.BowPosition, bow.StringPosition, bow.Direction, bow.Draw, AttackColor);
+            if (bowLoop == null)
+                bowLoop = LoopSound.Create("Bow Draw", StrainSfx);
+            bowLoop.Set(bow.StringPosition, Tier >= 2 && bow.Formed && bow.Draw > 0.03f ? bow.Draw : 0f, 0.7f, 1.4f, 0.6f);
             if (bow.Formed)
             {
                 // Where the arrow will go.
@@ -334,6 +361,7 @@ namespace Repulsor
                         bool poison = !Pvp;
                         SmokeCloud.Throw(from2, velocity, foes, poison, poison ? game : null,
                             poison ? player.Outgoing(Balance.PoisonPerSecond) : 0f);
+                        game.PlayAt(from2, game.WhooshSound);
                         SendEffect(NetEffect.Smoke, from2, velocity.normalized, velocity.magnitude, default, poison ? 1 : 0);
                         Log(poison ? "Poison bomb" : "Smoke bomb");
                     }

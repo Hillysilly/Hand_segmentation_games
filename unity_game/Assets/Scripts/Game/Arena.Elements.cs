@@ -70,6 +70,8 @@ namespace Repulsor
             stuckRocks.RemoveAll(rock => rock == null);
         }
 
+        LoopSound windLoop, crackleLoop;
+
         void TickElementalist(float dt)
         {
             // Level 3 tornado: circling hands charge it, a two-handed push throws it.
@@ -86,6 +88,10 @@ namespace Repulsor
                 }
                 charging = swirl.Charging;
                 ShowTornadoCharge(charging ? swirl.Charge : 0f);
+                // Wind gathering as the hands circle (11/17).
+                if (windLoop == null)
+                    windLoop = LoopSound.Create("Tornado Charge", Sfx.Wind());
+                windLoop.Set(swirl.Center, charging ? Mathf.Max(0.1f, swirl.Charge) : 0f, 0.7f, 1.3f, 0.7f);
             }
 
             // Level 2 lightning: both hands out flat. Five seconds at most, then it needs a rest.
@@ -117,6 +123,10 @@ namespace Repulsor
                 if (lightningCooldown <= 0f && lightningLeft <= 0f)
                     lightningLeft = LightningSeconds;
             }
+            // Crackling while the lightning runs (it had one zap at the start, 11/17).
+            if (crackleLoop == null)
+                crackleLoop = LoopSound.Create("Lightning", Sfx.Crackle());
+            crackleLoop.Set(head.position + body.Forward * 0.45f + Vector3.down * 0.25f, zap ? 1f : 0f, 1f, 1f, 0.8f);
             if (zap != lightningOn)
             {
                 lightningOn = zap;

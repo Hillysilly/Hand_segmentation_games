@@ -340,10 +340,17 @@ namespace Repulsor
             return true;
         }
 
+        LoopSound chargeHum;
+        static AudioClip chargeClip;
+
         void UpdateChargeVisuals(Vector3 muzzle, Vector3 direction)
         {
             float charge = repulsor.Charge;
             bool charging = charge > 0.01f;
+            // Energy gathering in the hand: a whine that climbs as the charge grows (11/17).
+            if (chargeHum == null)
+                chargeHum = LoopSound.Create("Hand Charge", chargeClip != null ? chargeClip : chargeClip = Sfx.Charge());
+            chargeHum.Set(muzzle, charging ? charge : 0f, 0.8f, 1.9f, 0.55f);
 
             chargeOrb.gameObject.SetActive(charging);
             if (charging)

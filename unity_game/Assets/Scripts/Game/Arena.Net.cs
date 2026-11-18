@@ -4,7 +4,7 @@ using UnityEngine.UI;
 namespace Repulsor
 {
     /// <summary>
-    /// Two players on one Wi-Fi network. The host creates a room and shows its code, and the other player
+    /// Two players on one Wi-Fi network. The host creates a room and shows its IP address, and the other player
     /// types it in. Both then touch the same two real points to line up their headsets, pick characters and
     /// ready up; the host starts the match.
     ///
@@ -460,7 +460,7 @@ namespace Repulsor
                 mode = roomMode;
                 bool ok = net.Host();
                 net.Mode = (byte)mode;
-                Log($"Hosting: {net.Status}, code {net.RoomCode}");
+                Log($"Hosting: {net.Status}, address {NetSession.LocalAddress()}");
                 phase = Phase.Lobby;
                 if (!ok)
                     hud.Message("NO NETWORK", net.Status, 3f);
@@ -468,6 +468,7 @@ namespace Repulsor
             }, 20);
             Ui.Button(s, "JOIN ROOM", new Vector2(0f, -22f), new Vector2(260f, 48f), () =>
             {
+                // Empty: the two headsets can be on different parts of one network (10.201.x and 10.202.x).
                 joinCode = "";
                 ShowJoin();
             }, 20);
@@ -478,16 +479,16 @@ namespace Repulsor
         const string LastHostKey = "LastHostAddress";
 
         /// <summary>
-        /// The join keypad: the host's IP address (shown on its room screen) or its 4-digit room code. The code only
-        /// works when both headsets' addresses share their first three numbers; the address always works on one network.
+        /// The join keypad: the host's whole IP address, shown on its room screen (11/17: IP only; the room code is
+        /// gone). Nothing is filled in: the headsets' addresses needn't start the same.
         /// </summary>
         void ShowJoin()
         {
             phase = Phase.Modes;
             RectTransform s = OpenScreen(new Vector2(330f, 440f), "JOIN A ROOM");
-            Ui.Label(s, "Type the host's IP address (on its screen), or its room code.", new Vector2(0f, 168f), new Vector2(310f, 30f), 12,
+            Ui.Label(s, "Type the host's IP address (shown on the host's screen).", new Vector2(0f, 168f), new Vector2(310f, 30f), 12,
                 TextAnchor.MiddleCenter).color = Ui.Muted;
-            Text display = Ui.Label(s, joinCode.Length > 0 ? joinCode : "_ _ _ _", new Vector2(0f, 128f), new Vector2(310f, 40f),
+            Text display = Ui.Label(s, joinCode.Length > 0 ? joinCode : "_._._._", new Vector2(0f, 128f), new Vector2(310f, 40f),
                 joinCode.Length > 8 ? 26 : 34, TextAnchor.MiddleCenter, FontStyle.Bold);
             display.color = Ui.Accent;
             string[] keys = { "1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "DEL" };
@@ -517,25 +518,18 @@ namespace Repulsor
 
         void TryJoin()
         {
-            bool joined;
-            if (joinCode.Contains("."))
+            if (!NetProtocol.TryParseAddress(joinCode, out System.Net.IPAddress host))
             {
-                if (!NetProtocol.TryParseAddress(joinCode, out System.Net.IPAddress host))
-                {
-                    hud.Message("CAN'T JOIN", "That address isn't right (four numbers with dots)", 2.5f);
-                    ShowJoin();
-                    return;
-                }
-                joined = net.Join(-1, NetProtocol.Port, host);
-                if (joined)
-                    PlayerPrefs.SetString(LastHostKey, joinCode);
+                hud.Message("CAN'T JOIN", "Type the host's IP address: four numbers with dots", 2.5f);
+                ShowJoin();
+                return;
             }
+            bool joined = net.Join(-1, NetProtocol.Port, host);
+            if (joined)
+                PlayerPrefs.SetString(LastHostKey, joinCode);
             else
-                joined = int.TryParse(joinCode, out int code) && net.Join(code);
-            if (!joined)
-                hud.Message("CAN'T JOIN", net.Status ?? "That code isn't right", 2.5f);
-            if (!joined)
             {
+                hud.Message("CAN'T JOIN", net.Status ?? "Couldn't reach that address", 2.5f);
                 ShowJoin();
                 return;
             }
@@ -551,13 +545,13 @@ namespace Repulsor
             RectTransform s = OpenScreen(new Vector2(400f, 320f), net.Role == NetRole.Host ? "YOUR ROOM" : "JOINING");
             if (net.Role == NetRole.Host)
             {
-                // The address is what always works; the code is a shortcut on small (home) networks.
+                // Player 2 types this address (11/17: IP only).
                 System.Net.IPAddress local = NetSession.LocalAddress();
                 Ui.Label(s, "YOUR IP ADDRESS", new Vector2(0f, 112f), new Vector2(360f, 18f), 13).color = Ui.Muted;
                 Ui.Label(s, local != null ? local.ToString() : "no Wi-Fi", new Vector2(0f, 84f), new Vector2(380f, 40f), 34,
                     TextAnchor.MiddleCenter, FontStyle.Bold).color = Ui.Accent;
-                Ui.Label(s, "or room code  " + (net.RoomCode >= 0 ? net.RoomCode.ToString("0000") : "----"), new Vector2(0f, 52f),
-                    new Vector2(360f, 20f), 15, TextAnchor.MiddleCenter).color = Ui.Muted;
+                Ui.Label(s, "Player 2: JOIN ROOM and type this address", new Vector2(0f, 52f),
+                    new Vector2(360f, 20f), 13, TextAnchor.MiddleCenter).color = Ui.Muted;
             }
             lobbyStatus = Ui.Label(s, net.Status, new Vector2(0f, 18f), new Vector2(360f, 22f), 15);
             if (net.Connected)

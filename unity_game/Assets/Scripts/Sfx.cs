@@ -105,6 +105,55 @@ namespace Repulsor
             return (Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(140f, 60f, u) * t) * 0.6f + noise * 0.3f) * (1f - u);
         });
 
+        // ---- 11/17: sounds for the moves that had none. Loops use whole cycles only, so they don't click.
+
+        /// <summary>A bright humming whine for energy gathering in a hand (played higher as the charge grows).</summary>
+        public static AudioClip Charge() => Render("charge", 1f, (t, u, rng) =>
+        {
+            float shimmer = 0.75f + 0.25f * Mathf.Sin(2f * Mathf.PI * 14f * t);
+            float tone = Mathf.Sin(2f * Mathf.PI * 220f * t)
+                + 0.6f * Mathf.Sin(2f * Mathf.PI * 330f * t)
+                + 0.35f * Mathf.Sin(2f * Mathf.PI * 441f * t)
+                + 0.2f * Mathf.Sin(2f * Mathf.PI * 662f * t);
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0) * 0.06f;
+            return (tone * 0.16f + noise) * shimmer;
+        });
+
+        /// <summary>A creaking strain for a bowstring being pulled back.</summary>
+        public static AudioClip Strain() => Render("strain", 1f, (t, u, rng) =>
+        {
+            float grain = 0.6f + 0.4f * Mathf.Sin(2f * Mathf.PI * 31f * t);
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+            float tone = Mathf.Sin(2f * Mathf.PI * 140f * t) + 0.4f * Mathf.Sin(2f * Mathf.PI * 283f * t);
+            return (noise * 0.08f + tone * 0.12f) * grain;
+        });
+
+        /// <summary>Rushing air that swells and falls: wind gathering into a tornado.</summary>
+        public static AudioClip Wind() => Render("wind", 2f, (t, u, rng) =>
+        {
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+            float swell = 0.6f + 0.4f * Mathf.Sin(2f * Mathf.PI * 1f * t);
+            float howl = Mathf.Sin(2f * Mathf.PI * 180f * t + 2f * Mathf.Sin(2f * Mathf.PI * 2f * t));
+            return (noise * 0.22f + howl * 0.05f) * swell;
+        });
+
+        /// <summary>Electric crackle: sharp sparks over a hiss, for lightning from the hands.</summary>
+        public static AudioClip Crackle() => Render("crackle", 1f, (t, u, rng) =>
+        {
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+            float spark = rng.NextDouble() < 0.004 ? (float)(rng.NextDouble() * 2.0 - 1.0) * 0.9f : 0f;
+            float buzz = Mathf.Sin(2f * Mathf.PI * 120f * t) * 0.08f;
+            return noise * 0.1f + spark + buzz;
+        });
+
+        /// <summary>A soft burst: a smoke or poison bomb popping open.</summary>
+        public static AudioClip Puff() => Render("puff", 0.6f, (t, u, rng) =>
+        {
+            float noise = (float)(rng.NextDouble() * 2.0 - 1.0) * Mathf.Pow(1f - u, 2f);
+            float thump = Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(110f, 60f, u) * t) * Mathf.Pow(1f - u, 3f);
+            return (noise * 0.4f + thump * 0.5f) * Mathf.Min(1f, u * 40f);
+        });
+
         delegate float Wave(float seconds, float progress, System.Random rng);
 
         static AudioClip Render(string name, float seconds, Wave wave)

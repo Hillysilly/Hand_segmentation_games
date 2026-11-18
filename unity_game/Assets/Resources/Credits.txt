@@ -1,4 +1,4 @@
-Repulsor uses these assets. Thank you to their makers.
+Tin Can Takedown uses these assets. Thank you to their makers.
 
 pose_detection.onnx, pose_anchors.csv
   BlazePose detector by Google Research (MediaPipe), under the Apache License 2.0,
@@ -44,8 +44,8 @@ Assets/Characters/Mannequin (the character select mannequin and its animations)
 
 Assets/Resources/Icons (character select symbols)
   Icons by Lorc, from game-icons.net, CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/).
-  laser-blast (Technoman), punch-blast (Ryuu), fireball (Emberwitch), energy-sword (Lumen), high-shot (Valkyr),
-  spider-web (Webline), tornado (Tempest), earth-spit (Terra). Recoloured white; tinted in the game.
+  laser-blast (Techno), punch-blast (Brawler), fireball (Emberwitch), energy-sword (Lumen), high-shot (Valkyr),
+  spider-web (Spider Boy), tornado (Tempest), earth-spit (Terra). Recoloured white; tinted in the game.
   https://game-icons.net
 
 Assets/Props/Web (Cobweb.glb: the Spider's web shots and splats)
@@ -61,3 +61,11 @@ Assets/Props/Tornado2 (Tempest's tornado)
   The author asks for credit to STICK O' MEDIA Entertainment (youtube.com/@STICKOMEDIA).
   Its cloud deck and floor swirls are left out; drawn see-through.
   https://sketchfab.com/models/dbc7e7176ce9435d9f04f2c88257fff6
+
+Assets/Resources/Music (the soundtrack), from Pixabay, under the Pixabay Content License
+(https://pixabay.com/service/license-summary/):
+  Menu.mp3: "Retro Arcade Game Music" by Monume (pixabay 629809)
+  Gameplay.mp3: "8-bit Retro" by Monume (pixabay 629800)
+  Boss.mp3: "Boss Fight One" by BouncyRunner (pixabay 400508)
+  FinalBoss.mp3: "The Final Boss Battle" by alperomeresin (pixabay 158700)
+  Pvp.mp3: "Chiptune Medium Boss" by NickPanek (pixabay 218095)

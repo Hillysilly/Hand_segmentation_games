@@ -72,6 +72,7 @@ namespace Repulsor
 
             hud = new PlayerHud(transform, head);
             hud.Visible = false;
+            music = MusicPlayer.Create(transform);
             // Your own shield isn't hidden by live depth: your crossed arms are always in front of it.
             shield = new ShieldView(transform) { Occlude = false };
             death = new DeathView(eye);
@@ -185,7 +186,32 @@ namespace Repulsor
             LogPerformance(dt);
             TickHandAura();
             TickShowcase(Time.unscaledDeltaTime);
+            music?.Play(WantedMusic(), paused);
         }
+
+        MusicPlayer music;
+
+        /// <summary>
+        /// The soundtrack for where you are: the menus (title, modes, character select, results); fighting the
+        /// robots; TRILOBITE's round; GOLIATH's round; a PVP match. Paused, it carries on quieter.
+        /// </summary>
+        MusicTrack WantedMusic()
+        {
+            if (phase != Phase.Playing)
+                return MusicTrack.Menu;
+            if (Pvp)
+                return MusicTrack.Pvp;
+            if (boss != null && boss.Alive)
+                return boss.Kind == EnemyKind.Mech ? MusicTrack.FinalBoss : MusicTrack.Boss;
+            if (waves != null && waves.BossWave && waves.State == WaveState.Fighting)
+                return waves.Boss == EnemyKind.Mech ? MusicTrack.FinalBoss : MusicTrack.Boss;
+            return MusicTrack.Gameplay;
+        }
+
+#if UNITY_EDITOR
+        /// <summary>For tests: the track playing now.</summary>
+        public MusicTrack TestMusic => music != null ? music.Playing : MusicTrack.None;
+#endif
 
         readonly GameObject[] fistGlow = new GameObject[2];
 

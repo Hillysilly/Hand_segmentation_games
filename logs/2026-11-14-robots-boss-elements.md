@@ -453,3 +453,27 @@ EditMode 175/175, PlayMode 23/23. Installed.
   - A fist closed on nothing cancels the force, so it lights the sword as usual.
   - `ForceGrabDetector` was rewritten (0.7 s window from cup to fist; a loose fist counts).
   - Tests: `CupAimsAFistGrabsAndAFastSwingThrows`, `AFistWithoutACupFirstIsNotAForceGrab`, `OpeningTheHandLetsGo`; the PlayMode crush check became a force-hold check.
+
+### 11/17: soundtrack
+- **Tracks:** `Resources/Music` holds Menu (Monume "Retro Arcade Game Music": title, modes, character select, results), Gameplay (Monume "8-bit Retro": the robot rounds and PVP), Boss (BouncyRunner "Boss Fight One": TRILOBITE) and FinalBoss (alperomeresin "The Final Boss Battle": GOLIATH).
+- **Source:** Pixabay downloads from the user, credited in `Credits.txt` under the Pixabay Content License.
+- **Player:** `MusicPlayer` (2D, volume 0.35, 1.5 s crossfade, quieter while paused) is chosen by `Arena.WantedMusic`. `Editor/MusicImport` streams the tracks (Vorbis, no preload).
+- **Test:** `TheMusicFollowsTheGame`.
+- Not yet tested or built.
+- **MUSIC volume bar:** a row with −/+ buttons, a bar and a percentage, on the title and pause screens (`Arena.MusicVolumeRow`). Steps of 10%, default 40%, saved in PlayerPrefs `music.volume` (`MusicPlayer.Volume`). Separate from the pause screen's overall VOLUME. Not yet built.
+- **PVP music:** `Resources/Music/Pvp.mp3` (NickPanek "Chiptune Medium Boss", Pixabay 218095, credited) plays in PVP matches (`MusicTrack.Pvp`). Not yet built.
+- **GOLIATH music intro shortened:** `MusicPlayer.CueOf(FinalBoss)` starts at 0:35 (the intense part is at 0:40, by `Editor/MusicAnalysis` → `Logs/music_energy.txt`) and loops 3:54 → 0:40. The file is unchanged. Not yet built.
+  - Changed to start at 0:25 (a 15 s intro), as the user asked.
+
+### 11/17: sounds for silent moves
+- **New sounds:** `Sfx.Charge`, `Strain`, `Wind`, `Crackle` and `Puff` (synthesized), plus `LoopSound`: a looping source whose pitch and volume follow an amount, that stops itself if not set for a frame.
+- **Techno and every hand charge (fist then snap):** a whine climbing with the charge (`HandRepulsor.chargeHum`).
+- **Brawler:** a deeper whine while the ki ball charges; a whoosh on the dragon fist.
+- **Lumen:** ignite when the blade comes out; a whoosh when the tip passes 3.5 m/s (at most every 0.3 s).
+- **Valkyr:** a bowstring strain rising with the draw; a whoosh on the bomb throw and a puff when it bursts.
+- **Tempest:** wind while the tornado charges; crackle while lightning runs.
+- **Test:** `SoundTests` (they render, aren't silent, don't clip).
+- Not yet built.
+- **Boss music louder:** `MusicPlayer.BossBoost` 1.5x for Boss/FinalBoss (the tracks already measure 0.163/0.169 RMS against gameplay's 0.136; about 1.8x overall), capped at full volume. Not yet built.
+- **11/17: multiplayer joins by IP only.** The room code was removed from the host screen and the join keypad, which starts with this headset's own network prefix (`NetworkPrefix`). Built and installed on …C5ZG8V05SS; tests not rerun (user's request).
+  - The prefill was removed: the user's headsets are on 10.201.x and 10.202.x, so the keypad starts empty. Built and installed on …C1ZF7K09VL.
